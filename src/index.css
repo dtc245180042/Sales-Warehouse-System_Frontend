@@ -16,3 +16,166 @@ body,
   overflow-x: hidden;
   /* Ngăn xuất hiện thanh cuộn ngang */
 }
+@media (max-width: 768px) {
+  .omsContainer {
+    width: 100% !important;
+    flex-direction: column;
+  }
+
+  .omsSidebar {
+    width: 100% !important;
+    gap: 12px;
+    padding: 12px !important;
+  }
+
+  .omsSidebar > div:first-child,
+  .omsMainArea {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .omsMainArea,
+  .omsContentBody {
+    max-width: 100%;
+  }
+
+  .omsSidebarHeader {
+    margin-bottom: 8px !important;
+  }
+
+  .omsNavList {
+    flex-direction: row !important;
+    max-width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    padding-bottom: 4px;
+    scrollbar-width: thin;
+  }
+
+  .omsNavList > div {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+
+  .omsSidebarFooter {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding-top: 10px !important;
+  }
+
+  .omsLogoutBtn {
+    width: auto !important;
+    margin-top: 0 !important;
+  }
+
+  .omsHeader {
+    height: auto !important;
+    min-height: 60px;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 10px 16px !important;
+  }
+
+  .omsHeaderBrand,
+  .omsHeaderActions {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .omsHeaderBrand > div {
+    min-width: 0;
+  }
+
+  .omsHeaderActions {
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px !important;
+  }
+
+  .omsBanner {
+    gap: 12px !important;
+    width: calc(100% - 32px);
+    margin: 12px auto 0 !important;
+    padding: 16px !important;
+  }
+
+  .omsContentBody {
+    width: 100%;
+    padding: 16px !important;
+  }
+
+  .omsContentBody > * {
+    min-width: 0;
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .omsSidebar {
+    padding: 10px !important;
+  }
+
+  .omsHeader {
+    padding: 10px 12px !important;
+  }
+
+  .omsHeaderActions {
+    align-items: stretch !important;
+    flex-direction: column;
+  }
+
+  .omsRoleSelectWrapper,
+  .omsUserAvatarPill {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .omsRoleSelectWrapper {
+    justify-content: space-between;
+    gap: 6px !important;
+    padding: 4px 8px !important;
+  }
+
+  .omsRoleSelectWrapper select {
+    flex: 1 1 0;
+    width: 0;
+    min-width: 0;
+    max-width: 100%;
+    text-overflow: ellipsis;
+  }
+
+  .omsUserAvatarPill {
+    padding: 6px 8px !important;
+  }
+
+  .userInformation {
+    max-width: 220px !important;
+  }
+
+  .omsBanner {
+    min-width: 0;
+    width: calc(100% - 24px);
+    margin: 10px auto 0 !important;
+    padding: 14px !important;
+  }
+
+  .omsBanner > div:first-child {
+    min-width: 0;
+    flex: 1 1 100%;
+  }
+
+  .omsBanner h2,
+  .omsBanner p {
+    overflow-wrap: anywhere;
+  }
+
+  .omsContentBody {
+    padding: 12px !important;
+  }
+
+  .omsTabRow {
+    overflow-x: auto;
+  }
+}

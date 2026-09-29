@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import UserInformation from './components/UserInformation.jsx';
 
 // =========================================================================
 // 1. LOGO KHO HÀNG DẠNG SVG HOÀN HOẢN (KHÔNG LO BỊ LỖI ĐƯỜNG DẪN ẢNH)
@@ -41,10 +42,14 @@ const MOCK_ACCOUNTS = [
   { fullName: 'Công ty TNHH Thương mại Tuấn Phương (Đại lý cấp 1)', username: 'customer', password: 'customer123', email: 'tuanphuong@daily.vn', phone: '0933445566', role: 'customer', createdAt: '20/03/2026' }
 ];
 
+const MOCK_WORKPLACES = {
+  admin: 'Văn phòng quản trị',
+  staff: 'Kho Thái Nguyên',
+  customer: 'Đại lý Tuấn Phương',
+};
+
 function App({
   orderHistory = [],
-  staffPendingOrders = [],
-  adminStats = { totalAgencies: 0, totalOrders: 0, monthlyRevenue: 0, pendingLimitRequests: 0 },
   onLoginSubmit = (data) => console.log('[Backend API] Login:', data),
   onRegisterSubmit = (data) => console.log('[Backend API] Register:', data),
   onChangePassSubmit = (data) => console.log('[Backend API] Change Pass:', data),
@@ -118,7 +123,7 @@ function App({
             type: 'warning',
             badgeText: 'TRẠNG THÁI: PHIÊN ĐĂNG NHẬP HẾT HẠN (401)',
             primaryBtnText: '🔐 Đăng Nhập Lại Ngay',
-            onPrimaryAction: () => setPopup({ ...popup, show: false })
+            onPrimaryAction: () => setPopup((previousPopup) => ({ ...previousPopup, show: false }))
           });
         }
       };
@@ -299,7 +304,7 @@ function App({
     }
   };
 
-  const NotificationModal = () => {
+  const renderNotificationModal = () => {
     if (!popup.show) return null;
 
     const isSuccess = popup.type === 'success';
@@ -382,11 +387,11 @@ function App({
     const roleActive = user?.role || currentRole;
 
     return (
-      <div style={styles.omsContainer}>
-        <aside style={styles.omsSidebar}>
+      <div className="omsContainer" style={styles.omsContainer}>
+        <aside className="omsSidebar" style={styles.omsSidebar}>
           <div>
-            <div style={styles.omsSidebarHeader}>PHÂN HỆ {roleActive.toUpperCase()}</div>
-            <div style={styles.omsNavList}>
+            <div className="omsSidebarHeader" style={styles.omsSidebarHeader}>PHÂN HỆ {roleActive.toUpperCase()}</div>
+            <div className="omsNavList" style={styles.omsNavList}>
               {roleActive === 'customer' && (
                 <>
                   <div
@@ -467,13 +472,14 @@ function App({
             </div>
           </div>
 
-          <div style={styles.omsSidebarFooter}>
+          <div className="omsSidebarFooter" style={styles.omsSidebarFooter}>
             <div style={{ fontSize: '11px', color: '#94a3b8' }}>
               Vai trò: <strong style={{ color: '#fff' }}>{roleActive.toUpperCase()}</strong>
             </div>
             <button
               type="button"
               onClick={handleLogout}
+              className="omsLogoutBtn"
               style={{
                 ...styles.omsLogoutBtn,
                 ...(hoveredBlock === 'sidebar-logout' ? styles.elevatedBtnDarkRed : {}),
@@ -486,9 +492,9 @@ function App({
           </div>
         </aside>
 
-        <div style={styles.omsMainArea}>
-          <header style={styles.omsHeader}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div className="omsMainArea" style={styles.omsMainArea}>
+          <header className="omsHeader" style={styles.omsHeader}>
+            <div className="omsHeaderBrand" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <SalesWarehouseLogo />
               <div>
                 <h3 style={{ margin: 0, fontSize: '16px', color: '#0f172a', fontWeight: '800' }}>OMS Pro</h3>
@@ -496,12 +502,13 @@ function App({
               </div>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-              <div style={styles.omsRoleSelectWrapper}>
+            <div className="omsHeaderActions" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <div className="omsRoleSelectWrapper" style={styles.omsRoleSelectWrapper}>
                 <span style={{ fontSize: '12px', color: '#64748b' }}>🔍 Xem Giao Diện:</span>
                 <select
                   value={roleActive}
                   onChange={(e) => handleRoleChange(e.target.value)}
+                  className="omsRoleSelect"
                   style={styles.omsRoleSelect}
                 >
                   <option value="customer">Đại lý (Customer)</option>
@@ -511,6 +518,7 @@ function App({
               </div>
 
               <div
+                className="omsUserAvatarPill"
                 onClick={() => setScreen('profile')}
                 style={{
                   ...styles.omsUserAvatarPill,
@@ -521,15 +529,16 @@ function App({
                 title="Xem Hồ sơ cá nhân"
               >
                 <div style={styles.omsAvatarIcon}>{(user?.username || roleActive).charAt(0).toUpperCase()}</div>
-                <div>
-                  <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#1e293b' }}>{user?.fullName || 'Demo Account'}</div>
-                  <div style={{ fontSize: '10px', color: '#64748b' }}>{roleActive}</div>
-                </div>
+                <UserInformation
+                  user={user ? { ...user, workplace: user.workplace || MOCK_WORKPLACES[roleActive] } : null}
+                  role={roleActive}
+                />
               </div>
             </div>
           </header>
 
           <div
+            className="omsBanner"
             style={{
               ...styles.omsBanner,
               ...(hoveredBlock === 'oms-banner' ? styles.elevatedCard : {}),
@@ -574,7 +583,7 @@ function App({
             </div>
           </div>
 
-          <main style={styles.omsContentBody}>{children}</main>
+          <main className="omsContentBody" style={styles.omsContentBody}>{children}</main>
         </div>
       </div>
     );
@@ -588,7 +597,7 @@ function App({
         <OMSDashboardLayout>
           {roleActive === 'customer' && (
             <>
-              <div style={styles.omsTabRow}>
+              <div className="omsTabRow" style={styles.omsTabRow}>
                 <button type="button" onClick={() => setActiveTab('main')} style={{ ...styles.omsTabBtn, ...(activeTab === 'main' ? styles.omsTabBtnActive : {}) }}>🛒 Đặt hàng trực tuyến</button>
                 <button type="button" onClick={() => setActiveTab('history')} style={{ ...styles.omsTabBtn, ...(activeTab === 'history' ? styles.omsTabBtnActive : {}) }}>📜 Lịch sử đơn hàng của tôi ({orderHistory.length})</button>
               </div>
@@ -1086,7 +1095,7 @@ function App({
 
   return (
     <>
-      <NotificationModal />
+      {renderNotificationModal()}
       {renderMainContent()}
     </>
   );
