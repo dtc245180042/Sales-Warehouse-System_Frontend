@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { AuthProvider } from './context';
 import Navbar from './components/Navbar';
 import Scrum300Demo from './pages/Scrum300Demo';
@@ -34,8 +34,6 @@ const MOCK_FINANCIAL_MARGINS = [
 
 function App({
   orderHistory = [],
-  staffPendingOrders = [],
-  adminStats = { totalAgencies: 0, totalOrders: 0, monthlyRevenue: 0, pendingLimitRequests: 0 },
   onLoginSubmit = (data) => console.log('[Backend API] Login:', data),
   onRegisterSubmit = (data) => console.log('[Backend API] Register:', data),
   onChangePassSubmit = (data) => console.log('[Backend API] Change Pass:', data),
@@ -312,8 +310,8 @@ function App({
   };
 
 
-  // COMPONENT POP-UP MODAL HIỂN THỊ TOÀN CỤC
-  const NotificationModal = () => {
+  // HÀM RENDER POP-UP MODAL HIỂN THỊ TOÀN CỤC
+  const renderNotificationModal = () => {
     if (!popup.show) return null;
 
     const isSuccess = popup.type === 'success';
@@ -353,24 +351,8 @@ function App({
     );
   };
 
-  const TogglePassBtn = ({ isVisible, onToggle }) => (
-    <button type="button" onClick={onToggle} style={styles.eyeBtn} title={isVisible ? "Ẩn mật khẩu" : "Hiện mật khẩu"}>
-      {isVisible ? (
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1E2A78" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-          <circle cx="12" cy="12" r="3"></circle>
-        </svg>
-      ) : (
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
-          <line x1="1" y1="1" x2="23" y2="23"></line>
-        </svg>
-      )}
-    </button>
-  );
-
   // LAYOUT DASHBOARD OMS PRO
-  const OMSDashboardLayout = ({ children }) => {
+  const renderOMSDashboardLayout = (children) => {
     const roleActive = user?.role || currentRole;
 
     return (
@@ -645,8 +627,8 @@ function App({
     if (screen === 'dashboard') {
       const roleActive = user?.role || currentRole;
 
-      return (
-        <OMSDashboardLayout>
+      return renderOMSDashboardLayout(
+        <>
           {roleActive === 'customer' && (
             <>
               <div style={styles.omsTabRow}>
@@ -955,7 +937,7 @@ function App({
               </div>
             </div>
           )}
-        </OMSDashboardLayout>
+        </>
       );
     }
 
@@ -1485,7 +1467,7 @@ function App({
         </div>
       ) : (
         <>
-          <NotificationModal />
+          {renderNotificationModal()}
           {renderMainContent()}
         </>
       )}
@@ -1621,5 +1603,21 @@ const styles = {
   elevatedBtnPill: { transform: 'translateY(-4px)', backgroundColor: '#0f1a3a', boxShadow: '0 10px 20px rgba(0, 0, 0, 0.4)' },
   elevatedText: { transform: 'translateY(-2px)', color: '#ffffff', textShadow: '0 2px 8px rgba(0, 0, 0, 0.5)' },
 };
+
+const TogglePassBtn = ({ isVisible, onToggle }) => (
+  <button type="button" onClick={onToggle} style={styles.eyeBtn} title={isVisible ? "Ẩn mật khẩu" : "Hiện mật khẩu"}>
+    {isVisible ? (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1E2A78" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+        <circle cx="12" cy="12" r="3"></circle>
+      </svg>
+    ) : (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+        <line x1="1" y1="1" x2="23" y2="23"></line>
+      </svg>
+    )}
+  </button>
+);
 
 export default App;
