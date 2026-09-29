@@ -1,0 +1,417 @@
+/* ==========================================================================
+   SCRUM-303: Tối ưu giao diện điều hướng và thông tin người dùng cho 360px
+   Tương thích hoàn hảo: 360px, 375px, 390px, 414px, Tablet và Desktop
+   ========================================================================== */
+
+/* 1. Reset & Global Box Sizing */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+/* 2. Drawer Navigation & Backdrop (Mobile-First / Responsive) */
+.oms-backdrop {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .oms-backdrop {
+    display: block;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: rgba(11, 19, 43, 0.65);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    z-index: 998;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .oms-backdrop.open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .oms-sidebar-drawer {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    bottom: 0 !important;
+    width: 290px !important;
+    max-width: calc(100vw - 44px) !important;
+    height: 100vh !important;
+    height: 100dvh !important;
+    z-index: 999 !important;
+    transform: translateX(-100%);
+    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s ease !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
+    box-shadow: none;
+  }
+
+  .oms-sidebar-drawer.open {
+    transform: translateX(0) !important;
+    box-shadow: 6px 0 28px rgba(0, 0, 0, 0.45) !important;
+  }
+}
+
+@media (min-width: 769px) {
+  .oms-sidebar-drawer {
+    position: static !important;
+    transform: none !important;
+    box-shadow: 4px 0 20px rgba(0, 0, 0, 0.25) !important;
+  }
+
+  .oms-drawer-close-btn {
+    display: none !important;
+  }
+
+  .oms-hamburger-btn {
+    display: none !important;
+  }
+}
+
+/* 3. Touch UX & Interaction Targets (Chuẩn tối thiểu 44x44px) */
+.oms-hamburger-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  background-color: #f8fafc;
+  color: #0f172a;
+  cursor: pointer;
+  padding: 0;
+  margin-right: 8px;
+  flex-shrink: 0;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition: all 0.2s ease;
+}
+
+.oms-hamburger-btn:hover {
+  background-color: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+.oms-hamburger-btn:active {
+  transform: scale(0.95);
+  background-color: #e2e8f0;
+}
+
+.oms-drawer-close-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+  cursor: pointer;
+  padding: 0;
+  font-size: 18px;
+  font-weight: bold;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition: all 0.2s ease;
+}
+
+.oms-drawer-close-btn:hover {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.oms-drawer-close-btn:active {
+  transform: scale(0.94);
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* 4. Drawer Header (chứa title & nút đóng) */
+.oms-drawer-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  padding: 4px 6px;
+}
+
+/* 5. Vùng Thông Tin Người Dùng (User Information Component) */
+.oms-user-card-drawer {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  padding: 12px;
+  margin-bottom: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.oms-user-card-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.oms-user-card-avatar {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  min-height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.4);
+  flex-shrink: 0;
+}
+
+.oms-user-card-details {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.oms-user-name {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #ffffff;
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.oms-user-role-badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  color: #93c5fd;
+  background: rgba(59, 130, 246, 0.2);
+  border: 1px solid rgba(96, 165, 250, 0.3);
+  padding: 2px 8px;
+  border-radius: 6px;
+  margin-top: 3px;
+  align-self: flex-start;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.oms-user-workplace {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: #cbd5e1;
+  background: rgba(15, 23, 42, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 6px 10px;
+  border-radius: 8px;
+  min-width: 0;
+}
+
+.oms-user-workplace-text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  line-height: 1.2;
+}
+
+/* 6. Navigation Items Touch Target */
+.oms-nav-item-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  min-height: 44px;
+  border-radius: 10px;
+  font-size: 13px;
+  color: #cbd5e1;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  border: 1px solid transparent;
+}
+
+.oms-nav-item-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #ffffff;
+}
+
+.oms-nav-item-btn:active {
+  transform: scale(0.98);
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.oms-nav-item-btn.active {
+  background: #2563eb !important;
+  color: #ffffff !important;
+  font-weight: 700;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.4);
+}
+
+.oms-nav-item-text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+}
+
+/* 7. Header User Pill */
+.oms-header-user-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 4px 10px 4px 4px;
+  border-radius: 24px;
+  background-color: #ffffff;
+  border: 1px solid #cbd5e1;
+  transition: all 0.25s ease;
+  min-height: 40px;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  flex-shrink: 0;
+  max-width: 170px;
+}
+
+.oms-header-user-pill:hover {
+  border-color: #94a3b8;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.oms-header-user-pill:active {
+  transform: scale(0.97);
+}
+
+.oms-header-user-name {
+  font-size: 12px;
+  font-weight: 700;
+  color: #1e293b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100px;
+  line-height: 1.2;
+}
+
+.oms-header-user-sub {
+  font-size: 10px;
+  color: #64748b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100px;
+}
+
+/* 8. Responsive Breakpoints - Tối ưu đặc biệt cho 360px */
+@media (max-width: 480px) {
+  /* Tối ưu Header cho 360px - 414px */
+  .oms-header-container {
+    height: 56px !important;
+    padding: 0 10px !important;
+    gap: 6px !important;
+  }
+
+  .oms-header-brand-title {
+    font-size: 14px !important;
+  }
+
+  .oms-header-brand-sub {
+    display: none !important; /* Ẩn subtitle trên 360px để không chèn ép các nút */
+  }
+
+  .oms-role-select-box {
+    display: none !important; /* Đã chuyển bộ chọn Role vào trong Drawer Menu trên mobile */
+  }
+
+  .oms-header-user-pill {
+    padding: 3px 8px 3px 3px !important;
+    max-width: 140px !important;
+  }
+
+  .oms-header-user-name {
+    max-width: 80px !important;
+    font-size: 11.5px !important;
+  }
+
+  .oms-header-user-sub {
+    display: none !important; /* Rút gọn trên 360px để avatar pill vừa vặn */
+  }
+
+  /* Tối ưu Banner cho 360px */
+  .oms-banner-container {
+    margin: 10px 10px 0 10px !important;
+    padding: 14px !important;
+    border-radius: 12px !important;
+  }
+
+  .oms-banner-stats {
+    flex-direction: column !important;
+    gap: 8px !important;
+    text-align: left !important;
+    width: 100% !important;
+    margin-top: 10px !important;
+  }
+
+  /* Tối ưu Body Content cho 360px */
+  .oms-body-content {
+    padding: 14px 10px !important;
+  }
+
+  /* Tối ưu Màn hình Auth / Login / Register cho 360px */
+  .auth-left-panel {
+    flex: 1 1 100% !important;
+    min-height: auto !important;
+    padding: 24px 16px !important;
+  }
+
+  .auth-right-panel {
+    flex: 1 1 100% !important;
+    min-height: auto !important;
+    padding: 24px 16px !important;
+  }
+
+  .auth-nav-header {
+    justify-content: center !important;
+    gap: 14px !important;
+  }
+
+  .auth-form-box {
+    max-width: 100% !important;
+    width: 100% !important;
+    margin: 15px 0 !important;
+  }
+}
+
+/* Ngăn ngừa thanh cuộn ngang triệt để */
+body, html, #root {
+  max-width: 100vw;
+  overflow-x: hidden !important;
+}

@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import './App.css';
 
 // =========================================================================
 // 1. LOGO KHO HÀNG DẠNG SVG HOÀN HOẢN (KHÔNG LO BỊ LỖI ĐƯỜNG DẪN ẢNH)
@@ -27,6 +28,36 @@ const ModernLoginAvatar = () => (
   </div>
 );
 
+const eyeBtnStyle = {
+  position: 'absolute',
+  right: '14px',
+  top: '50%',
+  transform: 'translateY(-50%)',
+  background: 'none',
+  border: 'none',
+  cursor: 'pointer',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: '4px'
+};
+
+const TogglePassBtn = ({ isVisible, onToggle }) => (
+  <button type="button" onClick={onToggle} style={eyeBtnStyle} title={isVisible ? "Ẩn mật khẩu" : "Hiện mật khẩu"}>
+    {isVisible ? (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1E2A78" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+        <circle cx="12" cy="12" r="3"></circle>
+      </svg>
+    ) : (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+        <line x1="1" y1="1" x2="23" y2="23"></line>
+      </svg>
+    )}
+  </button>
+);
+
 const MOCK_PRODUCTS = [
   { id: '1', sku: 'SKU-BIA-SG-SPEC', name: 'Bia Sài Gòn Special Lon 330ml', pack: '24 lon / thùng (4 lốc x 6 lon)', unit: 'Lon', price: 15000, status: 'Có sẵn' },
   { id: '2', sku: 'SKU-CHOCOPIE-OR', name: 'Bánh Chocopie Orion Hộp 12 Cái', pack: '8 hộp / thùng', unit: 'Hộp', price: 55000, status: 'Có sẵn' },
@@ -36,9 +67,9 @@ const MOCK_PRODUCTS = [
 ];
 
 const MOCK_ACCOUNTS = [
-  { fullName: 'Quản Trị Viên Hệ Thống', username: 'admin', password: 'admin123', email: 'admin@quanlykho.vn', phone: '0912345678', role: 'admin', createdAt: '01/01/2026' },
-  { fullName: 'Nhân Viên Bán Hàng POS', username: 'staff', password: 'staff123', email: 'staff@quanlykho.vn', phone: '0987654321', role: 'staff', createdAt: '15/02/2026' },
-  { fullName: 'Công ty TNHH Thương mại Tuấn Phương (Đại lý cấp 1)', username: 'customer', password: 'customer123', email: 'tuanphuong@daily.vn', phone: '0933445566', role: 'customer', createdAt: '20/03/2026' }
+  { fullName: 'Quản Trị Viên Hệ Thống', username: 'admin', password: 'admin123', email: 'admin@quanlykho.vn', phone: '0912345678', role: 'admin', roleTitle: 'Quản Trị Viên', workplace: 'Kho Tổng Hà Nội', createdAt: '01/01/2026' },
+  { fullName: 'Nguyễn Văn A', username: 'staff', password: 'staff123', email: 'staff@quanlykho.vn', phone: '0987654321', role: 'staff', roleTitle: 'Nhân viên CSKH', workplace: 'Kho Thái Nguyên', createdAt: '15/02/2026' },
+  { fullName: 'Công ty TNHH Thương mại Tuấn Phương (Đại lý cấp 1)', username: 'customer', password: 'customer123', email: 'tuanphuong@daily.vn', phone: '0933445566', role: 'customer', roleTitle: 'Đại lý phân phối', workplace: 'Địa bàn Thái Nguyên & Miền Bắc', createdAt: '20/03/2026' }
 ];
 
 function App({
@@ -50,6 +81,8 @@ function App({
   onChangePassSubmit = (data) => console.log('[Backend API] Change Pass:', data),
   onSubmitOrder = (cart) => console.log('[Backend API] Submit Order:', cart),
 }) {
+  void staffPendingOrders;
+  void adminStats;
   const [user, setUser] = useState(() => {
     const saved = localStorage.getItem('auth_user');
     return saved ? JSON.parse(saved) : null;
@@ -64,6 +97,18 @@ function App({
     const saved = localStorage.getItem('auth_user');
     return saved ? JSON.parse(saved).role : 'customer';
   });
+
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && isMobileMenuOpen) {
+        setIsMobileMenuOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isMobileMenuOpen]);
 
   const [activeTab, setActiveTab] = useState('main');
   const [hoveredBlock, setHoveredBlock] = useState(null);
@@ -227,7 +272,7 @@ function App({
     onLoginSubmit({});
 
     isSelfLoggingOut.current = false;
-    const loggedUser = MOCK_ACCOUNTS.find(a => a.role === currentRole) || MOCK_ACCOUNTS[2];
+    const loggedUser = MOCK_ACCOUNTS.find(a => a.role === currentRole) || MOCK_ACCOUNTS[1];
     setUser(loggedUser);
     localStorage.setItem('auth_user', JSON.stringify(loggedUser));
     setScreen('dashboard');
@@ -292,14 +337,18 @@ function App({
 
   const handleRoleChange = (role) => {
     setCurrentRole(role);
-    if (user) {
+    const matchingAccount = MOCK_ACCOUNTS.find(a => a.role === role);
+    if (matchingAccount) {
+      setUser(matchingAccount);
+      localStorage.setItem('auth_user', JSON.stringify(matchingAccount));
+    } else if (user) {
       const updatedUser = { ...user, role };
       setUser(updatedUser);
       localStorage.setItem('auth_user', JSON.stringify(updatedUser));
     }
   };
 
-  const NotificationModal = () => {
+  const renderNotificationModal = () => {
     if (!popup.show) return null;
 
     const isSuccess = popup.type === 'success';
@@ -362,53 +411,146 @@ function App({
     );
   };
 
-  const TogglePassBtn = ({ isVisible, onToggle }) => (
-    <button type="button" onClick={onToggle} style={styles.eyeBtn} title={isVisible ? "Ẩn mật khẩu" : "Hiện mật khẩu"}>
-      {isVisible ? (
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1E2A78" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-          <circle cx="12" cy="12" r="3"></circle>
-        </svg>
-      ) : (
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
-          <line x1="1" y1="1" x2="23" y2="23"></line>
-        </svg>
-      )}
-    </button>
-  );
-
   const OMSDashboardLayout = ({ children }) => {
     const roleActive = user?.role || currentRole;
 
+    const currentUserInfo = {
+      fullName: user?.fullName || (roleActive === 'staff' ? 'Nguyễn Văn A' : roleActive === 'admin' ? 'Quản Trị Viên Hệ Thống' : 'Công ty TNHH Thương mại Tuấn Phương (Đại lý cấp 1)'),
+      roleTitle: user?.roleTitle || (roleActive === 'staff' ? 'Nhân viên CSKH' : roleActive === 'admin' ? 'Quản Trị Viên' : 'Đại lý phân phối'),
+      workplace: user?.workplace || (roleActive === 'staff' ? 'Kho Thái Nguyên' : roleActive === 'admin' ? 'Kho Tổng Hà Nội' : 'Kho Thái Nguyên & Miền Bắc')
+    };
+
+    const handleNavClick = (action) => {
+      setIsMobileMenuOpen(false);
+      if (typeof action === 'function') {
+        action();
+      }
+    };
+
     return (
       <div style={styles.omsContainer}>
-        <aside style={styles.omsSidebar}>
+        {/* Backdrop overlay khi mở menu drawer trên mobile */}
+        <div
+          className={`oms-backdrop ${isMobileMenuOpen ? 'open' : ''}`}
+          onClick={() => setIsMobileMenuOpen(false)}
+          aria-hidden="true"
+        />
+
+        {/* Sidebar dạng Drawer trên Mobile và Sidebar cố định trên Desktop */}
+        <aside
+          className={`oms-sidebar-drawer ${isMobileMenuOpen ? 'open' : ''}`}
+          style={styles.omsSidebar}
+        >
           <div>
-            <div style={styles.omsSidebarHeader}>PHÂN HỆ {roleActive.toUpperCase()}</div>
+            <div className="oms-drawer-header-row">
+              <div style={styles.omsSidebarHeader}>PHÂN HỆ {roleActive.toUpperCase()}</div>
+              <button
+                type="button"
+                className="oms-drawer-close-btn"
+                onClick={() => setIsMobileMenuOpen(false)}
+                aria-label="Đóng menu"
+                title="Đóng menu điều hướng"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* VÙNG THÔNG TIN NGƯỜI DÙNG TỐI ƯU CHO 360PX THEO SCRUM-303 */}
+            <div
+              className="oms-user-card-drawer"
+              title={`${currentUserInfo.fullName} • ${currentUserInfo.roleTitle} • ${currentUserInfo.workplace}`}
+              onClick={() => {
+                setIsMobileMenuOpen(false);
+                setScreen('profile');
+              }}
+              style={{ cursor: 'pointer' }}
+            >
+              <div className="oms-user-card-top">
+                <div className="oms-user-card-avatar">
+                  {(user?.username || roleActive).charAt(0).toUpperCase()}
+                </div>
+                <div className="oms-user-card-details">
+                  <span className="oms-user-name">
+                    {currentUserInfo.fullName}
+                  </span>
+                  <span className="oms-user-role-badge">
+                    🎭 {currentUserInfo.roleTitle}
+                  </span>
+                </div>
+              </div>
+              <div className="oms-user-workplace">
+                <span>🏬</span>
+                <span className="oms-user-workplace-text">
+                  {currentUserInfo.workplace}
+                </span>
+              </div>
+            </div>
+
+            {/* CHUYỂN VAI TRÒ GIAO DIỆN TRONG DRAWER CHO MOBILE */}
+            <div style={{ marginBottom: '14px' }}>
+              <div style={{ fontSize: '11px', color: '#94a3b8', marginBottom: '6px', fontWeight: 'bold' }}>
+                🔍 CHUYỂN VAI TRÒ GIAO DIỆN:
+              </div>
+              <select
+                value={roleActive}
+                onChange={(e) => {
+                  handleRoleChange(e.target.value);
+                  setIsMobileMenuOpen(false);
+                }}
+                style={{
+                  width: '100%',
+                  padding: '10px 12px',
+                  borderRadius: '10px',
+                  backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                  color: '#ffffff',
+                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  outline: 'none',
+                  cursor: 'pointer',
+                  minHeight: '44px',
+                  touchAction: 'manipulation'
+                }}
+              >
+                <option value="customer" style={{ color: '#000' }}>Đại lý (Customer)</option>
+                <option value="staff" style={{ color: '#000' }}>Nhân viên CSKH (Staff)</option>
+                <option value="admin" style={{ color: '#000' }}>Quản trị viên (Admin)</option>
+              </select>
+            </div>
+
+            {/* DANH SÁCH MENU ITEMS ĐƯỢC TỐI ƯU TOUCH VÀ KHÔNG TRÀN VIEWPORT */}
             <div style={styles.omsNavList}>
               {roleActive === 'customer' && (
                 <>
                   <div
-                    onClick={() => setActiveTab('main')}
-                    style={{ ...styles.omsNavItem, ...(activeTab === 'main' ? styles.omsNavItemActive : {}), ...(hoveredBlock === 'nav-c1' ? styles.elevatedBlockDark : {}) }}
-                    onMouseEnter={() => setHoveredBlock('nav-c1')} onMouseLeave={() => setHoveredBlock(null)}
+                    onClick={() => handleNavClick(() => setActiveTab('main'))}
+                    className={`oms-nav-item-btn ${activeTab === 'main' ? 'active' : ''}`}
+                    style={hoveredBlock === 'nav-c1' ? styles.elevatedBlockDark : {}}
+                    onMouseEnter={() => setHoveredBlock('nav-c1')}
+                    onMouseLeave={() => setHoveredBlock(null)}
                   >
-                    <span>🛒</span> Cổng Đặt hàng Đại lý
+                    <span>🛒</span>
+                    <span className="oms-nav-item-text">Cổng Đặt hàng Đại lý</span>
                   </div>
                   <div
-                    onClick={() => triggerErrorPopup(403)}
-                    style={{ ...styles.omsNavItem, ...(hoveredBlock === 'nav-c2' ? styles.elevatedBlockDark : {}) }}
-                    onMouseEnter={() => setHoveredBlock('nav-c2')} onMouseLeave={() => setHoveredBlock(null)}
+                    onClick={() => handleNavClick(() => triggerErrorPopup(403))}
+                    className="oms-nav-item-btn"
+                    style={hoveredBlock === 'nav-c2' ? styles.elevatedBlockDark : {}}
+                    onMouseEnter={() => setHoveredBlock('nav-c2')}
+                    onMouseLeave={() => setHoveredBlock(null)}
                   >
-                    <span>🔒</span> Tra cứu Công nợ (Demo 403)
+                    <span>🔒</span>
+                    <span className="oms-nav-item-text">Tra cứu Công nợ (Demo 403)</span>
                   </div>
                   <div
-                    onClick={() => triggerErrorPopup(404)}
-                    style={{ ...styles.omsNavItem, ...(hoveredBlock === 'nav-c3' ? styles.elevatedBlockDark : {}) }}
-                    onMouseEnter={() => setHoveredBlock('nav-c3')} onMouseLeave={() => setHoveredBlock(null)}
+                    onClick={() => handleNavClick(() => triggerErrorPopup(404))}
+                    className="oms-nav-item-btn"
+                    style={hoveredBlock === 'nav-c3' ? styles.elevatedBlockDark : {}}
+                    onMouseEnter={() => setHoveredBlock('nav-c3')}
+                    onMouseLeave={() => setHoveredBlock(null)}
                   >
-                    <span>🔍</span> Trang bị xóa (Demo 404)
+                    <span>🔍</span>
+                    <span className="oms-nav-item-text">Trang bị xóa (Demo 404)</span>
                   </div>
                 </>
               )}
@@ -416,25 +558,34 @@ function App({
               {roleActive === 'staff' && (
                 <>
                   <div
-                    onClick={() => setActiveTab('main')}
-                    style={{ ...styles.omsNavItem, ...(activeTab === 'main' ? styles.omsNavItemActive : {}), ...(hoveredBlock === 'nav-s1' ? styles.elevatedBlockDark : {}) }}
-                    onMouseEnter={() => setHoveredBlock('nav-s1')} onMouseLeave={() => setHoveredBlock(null)}
+                    onClick={() => handleNavClick(() => setActiveTab('main'))}
+                    className={`oms-nav-item-btn ${activeTab === 'main' ? 'active' : ''}`}
+                    style={hoveredBlock === 'nav-s1' ? styles.elevatedBlockDark : {}}
+                    onMouseEnter={() => setHoveredBlock('nav-s1')}
+                    onMouseLeave={() => setHoveredBlock(null)}
                   >
-                    <span>⚡</span> Bán hàng & Xuất kho (POS)
+                    <span>⚡</span>
+                    <span className="oms-nav-item-text">Bán hàng & Xuất kho (POS)</span>
                   </div>
                   <div
-                    onClick={() => triggerErrorPopup(401)}
-                    style={{ ...styles.omsNavItem, ...(hoveredBlock === 'nav-s2' ? styles.elevatedBlockDark : {}) }}
-                    onMouseEnter={() => setHoveredBlock('nav-s2')} onMouseLeave={() => setHoveredBlock(null)}
+                    onClick={() => handleNavClick(() => triggerErrorPopup(401))}
+                    className="oms-nav-item-btn"
+                    style={hoveredBlock === 'nav-s2' ? styles.elevatedBlockDark : {}}
+                    onMouseEnter={() => setHoveredBlock('nav-s2')}
+                    onMouseLeave={() => setHoveredBlock(null)}
                   >
-                    <span>🔑</span> Hết phiên làm việc (Demo 401)
+                    <span>🔑</span>
+                    <span className="oms-nav-item-text">Hết phiên làm việc (Demo 401)</span>
                   </div>
                   <div
-                    onClick={() => triggerErrorPopup(500)}
-                    style={{ ...styles.omsNavItem, ...(hoveredBlock === 'nav-s3' ? styles.elevatedBlockDark : {}) }}
-                    onMouseEnter={() => setHoveredBlock('nav-s3')} onMouseLeave={() => setHoveredBlock(null)}
+                    onClick={() => handleNavClick(() => triggerErrorPopup(500))}
+                    className="oms-nav-item-btn"
+                    style={hoveredBlock === 'nav-s3' ? styles.elevatedBlockDark : {}}
+                    onMouseEnter={() => setHoveredBlock('nav-s3')}
+                    onMouseLeave={() => setHoveredBlock(null)}
                   >
-                    <span>⚠️</span> Kiểm kê kho (Demo 500)
+                    <span>⚠️</span>
+                    <span className="oms-nav-item-text">Kiểm kê kho (Demo 500)</span>
                   </div>
                 </>
               )}
@@ -442,25 +593,34 @@ function App({
               {roleActive === 'admin' && (
                 <>
                   <div
-                    onClick={() => setActiveTab('main')}
-                    style={{ ...styles.omsNavItem, ...(activeTab === 'main' ? styles.omsNavItemActive : {}), ...(hoveredBlock === 'nav-a1' ? styles.elevatedBlockDark : {}) }}
-                    onMouseEnter={() => setHoveredBlock('nav-a1')} onMouseLeave={() => setHoveredBlock(null)}
+                    onClick={() => handleNavClick(() => setActiveTab('main'))}
+                    className={`oms-nav-item-btn ${activeTab === 'main' ? 'active' : ''}`}
+                    style={hoveredBlock === 'nav-a1' ? styles.elevatedBlockDark : {}}
+                    onMouseEnter={() => setHoveredBlock('nav-a1')}
+                    onMouseLeave={() => setHoveredBlock(null)}
                   >
-                    <span>📊</span> Tổng quan Quản trị
+                    <span>📊</span>
+                    <span className="oms-nav-item-text">Tổng quan Quản trị</span>
                   </div>
                   <div
-                    onClick={() => triggerErrorPopup(403)}
-                    style={{ ...styles.omsNavItem, ...(hoveredBlock === 'nav-a2' ? styles.elevatedBlockDark : {}) }}
-                    onMouseEnter={() => setHoveredBlock('nav-a2')} onMouseLeave={() => setHoveredBlock(null)}
+                    onClick={() => handleNavClick(() => triggerErrorPopup(403))}
+                    className="oms-nav-item-btn"
+                    style={hoveredBlock === 'nav-a2' ? styles.elevatedBlockDark : {}}
+                    onMouseEnter={() => setHoveredBlock('nav-a2')}
+                    onMouseLeave={() => setHoveredBlock(null)}
                   >
-                    <span>🔒</span> Hệ thống Đại lý (Demo 403)
+                    <span>🔒</span>
+                    <span className="oms-nav-item-text">Hệ thống Đại lý (Demo 403)</span>
                   </div>
                   <div
-                    onClick={() => triggerErrorPopup(503)}
-                    style={{ ...styles.omsNavItem, ...(hoveredBlock === 'nav-a3' ? styles.elevatedBlockDark : {}) }}
-                    onMouseEnter={() => setHoveredBlock('nav-a3')} onMouseLeave={() => setHoveredBlock(null)}
+                    onClick={() => handleNavClick(() => triggerErrorPopup(503))}
+                    className="oms-nav-item-btn"
+                    style={hoveredBlock === 'nav-a3' ? styles.elevatedBlockDark : {}}
+                    onMouseEnter={() => setHoveredBlock('nav-a3')}
+                    onMouseLeave={() => setHoveredBlock(null)}
                   >
-                    <span>🛠️</span> Duyệt Hạn mức (Demo 503)
+                    <span>🛠️</span>
+                    <span className="oms-nav-item-text">Duyệt Hạn mức (Demo 503)</span>
                   </div>
                 </>
               )}
@@ -473,9 +633,14 @@ function App({
             </div>
             <button
               type="button"
-              onClick={handleLogout}
+              onClick={() => {
+                setIsMobileMenuOpen(false);
+                handleLogout();
+              }}
               style={{
                 ...styles.omsLogoutBtn,
+                minHeight: '44px',
+                touchAction: 'manipulation',
                 ...(hoveredBlock === 'sidebar-logout' ? styles.elevatedBtnDarkRed : {}),
               }}
               onMouseEnter={() => setHoveredBlock('sidebar-logout')}
@@ -487,17 +652,34 @@ function App({
         </aside>
 
         <div style={styles.omsMainArea}>
-          <header style={styles.omsHeader}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <SalesWarehouseLogo />
-              <div>
-                <h3 style={{ margin: 0, fontSize: '16px', color: '#0f172a', fontWeight: '800' }}>OMS Pro</h3>
-                <span style={{ fontSize: '11px', color: '#64748b' }}>Hệ thống Quản lý Bán hàng & Kho</span>
+          <header className="oms-header-container" style={styles.omsHeader}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+              {/* Nút Hamburger cho Mobile 360px */}
+              <button
+                type="button"
+                className="oms-hamburger-btn"
+                onClick={() => setIsMobileMenuOpen(true)}
+                aria-label="Mở menu điều hướng"
+                title="Mở menu"
+              >
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="3" y1="6" x2="21" y2="6"></line>
+                  <line x1="3" y1="12" x2="21" y2="12"></line>
+                  <line x1="3" y1="18" x2="21" y2="18"></line>
+                </svg>
+              </button>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                <SalesWarehouseLogo />
+                <div style={{ minWidth: 0 }}>
+                  <h3 className="oms-header-brand-title" style={{ margin: 0, fontSize: '16px', color: '#0f172a', fontWeight: '800', lineHeight: 1.2 }}>OMS Pro</h3>
+                  <span className="oms-header-brand-sub" style={{ fontSize: '11px', color: '#64748b' }}>Hệ thống Quản lý Bán hàng & Kho</span>
+                </div>
               </div>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-              <div style={styles.omsRoleSelectWrapper}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
+              <div className="oms-role-select-box" style={styles.omsRoleSelectWrapper}>
                 <span style={{ fontSize: '12px', color: '#64748b' }}>🔍 Xem Giao Diện:</span>
                 <select
                   value={roleActive}
@@ -511,25 +693,27 @@ function App({
               </div>
 
               <div
+                className="oms-header-user-pill"
                 onClick={() => setScreen('profile')}
-                style={{
-                  ...styles.omsUserAvatarPill,
-                  ...(hoveredBlock === 'header-profile' ? styles.elevatedCardLight : {}),
-                }}
-                onMouseEnter={() => setHoveredBlock('header-profile')}
-                onMouseLeave={() => setHoveredBlock(null)}
-                title="Xem Hồ sơ cá nhân"
+                title={`Xem Hồ sơ: ${currentUserInfo.fullName} • ${currentUserInfo.workplace}`}
               >
-                <div style={styles.omsAvatarIcon}>{(user?.username || roleActive).charAt(0).toUpperCase()}</div>
-                <div>
-                  <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#1e293b' }}>{user?.fullName || 'Demo Account'}</div>
-                  <div style={{ fontSize: '10px', color: '#64748b' }}>{roleActive}</div>
+                <div style={styles.omsAvatarIcon}>
+                  {(user?.username || roleActive).charAt(0).toUpperCase()}
+                </div>
+                <div style={{ minWidth: 0, overflow: 'hidden' }}>
+                  <div className="oms-header-user-name">
+                    {currentUserInfo.fullName}
+                  </div>
+                  <div className="oms-header-user-sub">
+                    {currentUserInfo.workplace}
+                  </div>
                 </div>
               </div>
             </div>
           </header>
 
           <div
+            className="oms-banner-container"
             style={{
               ...styles.omsBanner,
               ...(hoveredBlock === 'oms-banner' ? styles.elevatedCard : {}),
@@ -537,16 +721,16 @@ function App({
             onMouseEnter={() => setHoveredBlock('oms-banner')}
             onMouseLeave={() => setHoveredBlock(null)}
           >
-            <div>
-              <h2 style={{ margin: '0 0 6px 0', fontSize: '20px', fontWeight: 'bold' }}>
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <h2 style={{ margin: '0 0 6px 0', fontSize: '18px', fontWeight: 'bold' }}>
                 {roleActive === 'admin' ? "Bảng Điều Khiển Quản Trị Hệ Thống (ADMIN)" : roleActive === 'staff' ? "Phân Hệ Xử Lý Bán Hàng & Kho (STAFF)" : "Cổng Đặt Hàng Trực Tuyến Đại Lý (CUSTOMER)"}
               </h2>
-              <p style={{ margin: 0, fontSize: '13px', opacity: 0.9 }}>
-                {roleActive === 'admin' ? "Quản lý toàn bộ chi nhánh, hạn mức đại lý & kho hàng" : roleActive === 'staff' ? "Phân hệ kiểm duyệt đơn, kiểm kê kho & quầy POS" : user?.fullName || "Công ty TNHH Thương mại Tuấn Phương (Đại lý cấp 1)"}
+              <p style={{ margin: 0, fontSize: '12.5px', opacity: 0.9 }}>
+                {roleActive === 'admin' ? "Quản lý toàn bộ chi nhánh, hạn mức đại lý & kho hàng" : roleActive === 'staff' ? `Phân hệ kiểm duyệt đơn, kiểm kê kho & quầy POS • ${currentUserInfo.workplace}` : currentUserInfo.fullName}
               </p>
             </div>
 
-            <div style={{ display: 'flex', gap: '24px', textAlign: 'right' }}>
+            <div className="oms-banner-stats" style={{ display: 'flex', gap: '20px', textAlign: 'right', flexShrink: 0 }}>
               {roleActive === 'customer' && (
                 <>
                   <div>
@@ -574,7 +758,7 @@ function App({
             </div>
           </div>
 
-          <main style={styles.omsContentBody}>{children}</main>
+          <main className="oms-body-content" style={styles.omsContentBody}>{children}</main>
         </div>
       </div>
     );
@@ -721,7 +905,8 @@ function App({
                 <div style={{ textAlign: 'left', borderTop: '1px solid #f1f5f9', paddingTop: '15px', fontSize: '12px', color: '#334155' }}>
                   <p>📧 <strong>Email:</strong> {user?.email || 'demo@quanlykho.vn'}</p>
                   <p>📱 <strong>SĐT:</strong> {user?.phone || '0912345678'}</p>
-                  <p>🎭 <strong>Vai trò:</strong> {user?.role || 'customer'}</p>
+                  <p>🎭 <strong>Vai trò:</strong> {user?.roleTitle || (user?.role === 'staff' ? 'Nhân viên CSKH' : user?.role === 'admin' ? 'Quản Trị Viên' : 'Đại lý phân phối')}</p>
+                  <p>🏬 <strong>Kho / Địa bàn:</strong> {user?.workplace || (user?.role === 'staff' ? 'Kho Thái Nguyên' : user?.role === 'admin' ? 'Kho Tổng Hà Nội' : 'Kho Thái Nguyên & Miền Bắc')}</p>
                   <p>📅 <strong>Ngày tham gia:</strong> {user?.createdAt || '01/01/2026'}</p>
                 </div>
                 <button
@@ -828,7 +1013,7 @@ function App({
 
     return (
       <div style={styles.outerContainerFullWidth}>
-        <div style={styles.leftPanelFullWidth}>
+        <div className="auth-left-panel" style={styles.leftPanelFullWidth}>
           {/* ========================================================================= */}
           {/* GÓC TRÊN BÊN TRÁI: LOGO SVG TỰ ĐỘNG CHUẨN ĐẸP KHÔNG BỊ RÁC/LỖI FILE */}
           {/* ========================================================================= */}
@@ -841,7 +1026,7 @@ function App({
           </div>
 
           {screen === 'login' && (
-            <form onSubmit={handleLoginSubmit} style={styles.formContainerResponsive}>
+            <form onSubmit={handleLoginSubmit} className="auth-form-box" style={styles.formContainerResponsive}>
               {/* AVATAR TRÒN SANG TRỌNG ĐƯỢC THAY THẾ MỚI */}
               <ModernLoginAvatar />
 
@@ -904,7 +1089,7 @@ function App({
           )}
 
           {screen === 'register' && (
-            <form onSubmit={handleRegisterSubmit} style={styles.formContainerResponsive}>
+            <form onSubmit={handleRegisterSubmit} className="auth-form-box" style={styles.formContainerResponsive}>
               <h3 style={styles.formTitle}>ĐĂNG KÝ TÀI KHOẢN MỚI</h3>
 
               <div style={{ ...styles.inputWrapper, ...(hoveredBlock === 'reg-fullname' ? styles.elevatedInput3D : {}) }} onMouseEnter={() => setHoveredBlock('reg-fullname')} onMouseLeave={() => setHoveredBlock(null)}>
@@ -986,7 +1171,7 @@ function App({
           )}
 
           {screen === 'forgot' && (
-            <form onSubmit={(e) => { e.preventDefault(); setScreen('login'); }} style={styles.formContainerResponsive}>
+            <form onSubmit={(e) => { e.preventDefault(); setScreen('login'); }} className="auth-form-box" style={styles.formContainerResponsive}>
               <h3 style={styles.formTitle}>KHÔI PHỤC MẬT KHẨU</h3>
               <input type="email" placeholder="ENTER YOUR EMAIL" style={styles.input} />
               <button type="submit" style={{ ...styles.actionBtn, marginTop: '12px' }}>SEND RESET LINK</button>
@@ -999,8 +1184,8 @@ function App({
           </div>
         </div>
 
-        <div style={styles.rightPanelFullWidth}>
-          <div style={styles.navHeader}>
+        <div className="auth-right-panel" style={styles.rightPanelFullWidth}>
+          <div className="auth-nav-header" style={styles.navHeader}>
             <span
               onClick={() => setScreen(screen === 'about' ? 'login' : 'about')}
               style={{
@@ -1086,7 +1271,7 @@ function App({
 
   return (
     <>
-      <NotificationModal />
+      {renderNotificationModal()}
       {renderMainContent()}
     </>
   );
@@ -1162,7 +1347,7 @@ const styles = {
     transition: 'all 0.2s ease',
   },
 
-  omsContainer: { display: 'flex', width: '100vw', minHeight: '100vh', backgroundColor: '#f8fafc', fontFamily: "'Inter', sans-serif" },
+  omsContainer: { display: 'flex', width: '100%', minHeight: '100vh', backgroundColor: '#f8fafc', fontFamily: "'Inter', sans-serif" },
   omsSidebar: { width: '240px', backgroundColor: '#0b132b', color: '#ffffff', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '20px 15px', boxSizing: 'border-box', flexShrink: 0, zIndex: 10, boxShadow: '4px 0 20px rgba(0,0,0,0.25)' },
   omsSidebarHeader: { fontSize: '11px', fontWeight: 'bold', letterSpacing: '1px', color: '#64748b', marginBottom: '15px', paddingLeft: '10px' },
   omsNavList: { display: 'flex', flexDirection: 'column', gap: '6px' },
@@ -1191,7 +1376,7 @@ const styles = {
   staffStatCard: { backgroundColor: '#ffffff', padding: '15px 20px', borderRadius: '12px', border: '1px solid #e2e8f0', cursor: 'pointer', transition: 'all 0.3s ease' },
   adminStatCard: { backgroundColor: '#ffffff', padding: '15px 20px', borderRadius: '12px', border: '1px solid #e2e8f0', cursor: 'pointer', transition: 'all 0.3s ease' },
 
-  outerContainerFullWidth: { width: '100vw', minHeight: '100vh', display: 'flex', flexWrap: 'wrap', fontFamily: "'Inter', sans-serif", margin: 0, padding: 0, backgroundColor: '#ffffff', overflowX: 'hidden' },
+  outerContainerFullWidth: { width: '100%', minHeight: '100vh', display: 'flex', flexWrap: 'wrap', fontFamily: "'Inter', sans-serif", margin: 0, padding: 0, backgroundColor: '#ffffff', overflowX: 'hidden' },
   leftPanelFullWidth: { flex: '1 1 380px', padding: 'min(4vw, 40px)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', backgroundColor: '#ffffff', minHeight: '100vh', boxSizing: 'border-box' },
   rightPanelFullWidth: { flex: '2 1 450px', background: 'radial-gradient(circle at 80% 20%, #FBEFD5 0%, #3B72A4 45%, #182C61 90%)', padding: 'min(4vw, 40px)', display: 'flex', flexDirection: 'column', color: '#ffffff', minHeight: '100vh', boxSizing: 'border-box' },
 
