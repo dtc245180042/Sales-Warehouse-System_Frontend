@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { AuthProvider } from './context';
 import Navbar from './components/Navbar';
 import Scrum300Demo from './pages/Scrum300Demo';
+import LockAccountModal from './components/LockAccountModal';
+import UnlockAccountModal from './components/UnlockAccountModal';
 
 // =========================================================================
 // MOCK DATA CỐ ĐỊNH CHỈ DÙNG ĐỂ HIỂN THỊ KHUNG GIAO DIỆN FRONTEND
@@ -71,35 +73,52 @@ function App({
     onConfirm: null
   });
 
-  const handleLockAccountDemo = (targetUsername) => {
-    const reason = window.prompt("Nhập lý do khóa tài khoản (Bắt buộc):");
-    if (!reason || !reason.trim()) {
-      alert("Lỗi: Bắt buộc phải ghi rõ lý do khóa tài khoản!");
-      return;
-    }
-    const target = userList.find(u => u.username === targetUsername);
+  // STATE HỘP THOẠI KHÓA / MỞ KHÓA TÀI KHOẢN (SCRUM-344)
+  const [selectedUserToLock, setSelectedUserToLock] = useState(null);
+  const [selectedUserToUnlock, setSelectedUserToUnlock] = useState(null);
+
+  const handleOpenLockModal = (targetUser) => {
+    setSelectedUserToLock(targetUser);
+  };
+
+  const handleOpenUnlockModal = (targetUser) => {
+    setSelectedUserToUnlock(targetUser);
+  };
+
+  const handleConfirmLock = (targetUsername, reason) => {
+    const target = userList.find((u) => u.username === targetUsername);
     let warningMsg = `Tài khoản '${targetUsername}' đã bị khóa và lập tức thu hồi toàn bộ phiên đăng nhập đang mở phía server.\nLý do: "${reason}".`;
     if (target && (target.role === 'sales_rep' || target.role === 'sales_mgr')) {
       warningMsg += `\n\n⚠️ CẢNH BÁO BÀN GIAO: Nhân viên kinh doanh '${target.fullName}' phụ trách danh sách đại lý địa bàn. Yêu cầu phân công bàn giao ngay lập tức cho nhân viên khác!`;
     }
-    setUserList(prev => prev.map(u => u.username === targetUsername ? { ...u, isLocked: true, lockReason: reason } : u));
+    setUserList((prev) =>
+      prev.map((u) =>
+        u.username === targetUsername
+          ? { ...u, isLocked: true, lockReason: reason, lockedAt: new Date().toLocaleDateString('vi-VN') }
+          : u
+      )
+    );
     setPopup({
       show: true,
       title: 'Khóa tài khoản thành công',
       message: warningMsg,
       type: 'info',
-      onConfirm: () => setPopup({ ...popup, show: false })
+      onConfirm: () => setPopup((p) => ({ ...p, show: false })),
     });
   };
 
-  const handleUnlockAccountDemo = (targetUsername) => {
-    setUserList(prev => prev.map(u => u.username === targetUsername ? { ...u, isLocked: false, lockReason: null } : u));
+  const handleConfirmUnlock = (targetUsername) => {
+    setUserList((prev) =>
+      prev.map((u) =>
+        u.username === targetUsername ? { ...u, isLocked: false, lockReason: null } : u
+      )
+    );
     setPopup({
       show: true,
-      title: 'Mở khóa tài khoản',
+      title: 'Mở khóa tài khoản thành công',
       message: `Tài khoản '${targetUsername}' đã được mở khóa và có thể đăng nhập bình thường.`,
       type: 'success',
-      onConfirm: () => setPopup({ ...popup, show: false })
+      onConfirm: () => setPopup((p) => ({ ...p, show: false })),
     });
   };
 
@@ -914,7 +933,7 @@ function App({
                             ) : u.isLocked ? (
                               <button
                                 type="button"
-                                onClick={() => handleUnlockAccountDemo(u.username)}
+                                onClick={() => handleOpenUnlockModal(u)}
                                 style={{ padding: '4px 10px', fontSize: '11px', borderRadius: '6px', border: '1px solid #86efac', backgroundColor: '#f0fdf4', color: '#15803d', cursor: 'pointer', fontWeight: 'bold' }}
                               >
                                 🔓 Mở khóa
@@ -922,7 +941,7 @@ function App({
                             ) : (
                               <button
                                 type="button"
-                                onClick={() => handleLockAccountDemo(u.username)}
+                                onClick={() => handleOpenLockModal(u)}
                                 style={{ padding: '4px 10px', fontSize: '11px', borderRadius: '6px', border: '1px solid #fca5a5', backgroundColor: '#fef2f2', color: '#b91c1c', cursor: 'pointer', fontWeight: 'bold' }}
                               >
                                 🔒 Khóa tài khoản
@@ -1468,6 +1487,18 @@ function App({
       ) : (
         <>
           {renderNotificationModal()}
+          <LockAccountModal
+            isOpen={!!selectedUserToLock}
+            targetUser={selectedUserToLock}
+            onClose={() => setSelectedUserToLock(null)}
+            onConfirmLock={handleConfirmLock}
+          />
+          <UnlockAccountModal
+            isOpen={!!selectedUserToUnlock}
+            targetUser={selectedUserToUnlock}
+            onClose={() => setSelectedUserToUnlock(null)}
+            onConfirmUnlock={handleConfirmUnlock}
+          />
           {renderMainContent()}
         </>
       )}
