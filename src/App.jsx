@@ -1,36 +1,17 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { AuthProvider } from './context';
 import Navbar from './components/Navbar';
 import Scrum300Demo from './pages/Scrum300Demo';
+import Login from './pages/Login';
+import ErrorPage from './pages/ErrorPage';
+import TogglePassBtn from './components/TogglePassBtn';
+import UserManagement from './components/UserManagement';
+import ErrorBoundary from './components/ErrorBoundary';
 
-// =========================================================================
-// MOCK DATA CỐ ĐỊNH CHỈ DÙNG ĐỂ HIỂN THỊ KHUNG GIAO DIỆN FRONTEND
-// =========================================================================
-const MOCK_PRODUCTS = [
-  { id: '1', sku: 'SKU-BIA-SG-SPEC', name: 'Bia Sài Gòn Special Lon 330ml', pack: '24 lon / thùng (4 lốc x 6 lon)', unit: 'Lon', price: 15000, status: 'Có sẵn' },
-  { id: '2', sku: 'SKU-CHOCOPIE-OR', name: 'Bánh Chocopie Orion Hộp 12 Cái', pack: '8 hộp / thùng', unit: 'Hộp', price: 55000, status: 'Có sẵn' },
-  { id: '3', sku: 'SKU-LAVIE-500', name: 'Nước khoáng thiên nhiên Lavie Chai 500ml', pack: '24 chai / thùng', unit: 'Chai', price: 6000, status: 'Có sẵn' },
-  { id: '4', sku: 'SKU-STING-DAU', name: 'Nước tăng lực Sting Dâu Chai 330ml', pack: '24 chai / thùng', unit: 'Chai', price: 10000, status: 'Có sẵn' },
-  { id: '5', sku: 'SKU-SUA-VNM-180', name: 'Sữa tươi tiệt trùng Vinamilk Có đường 180ml', pack: '48 hộp / thùng (12 lốc x 4 hộp)', unit: 'Hộp', price: 8500, status: 'Có sẵn' },
-];
-
-const MOCK_ACCOUNTS = [
-  { fullName: 'Trần Quản Trị Hệ Thống', username: 'admin', password: 'Admin@1234', email: 'admin@warehouse.local', phone: '0901234567', role: 'admin', roleTitle: 'Quản trị viên (Admin)', createdAt: '01/01/2026', warehouse: null },
-  { fullName: 'Nguyễn Văn Giám Đốc Kinh Doanh', username: 'sales_mgr', password: 'SalesMgr@1234', email: 'sales_mgr@warehouse.local', phone: '0902345678', role: 'sales_mgr', roleTitle: 'Quản lý kinh doanh (Sales Manager)', createdAt: '10/01/2026', warehouse: null },
-  { fullName: 'Lê Thị Nhân Viên Kinh Doanh', username: 'sales_rep', password: 'SalesRep@1234', email: 'sales_rep@warehouse.local', phone: '0903456789', role: 'sales_rep', roleTitle: 'Nhân viên kinh doanh (Sales Rep)', createdAt: '15/01/2026', warehouse: null, assignedAgencies: ['Công ty TNHH Tuấn Phương', 'Đại lý Minh Phát', 'Đại lý Hồng Hà'] },
-  { fullName: 'Phạm Văn Trưởng Kho', username: 'wh_mgr', password: 'WhMgr@1234', email: 'wh_mgr@warehouse.local', phone: '0904567890', role: 'wh_mgr', roleTitle: 'Quản lý kho (WH Manager)', createdAt: '20/01/2026', warehouse: 'Kho Tổng Hà Nội' },
-  { fullName: 'Hoàng Văn Thủ Kho', username: 'warehouse', password: 'Warehouse@1234', email: 'warehouse@warehouse.local', phone: '0905678901', role: 'warehouse', roleTitle: 'Thủ kho (Warehouse Staff)', createdAt: '25/01/2026', warehouse: 'Kho Đà Nẵng' },
-  { fullName: 'Đỗ Thị Kế Toán Trưởng', username: 'accountant', password: 'Accountant@1234', email: 'accountant@warehouse.local', phone: '0906789012', role: 'accountant', roleTitle: 'Kế toán (Accountant)', createdAt: '01/02/2026', warehouse: null },
-  { fullName: 'Công ty TNHH Đại Lý Tuấn Phương', username: 'customer', password: 'Customer@1234', email: 'customer@warehouse.local', phone: '0907890123', role: 'customer', roleTitle: 'Đại lý cấp 1 (Customer)', createdAt: '10/02/2026', warehouse: null }
-];
-
-const MOCK_FINANCIAL_MARGINS = [
-  { sku: 'SKU-BIA-SG-SPEC', name: 'Bia Sài Gòn Special Lon 330ml', costPrice: 11500, salePrice: 15000, margin: '23.3%' },
-  { sku: 'SKU-CHOCOPIE-OR', name: 'Bánh Chocopie Orion Hộp 12 Cái', costPrice: 42000, salePrice: 55000, margin: '23.6%' },
-  { sku: 'SKU-LAVIE-500', name: 'Nước khoáng Lavie Chai 500ml', costPrice: 4200, salePrice: 6000, margin: '30.0%' },
-  { sku: 'SKU-STING-DAU', name: 'Nước tăng lực Sting Dâu Chai 330ml', costPrice: 7000, salePrice: 10000, margin: '30.0%' },
-  { sku: 'SKU-SUA-VNM-180', name: 'Sữa tươi Vinamilk Có đường 180ml', costPrice: 6500, salePrice: 8500, margin: '23.5%' },
-];
+import { MOCK_PRODUCTS, MOCK_ACCOUNTS, MOCK_FINANCIAL_MARGINS } from './utils/mockData';
+import { useSessionManager } from './utils/useSessionManager';
+import { apiClient } from './api/apiClient';
+import { setupRouterGuardListener } from './routes/routerGuard';
 
 function App({
   orderHistory = [],
@@ -61,6 +42,7 @@ function App({
   const [hoveredBlock, setHoveredBlock] = useState(null);
   const [viewMode, setViewMode] = useState('oms'); // 'oms' | 'scrum300'
   const [userList, setUserList] = useState(MOCK_ACCOUNTS);
+  const [errorType, setErrorType] = useState(null); // null | 404 | 403 | 401 | 500
 
   // STATE POP-UP THÔNG BÁO (MODAL ALERT)
   const [popup, setPopup] = useState({
@@ -71,42 +53,103 @@ function App({
     onConfirm: null
   });
 
-  const handleLockAccountDemo = (targetUsername) => {
-    const reason = window.prompt("Nhập lý do khóa tài khoản (Bắt buộc):");
-    if (!reason || !reason.trim()) {
-      alert("Lỗi: Bắt buộc phải ghi rõ lý do khóa tài khoản!");
-      return;
-    }
-    const target = userList.find(u => u.username === targetUsername);
-    let warningMsg = `Tài khoản '${targetUsername}' đã bị khóa và lập tức thu hồi toàn bộ phiên đăng nhập đang mở phía server.\nLý do: "${reason}".`;
-    if (target && (target.role === 'sales_rep' || target.role === 'sales_mgr')) {
-      warningMsg += `\n\n⚠️ CẢNH BÁO BÀN GIAO: Nhân viên kinh doanh '${target.fullName}' phụ trách danh sách đại lý địa bàn. Yêu cầu phân công bàn giao ngay lập tức cho nhân viên khác!`;
-    }
-    setUserList(prev => prev.map(u => u.username === targetUsername ? { ...u, isLocked: true, lockReason: reason } : u));
+  // =========================================================================
+  // QUẢN LÝ PHIÊN ĐĂNG NHẬP (Session Manager)
+  // =========================================================================
+  const handleSessionExpired = useCallback(() => {
+    setUser(null);
+    localStorage.removeItem('auth_user');
+    setScreen('login');
     setPopup({
       show: true,
-      title: 'Khóa tài khoản thành công',
-      message: warningMsg,
+      title: '⏱️ Phiên đã hết hạn',
+      message: 'Phiên làm việc của bạn đã hết hạn do không hoạt động trong thời gian dài. Vui lòng đăng nhập lại để tiếp tục.',
       type: 'info',
-      onConfirm: () => setPopup({ ...popup, show: false })
+      onConfirm: () => setPopup({ show: false, title: '', message: '', type: 'info', onConfirm: null })
     });
-  };
+  }, []);
 
-  const handleUnlockAccountDemo = (targetUsername) => {
-    setUserList(prev => prev.map(u => u.username === targetUsername ? { ...u, isLocked: false, lockReason: null } : u));
+  const handleSessionWarning = useCallback((minutesLeft) => {
     setPopup({
       show: true,
-      title: 'Mở khóa tài khoản',
-      message: `Tài khoản '${targetUsername}' đã được mở khóa và có thể đăng nhập bình thường.`,
-      type: 'success',
-      onConfirm: () => setPopup({ ...popup, show: false })
+      title: '⚠️ Sắp hết phiên làm việc',
+      message: `Phiên đăng nhập của bạn sẽ hết hạn trong ${minutesLeft} phút nữa. Di chuyển chuột hoặc thực hiện thao tác bất kỳ để gia hạn phiên tự động.\n\n💾 Đơn hàng đang gõ dở sẽ không bị mất nếu bạn tiếp tục hoạt động.`,
+      type: 'info',
+      onConfirm: () => setPopup({ show: false, title: '', message: '', type: 'info', onConfirm: null })
+    });
+  }, []);
+
+  const handleSessionRenewed = useCallback(() => {
+    // Khi phiên được gia hạn (người dùng quay lại hoạt động sau cảnh báo) -> đóng popup cảnh báo
+    setPopup(prev => prev.title === '⚠️ Sắp hết phiên làm việc'
+      ? { show: false, title: '', message: '', type: 'info', onConfirm: null }
+      : prev
+    );
+  }, []);
+
+  const { destroySession } = useSessionManager({
+    user,
+    onSessionExpired: handleSessionExpired,
+    onSessionWarning: handleSessionWarning,
+    onSessionRenewed: handleSessionRenewed,
+    enabled: !!user, // Chỉ bật khi đã đăng nhập
+  });
+
+  // =========================================================================
+  // BỘ XỬ LÝ LỖI API & ĐIỀU HƯỚNG ROUTING TỰ ĐỘNG
+  // =========================================================================
+  useEffect(() => {
+    // 1. Đăng ký Interceptor bắt lỗi HTTP status code từ API (401, 403, 404, 500)
+    apiClient.setErrorHandler((statusCode) => {
+      setErrorType(statusCode);
+      setScreen('error');
+    });
+  }, []);
+
+  useEffect(() => {
+    // 2. Lắng nghe URL Hash Router để kiểm tra phân quyền trang và điều hướng lỗi
+    const cleanup = setupRouterGuardListener(
+      () => user,
+      (errType) => {
+        setErrorType(errType);
+        setScreen('error');
+      }
+    );
+    return cleanup;
+  }, [user]);
+
+  // =========================================================================
+  // XỚ LÝ ĐĂNG XUẤT CHO TAB BẤM ĐĂNG XUẤT (ĐÃ ĐĂNG XUẤT THÀNH CÔNG)
+  // =========================================================================
+  const handleLogout = () => {
+    // 1. Hủy phiên làm việc tức thì (mô phỏng thu hồi token phía server)
+    destroySession();
+
+    // 2. Xoá thông tin người dùng
+    setUser(null);
+    localStorage.removeItem('auth_user');
+
+    // 3. Gửi thông điệp báo cho TẤT CẢ các tab khác
+    try {
+      const authChannel = new BroadcastChannel('auth_logout_channel');
+      authChannel.postMessage({ type: 'LOGOUT_EVENT', timestamp: Date.now() });
+      authChannel.close();
+    } catch (e) {
+      console.log('BroadcastChannel error:', e);
+    }
+
+    // 4. Hiển thị Pop-up "ĐÃ ĐĂNG XUẤT THÀNH CÔNG"
+    setScreen('login');
+    setPopup({
+      show: true,
+      title: 'Đăng xuất thành công',
+      message: 'Tài khoản của bạn đã được đăng xuất an toàn. Phiên làm việc đã bị thu hồi ngay lập tức khỏi hệ thống!',
+      type: 'info',
+      onConfirm: () => setPopup({ show: false, title: '', message: '', type: 'info', onConfirm: null })
     });
   };
 
-  // STATE DỮ LIỆU ĐĂNG NHẬP
-  const [loginUsername, setLoginUsername] = useState('');
-  const [loginPassword, setLoginPassword] = useState('');
-
+  // STATE DỮ LIỆU ĐĂNG NHẬP (Đã chuyển sang Login.jsx)
   // STATE DỮ LIỆU FORM ĐĂNG KÝ
   const [regForm, setRegForm] = useState({
     fullName: '',
@@ -118,7 +161,6 @@ function App({
   });
 
   // STATE BẬT/TẮT HIỂN THỊ MẬT KHẨU
-  const [showLoginPass, setShowLoginPass] = useState(false);
   const [showRegPass, setShowRegPass] = useState(false);
   const [showRegConfirmPass, setShowRegConfirmPass] = useState(false);
   const [showProfCurrentPass, setShowProfCurrentPass] = useState(false);
@@ -128,14 +170,97 @@ function App({
   const [resetStep, setResetStep] = useState(1);
   const [showForgotInProfile, setShowForgotInProfile] = useState(false);
 
+  // STATE ĐỔI MẬT KHẨU & THÔNG BÁO LỖI
+  const [changePassForm, setChangePassForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
+  const [changePassError, setChangePassError] = useState('');
+
+  // -------------------------------------------------------------------------
+  // XỬ LÝ ĐỔI MẬT KHẨU VÀ THU HỒI TẤT CẢ CÁC PHIÊN LÀM VIỆC KHÁC
+  // -------------------------------------------------------------------------
+  const handleChangePasswordSubmit = (e) => {
+    e.preventDefault();
+    setChangePassError('');
+
+    const { currentPassword, newPassword, confirmPassword } = changePassForm;
+
+    // 1. Kiểm tra điền đủ thông tin
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      setChangePassError('Vui lòng điền đầy đủ cả 3 thông tin mật khẩu!');
+      return;
+    }
+
+    // 2. Kịch bản 1: Nhập sai mật khẩu hiện tại
+    const actualPassword = user?.password || '123456';
+    if (currentPassword !== actualPassword) {
+      setChangePassError('❌ Mật khẩu hiện tại không chính xác. Vui lòng kiểm tra lại!');
+      return;
+    }
+
+    // 3. Kịch bản 2: Mật khẩu mới không đạt yêu cầu
+    if (newPassword.length < 6) {
+      setChangePassError('❌ Mật khẩu mới phải có độ dài tối thiểu 6 ký tự!');
+      return;
+    }
+
+    if (newPassword === currentPassword) {
+      setChangePassError('❌ Mật khẩu mới không được trùng với mật khẩu hiện tại!');
+      return;
+    }
+
+    if (confirmPassword !== newPassword) {
+      setChangePassError('❌ Mật khẩu xác nhận không trùng khớp với mật khẩu mới!');
+      return;
+    }
+
+    // 4. Kịch bản 3: Đổi mật khẩu thành công & Thu hồi phiên khác
+    const updatedUser = { ...user, password: newPassword };
+    setUser(updatedUser);
+    localStorage.setItem('auth_user', JSON.stringify(updatedUser));
+
+    // Cập nhật lại userList hệ thống
+    if (user?.username) {
+      setUserList(prev => prev.map(u => u.username === user.username ? { ...u, password: newPassword } : u));
+    }
+
+    // Thu hồi toàn bộ phiên làm việc trên các Tab/thiết bị khác qua BroadcastChannel
+    try {
+      const authChannel = new BroadcastChannel('auth_logout_channel');
+      authChannel.postMessage({
+        type: 'PASSWORD_CHANGED_EVENT',
+        username: user?.username,
+        timestamp: Date.now()
+      });
+      authChannel.close();
+    } catch (err) {
+      console.log('BroadcastChannel error:', err);
+    }
+
+    // Reset Form & gọi callback API
+    setChangePassForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+    onChangePassSubmit({ username: user?.username, newPassword });
+
+    // Hiển thị Popup thành công kèm xác nhận thu hồi phiên
+    setPopup({
+      show: true,
+      title: '🎉 Đổi Mật Khẩu Thành Công',
+      message: `Mật khẩu tài khoản '@${user?.username || 'user'}' đã được cập nhật thành công!\n\n🔒 THU HỒI PHIÊN TỰ ĐỘNG: Tất cả các phiên đăng nhập đang hoạt động trên thiết bị/Tab khác đã được tự động ngắt để bảo vệ an toàn tài khoản.`,
+      type: 'success',
+      onConfirm: () => setPopup(p => ({ ...p, show: false }))
+    });
+  };
+
   // =========================================================================
-  // XỬ LÝ LẮNG NGHE ĐĂNG XUẤT CHO TAB PHỤ (HẾT PHIÊN ĐĂNG NHẬP)
+  // XỚ LÝ LẮNG NGHE ĐĂNG XUẤT CHO TAB PHỤ (HẾT PHIÊN ĐĂNG NHẬP)
   // =========================================================================
   useEffect(() => {
     const authChannel = new BroadcastChannel('auth_logout_channel');
 
-    // Hàm kích hoạt Pop-up HẾT PHIÊN ĐĂNG NHẬP dành riêng cho Tab phụ
     const triggerOtherTabLogoutPopup = () => {
+      destroySession();
       setUser(null);
       setScreen('login');
       setPopup({
@@ -147,14 +272,23 @@ function App({
       });
     };
 
-    // 1. Nhận tín hiệu qua BroadcastChannel
     authChannel.onmessage = (event) => {
       if (event.data && event.data.type === 'LOGOUT_EVENT') {
         triggerOtherTabLogoutPopup();
+      } else if (event.data && event.data.type === 'PASSWORD_CHANGED_EVENT') {
+        destroySession();
+        setUser(null);
+        setScreen('login');
+        setPopup({
+          show: true,
+          title: '🔒 Mật khẩu đã thay đổi',
+          message: 'Mật khẩu tài khoản của bạn vừa được thay đổi từ một Tab/thiết bị khác. Vì lý do bảo mật, phiên làm việc này đã được tự động thu hồi. Vui lòng đăng nhập lại bằng mật khẩu mới!',
+          type: 'info',
+          onConfirm: () => setPopup({ show: false, title: '', message: '', type: 'info', onConfirm: null })
+        });
       }
     };
 
-    // 2. Nhận tín hiệu qua Storage Event (Dự phòng)
     const handleStorageChange = (event) => {
       if (event.key === 'auth_user' && event.newValue === null) {
         triggerOtherTabLogoutPopup();
@@ -162,96 +296,17 @@ function App({
     };
 
     window.addEventListener('storage', handleStorageChange);
-
     return () => {
       authChannel.close();
       window.removeEventListener('storage', handleStorageChange);
     };
-  }, []);
-
-  // =========================================================================
-  // XỬ LÝ ĐĂNG XUẤT CHO TAB BẤM ĐĂNG XUẤT (ĐÃ ĐĂNG XUẤT THÀNH CÔNG)
-  // =========================================================================
-  const handleLogout = () => {
-    // 1. Xoá phiên đăng nhập hiện tại
-    setUser(null);
-    localStorage.removeItem('auth_user');
-
-    // 2. Gửi thông điệp báo cho TẤT CẢ các tab khác
-    try {
-      const authChannel = new BroadcastChannel('auth_logout_channel');
-      authChannel.postMessage({ type: 'LOGOUT_EVENT', timestamp: Date.now() });
-      authChannel.close();
-    } catch (e) {
-      console.log('BroadcastChannel error:', e);
-    }
-
-    // 3. Hiển thị Pop-up "ĐÃ ĐĂNG XUẤT THÀNH CÔNG" cho tab bấm Đăng xuất
-    setScreen('login');
-    setPopup({
-      show: true,
-      title: 'Đăng xuất thành công',
-      message: 'Tài khoản của bạn đã được đăng xuất an toàn khỏi hệ thống tập trung!',
-      type: 'info',
-      onConfirm: () => setPopup({ show: false, title: '', message: '', type: 'info', onConfirm: null })
-    });
-  };
+  }, [destroySession]);
 
   const handleRoleChange = (newRole) => {
     setCurrentRole(newRole);
     const matched = MOCK_ACCOUNTS.find(a => a.role === newRole) || MOCK_ACCOUNTS[0];
     setUser(matched);
     localStorage.setItem('auth_user', JSON.stringify(matched));
-  };
-
-  const handleLoginSubmit = (e) => {
-    e.preventDefault();
-    onLoginSubmit({ username: loginUsername, password: loginPassword });
-
-    const trimmedUser = loginUsername.trim();
-    if (!trimmedUser || !loginPassword) {
-      setPopup({
-        show: true,
-        title: 'Đăng nhập không thành công',
-        message: 'Vui lòng nhập đầy đủ tên đăng nhập và mật khẩu!',
-        type: 'error',
-        onConfirm: () => setPopup(p => ({ ...p, show: false }))
-      });
-      return;
-    }
-
-    const foundAccount = userList.find(
-      (a) => a.username.toLowerCase() === trimmedUser.toLowerCase()
-    );
-
-    if (!foundAccount || foundAccount.password !== loginPassword) {
-      setPopup({
-        show: true,
-        title: 'Đăng nhập thất bại',
-        message: 'Tên đăng nhập hoặc mật khẩu không chính xác. Vui lòng kiểm tra lại!',
-        type: 'error',
-        onConfirm: () => setPopup(p => ({ ...p, show: false }))
-      });
-      return;
-    }
-
-    if (foundAccount.isLocked) {
-      setPopup({
-        show: true,
-        title: 'Tài khoản đã bị khóa',
-        message: `Tài khoản này hiện đang bị khóa bởi Quản trị viên.\nLý do: "${foundAccount.lockReason || 'Không có'}"`,
-        type: 'error',
-        onConfirm: () => setPopup(p => ({ ...p, show: false }))
-      });
-      return;
-    }
-
-    setUser(foundAccount);
-    setCurrentRole(foundAccount.role);
-    localStorage.setItem('auth_user', JSON.stringify(foundAccount));
-    setScreen('dashboard');
-    setLoginUsername('');
-    setLoginPassword('');
   };
 
   const handleRegisterSubmit = (e) => {
@@ -550,16 +605,16 @@ function App({
                 {roleActive === 'admin'
                   ? "Bảng Điều Khiển Quản Trị Hệ Thống (ADMIN)"
                   : roleActive === 'sales_mgr'
-                  ? "Bảng Phân Tích & Điều Hành Kinh Doanh (SALES MANAGER)"
-                  : roleActive === 'sales_rep'
-                  ? "Cổng Nghiệp Vụ Nhân Viên Kinh Doanh (SALES REP)"
-                  : roleActive === 'wh_mgr'
-                  ? "Trung Tâm Quản Lý Kho Hàng (WH MANAGER)"
-                  : roleActive === 'warehouse'
-                  ? "Quầy Bán Hàng & Xuất Kho POS (WAREHOUSE)"
-                  : roleActive === 'accountant'
-                  ? "Phân Hệ Kế Toán & Quản Lý Công Nợ (ACCOUNTANT)"
-                  : "Cổng Đặt Hàng Trực Tuyến Đại Lý (CUSTOMER)"}
+                    ? "Bảng Phân Tích & Điều Hành Kinh Doanh (SALES MANAGER)"
+                    : roleActive === 'sales_rep'
+                      ? "Cổng Nghiệp Vụ Nhân Viên Kinh Doanh (SALES REP)"
+                      : roleActive === 'wh_mgr'
+                        ? "Trung Tâm Quản Lý Kho Hàng (WH MANAGER)"
+                        : roleActive === 'warehouse'
+                          ? "Quầy Bán Hàng & Xuất Kho POS (WAREHOUSE)"
+                          : roleActive === 'accountant'
+                            ? "Phân Hệ Kế Toán & Quản Lý Công Nợ (ACCOUNTANT)"
+                            : "Cổng Đặt Hàng Trực Tuyến Đại Lý (CUSTOMER)"}
               </h2>
               <p style={{ margin: 0, fontSize: '13px', opacity: 0.9 }}>
                 {user?.fullName || "Người dùng hệ thống"} • Vai trò: <strong>{user?.roleTitle || roleActive.toUpperCase()}</strong>
@@ -623,6 +678,34 @@ function App({
   // HAM RENDER NOI DUNG CHINH THEO SCREEN
   // =========================================================================
   const renderMainContent = () => {
+    // 0. MAN HINH LOI (404, 403, 401, 500)
+    if (screen === 'error' && errorType) {
+      return (
+        <ErrorPage
+          errorType={errorType}
+          userRole={user?.roleTitle || currentRole}
+          onGoHome={() => {
+            setErrorType(null);
+            setScreen(user ? 'dashboard' : 'login');
+          }}
+          onGoBack={() => {
+            setErrorType(null);
+            setScreen(user ? 'dashboard' : 'login');
+          }}
+          onLogin={() => {
+            setErrorType(null);
+            setUser(null);
+            localStorage.removeItem('auth_user');
+            setScreen('login');
+          }}
+          onRetry={() => {
+            setErrorType(null);
+            setScreen(user ? 'dashboard' : 'login');
+          }}
+        />
+      );
+    }
+
     // 1. MAN HINH DASHBOARD
     if (screen === 'dashboard') {
       const roleActive = user?.role || currentRole;
@@ -843,96 +926,65 @@ function App({
 
           {roleActive === 'admin' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px' }}>
-                <div style={styles.adminStatCard}>
-                  <span style={{ fontSize: '11px', color: '#64748b' }}>TÀI KHOẢN MẪU HỆ THỐNG</span>
-                  <h2 style={{ margin: '4px 0', color: '#1e293b' }}>{userList.length}</h2>
-                </div>
-                <div style={styles.adminStatCard}>
-                  <span style={{ fontSize: '11px', color: '#64748b' }}>VAI TRÒ NGHIỆP VỤ</span>
-                  <h2 style={{ margin: '4px 0', color: '#2563eb' }}>7 Vai trò</h2>
-                </div>
-                <div style={styles.adminStatCard}>
-                  <span style={{ fontSize: '11px', color: '#64748b' }}>DOANH SỐ TOÀN HỆ THỐNG</span>
-                  <h2 style={{ margin: '4px 0', color: '#059669' }}>450.000.000 đ</h2>
-                </div>
-                <div style={{ ...styles.adminStatCard, borderLeft: '4px solid #d97706' }}>
-                  <span style={{ fontSize: '11px', color: '#64748b' }}>QUY ĐỊNH KHÓA TÀI KHOẢN</span>
-                  <h2 style={{ margin: '4px 0', fontSize: '18px', color: '#d97706' }}>Bắt buộc lý do</h2>
-                </div>
-              </div>
+              <UserManagement
+                userList={userList}
+                setUserList={setUserList}
+                setPopup={setPopup}
+                currentUser={user}
+              />
 
-              <div style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '24px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                  <div>
-                    <h3 style={{ margin: 0, fontSize: '16px', color: '#1e293b' }}>
-                      👥 Quản Lý Tài Khoản & Khóa/Mở Khóa
-                    </h3>
-                    <span style={{ fontSize: '12px', color: '#64748b' }}>Bắt buộc ghi lý do khóa • Thu hồi phiên tức thì • Cảnh báo bàn giao đại lý</span>
+              {/* Bảng Test Error Pages & API/Router Interceptor (chỉ Admin thấy) */}
+              <div style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '24px', marginTop: '20px' }}>
+                <h3 style={{ margin: '0 0 8px 0', fontSize: '16px', color: '#1e293b' }}>
+                  🧪 Kiểm Tra Điều Hướng Bẫy Lỗi Router & API Interceptor
+                </h3>
+                <p style={{ fontSize: '12px', color: '#64748b', marginBottom: '16px' }}>
+                  Bấm các nút dưới đây để kiểm tra khả năng tự động bắt lỗi từ tầng gọi API (HTTP status code) và tầng Router (URL Hash & Phân quyền):
+                </p>
+
+                <div style={{ marginBottom: '16px' }}>
+                  <strong style={{ fontSize: '12px', color: '#334155', display: 'block', marginBottom: '8px' }}>1. Bắt lỗi trực tiếp (Error Screen Views):</strong>
+                  <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                    <button type="button" onClick={() => { setErrorType(404); setScreen('error'); }} style={{ flex: '1 1 0', padding: '8px 12px', borderRadius: '8px', border: '1px solid #93c5fd', backgroundColor: '#eff6ff', color: '#1d4ed8', fontWeight: '700', fontSize: '12px', cursor: 'pointer' }}>
+                      🗺️ 404 Không tìm thấy
+                    </button>
+                    <button type="button" onClick={() => { setErrorType(403); setScreen('error'); }} style={{ flex: '1 1 0', padding: '8px 12px', borderRadius: '8px', border: '1px solid #fca5a5', backgroundColor: '#fef2f2', color: '#dc2626', fontWeight: '700', fontSize: '12px', cursor: 'pointer' }}>
+                      🔒 403 Không đủ quyền
+                    </button>
+                    <button type="button" onClick={() => { setErrorType(401); setScreen('error'); }} style={{ flex: '1 1 0', padding: '8px 12px', borderRadius: '8px', border: '1px solid #fde68a', backgroundColor: '#fffbeb', color: '#b45309', fontWeight: '700', fontSize: '12px', cursor: 'pointer' }}>
+                      ⏱️ 401 Phiên hết hạn
+                    </button>
+                    <button type="button" onClick={() => { setErrorType(500); setScreen('error'); }} style={{ flex: '1 1 0', padding: '8px 12px', borderRadius: '8px', border: '1px solid #c4b5fd', backgroundColor: '#f5f3ff', color: '#7c3aed', fontWeight: '700', fontSize: '12px', cursor: 'pointer' }}>
+                      ⚙️ 500 Lỗi hệ thống
+                    </button>
                   </div>
                 </div>
 
-                <div style={{ overflowX: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', textAlign: 'left' }}>
-                    <thead>
-                      <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
-                        <th style={{ padding: '10px 12px' }}>Họ và tên</th>
-                        <th style={{ padding: '10px 12px' }}>Tài khoản</th>
-                        <th style={{ padding: '10px 12px' }}>Vai trò</th>
-                        <th style={{ padding: '10px 12px' }}>Kho gán</th>
-                        <th style={{ padding: '10px 12px' }}>Trạng thái</th>
-                        <th style={{ padding: '10px 12px', textAlign: 'center' }}>Thao tác</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {userList.map((u) => (
-                        <tr key={u.username} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                          <td style={{ padding: '10px 12px', fontWeight: '600' }}>{u.fullName}</td>
-                          <td style={{ padding: '10px 12px', color: '#2563eb' }}>@{u.username}</td>
-                          <td style={{ padding: '10px 12px' }}>
-                            <span style={{ backgroundColor: '#eff6ff', color: '#1d4ed8', padding: '3px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold' }}>
-                              {u.roleTitle || u.role}
-                            </span>
-                          </td>
-                          <td style={{ padding: '10px 12px' }}>
-                            {u.warehouse ? <span style={{ color: '#059669', fontWeight: 'bold' }}>🏢 {u.warehouse}</span> : <span style={{ color: '#94a3b8' }}>-</span>}
-                          </td>
-                          <td style={{ padding: '10px 12px' }}>
-                            {u.isLocked ? (
-                              <span style={{ backgroundColor: '#fee2e2', color: '#b91c1c', padding: '3px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold' }} title={`Lý do: ${u.lockReason}`}>
-                                🔒 Đã khóa
-                              </span>
-                            ) : (
-                              <span style={{ backgroundColor: '#dcfce7', color: '#15803d', padding: '3px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold' }}>
-                                 Hoạt động
-                              </span>
-                            )}
-                          </td>
-                          <td style={{ padding: '10px 12px', textAlign: 'center' }}>
-                            {u.role === 'admin' ? (
-                              <span style={{ fontSize: '11px', color: '#94a3b8' }} title="Không thể tự khóa tài khoản Admin">Admin gốc</span>
-                            ) : u.isLocked ? (
-                              <button
-                                type="button"
-                                onClick={() => handleUnlockAccountDemo(u.username)}
-                                style={{ padding: '4px 10px', fontSize: '11px', borderRadius: '6px', border: '1px solid #86efac', backgroundColor: '#f0fdf4', color: '#15803d', cursor: 'pointer', fontWeight: 'bold' }}
-                              >
-                                🔓 Mở khóa
-                              </button>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => handleLockAccountDemo(u.username)}
-                                style={{ padding: '4px 10px', fontSize: '11px', borderRadius: '6px', border: '1px solid #fca5a5', backgroundColor: '#fef2f2', color: '#b91c1c', cursor: 'pointer', fontWeight: 'bold' }}
-                              >
-                                🔒 Khóa tài khoản
-                              </button>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                <div style={{ marginBottom: '12px' }}>
+                  <strong style={{ fontSize: '12px', color: '#334155', display: 'block', marginBottom: '8px' }}>2. Bắt lỗi tự động từ Tầng API Interceptor (`apiClient`):</strong>
+                  <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                    <button type="button" onClick={() => apiClient.simulateApiCall(401).catch(() => { })} style={{ flex: '1 1 0', padding: '8px 12px', borderRadius: '8px', border: '1px stroke #cbd5e1', backgroundColor: '#f8fafc', color: '#0f172a', fontWeight: '600', fontSize: '11px', cursor: 'pointer' }}>
+                      📡 Giả lập API 401
+                    </button>
+                    <button type="button" onClick={() => apiClient.simulateApiCall(403).catch(() => { })} style={{ flex: '1 1 0', padding: '8px 12px', borderRadius: '8px', border: '1px stroke #cbd5e1', backgroundColor: '#f8fafc', color: '#0f172a', fontWeight: '600', fontSize: '11px', cursor: 'pointer' }}>
+                      📡 Giả lập API 403
+                    </button>
+                    <button type="button" onClick={() => apiClient.simulateApiCall(404).catch(() => { })} style={{ flex: '1 1 0', padding: '8px 12px', borderRadius: '8px', border: '1px stroke #cbd5e1', backgroundColor: '#f8fafc', color: '#0f172a', fontWeight: '600', fontSize: '11px', cursor: 'pointer' }}>
+                      📡 Giả lập API 404
+                    </button>
+                    <button type="button" onClick={() => apiClient.simulateApiCall(500).catch(() => { })} style={{ flex: '1 1 0', padding: '8px 12px', borderRadius: '8px', border: '1px stroke #cbd5e1', backgroundColor: '#f8fafc', color: '#0f172a', fontWeight: '600', fontSize: '11px', cursor: 'pointer' }}>
+                      📡 Giả lập API 500
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <strong style={{ fontSize: '12px', color: '#334155', display: 'block', marginBottom: '8px' }}>3. Bắt lỗi tự động từ Tầng Router Guard (`routerGuard`):</strong>
+                  <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                    <button type="button" onClick={() => { window.location.hash = '#/unknown-page-route'; }} style={{ flex: '1 1 0', padding: '8px 12px', borderRadius: '8px', border: '1px dashed #64748b', backgroundColor: '#ffffff', color: '#334155', fontWeight: '600', fontSize: '11px', cursor: 'pointer' }}>
+                      🛣️ Hash URL sai path (#/unknown) → 404
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1029,19 +1081,46 @@ function App({
                 {!showForgotInProfile ? (
                   <div>
                     <h3 style={{ borderBottom: '2px solid #f1f5f9', paddingBottom: '10px' }}>🔒 Thay Đổi Mật Khẩu</h3>
-                    <form onSubmit={(e) => { e.preventDefault(); onChangePassSubmit({}); }}>
+                    <form onSubmit={handleChangePasswordSubmit}>
+                      {changePassError && (
+                        <div style={{ backgroundColor: '#fef2f2', border: '1px solid #fca5a5', color: '#991b1b', padding: '10px 14px', borderRadius: '8px', fontSize: '12px', marginBottom: '14px', fontWeight: '500' }}>
+                          {changePassError}
+                        </div>
+                      )}
+
                       <div style={{ position: 'relative', marginBottom: '12px' }}>
-                        <input type={showProfCurrentPass ? "text" : "password"} placeholder="Mật khẩu hiện tại" style={styles.profileInput} />
+                        <input
+                          type={showProfCurrentPass ? "text" : "password"}
+                          placeholder="Mật khẩu hiện tại"
+                          value={changePassForm.currentPassword}
+                          onChange={(e) => setChangePassForm(prev => ({ ...prev, currentPassword: e.target.value }))}
+                          style={styles.profileInput}
+                        />
                         <TogglePassBtn isVisible={showProfCurrentPass} onToggle={() => setShowProfCurrentPass(!showProfCurrentPass)} />
                       </div>
+
                       <div style={{ position: 'relative', marginBottom: '12px' }}>
-                        <input type={showProfNewPass ? "text" : "password"} placeholder="Mật khẩu mới" style={styles.profileInput} />
+                        <input
+                          type={showProfNewPass ? "text" : "password"}
+                          placeholder="Mật khẩu mới (Tối thiểu 6 ký tự)"
+                          value={changePassForm.newPassword}
+                          onChange={(e) => setChangePassForm(prev => ({ ...prev, newPassword: e.target.value }))}
+                          style={styles.profileInput}
+                        />
                         <TogglePassBtn isVisible={showProfNewPass} onToggle={() => setShowProfNewPass(!showProfNewPass)} />
                       </div>
+
                       <div style={{ position: 'relative', marginBottom: '15px' }}>
-                        <input type={showProfConfirmPass ? "text" : "password"} placeholder="Xác nhận mật khẩu mới" style={styles.profileInput} />
+                        <input
+                          type={showProfConfirmPass ? "text" : "password"}
+                          placeholder="Xác nhận mật khẩu mới"
+                          value={changePassForm.confirmPassword}
+                          onChange={(e) => setChangePassForm(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                          style={styles.profileInput}
+                        />
                         <TogglePassBtn isVisible={showProfConfirmPass} onToggle={() => setShowProfConfirmPass(!showProfConfirmPass)} />
                       </div>
+
                       <button
                         type="submit"
                         style={{
@@ -1051,7 +1130,7 @@ function App({
                         onMouseEnter={() => setHoveredBlock('btn-chgpass')}
                         onMouseLeave={() => setHoveredBlock(null)}
                       >
-                        CẬP NHẬT MẬT KHẨU
+                        🔒 ĐỔI MẬT KHẨU & THU HỒI PHIÊN KẾT NỐI
                       </button>
                     </form>
                     <div style={{ textAlign: 'center', marginTop: '15px' }}>
@@ -1128,82 +1207,15 @@ function App({
 
           {/* FORM ĐĂNG NHẬP */}
           {screen === 'login' && (
-            <form onSubmit={handleLoginSubmit} style={styles.formContainerResponsive}>
-              <div style={styles.avatarCircle}>👤</div>
-              <h3 style={styles.formTitle}>ĐĂNG NHẬP HỆ THỐNG</h3>
-
-              <div
-                style={{
-                  ...styles.inputWrapper,
-                  ...(hoveredBlock === 'inp-user' ? styles.elevatedInput3D : {}),
-                }}
-                onMouseEnter={() => setHoveredBlock('inp-user')}
-                onMouseLeave={() => setHoveredBlock(null)}
-              >
-                <input
-                  type="text"
-                  placeholder="USERNAME"
-                  value={loginUsername}
-                  onChange={(e) => setLoginUsername(e.target.value)}
-                  style={styles.input}
-                  required
-                />
-              </div>
-
-              <div
-                style={{
-                  ...styles.inputWrapper,
-                  ...(hoveredBlock === 'inp-pass' ? styles.elevatedInput3D : {}),
-                }}
-                onMouseEnter={() => setHoveredBlock('inp-pass')}
-                onMouseLeave={() => setHoveredBlock(null)}
-              >
-                <input
-                  type={showLoginPass ? "text" : "password"}
-                  placeholder="MẬT KHẨU"
-                  value={loginPassword}
-                  onChange={(e) => setLoginPassword(e.target.value)}
-                  style={styles.inputWithEye}
-                  required
-                />
-                <TogglePassBtn isVisible={showLoginPass} onToggle={() => setShowLoginPass(!showLoginPass)} />
-              </div>
-
-              <button
-                type="submit"
-                style={{
-                  ...styles.actionBtn,
-                  ...(hoveredBlock === 'btn-login' ? styles.elevatedBtnNavy : {}),
-                }}
-                onMouseEnter={() => setHoveredBlock('btn-login')}
-                onMouseLeave={() => setHoveredBlock(null)}
-              >
-                ĐĂNG NHẬP
-              </button>
-
-              <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', fontSize: '12px', marginTop: '8px' }}>
-                <a
-                  href="#register"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    setScreen('register');
-                  }}
-                  style={{ ...styles.linkText, textDecoration: 'none' }}
-                >
-                  + Tạo tài khoản
-                </a>
-                <a
-                  href="#forgot"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    setScreen('forgot');
-                  }}
-                  style={{ ...styles.linkText, textDecoration: 'none' }}
-                >
-                  Quên mật khẩu?
-                </a>
-              </div>
-            </form>
+            <Login
+              userList={userList}
+              setUser={setUser}
+              setCurrentRole={setCurrentRole}
+              setScreen={setScreen}
+              setPopup={setPopup}
+              styles={styles}
+              onLoginSubmit={onLoginSubmit}
+            />
           )}
 
           {/* FORM ĐĂNG KÝ */}
@@ -1458,19 +1470,21 @@ function App({
         </a>
       </div>
 
-      {viewMode === 'scrum300' ? (
-        <div>
-          <Navbar />
-          <main>
-            <Scrum300Demo />
-          </main>
-        </div>
-      ) : (
-        <>
-          {renderNotificationModal()}
-          {renderMainContent()}
-        </>
-      )}
+      <ErrorBoundary userRole={user?.roleTitle || currentRole} onError={() => { setErrorType(500); setScreen('error'); }}>
+        {viewMode === 'scrum300' ? (
+          <div>
+            <Navbar />
+            <main>
+              <Scrum300Demo />
+            </main>
+          </div>
+        ) : (
+          <>
+            {renderNotificationModal()}
+            {renderMainContent()}
+          </>
+        )}
+      </ErrorBoundary>
     </AuthProvider>
   );
 }
@@ -1523,26 +1537,26 @@ const styles = {
     boxShadow: '0 6px 16px rgba(0,0,0,0.2)',
   },
 
-  omsContainer: { display: 'flex', width: '100vw', minHeight: '100vh', backgroundColor: '#f8fafc', fontFamily: "'Inter', sans-serif" },
-  omsSidebar: { width: '240px', backgroundColor: '#0b132b', color: '#ffffff', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '20px 15px', boxSizing: 'border-box', flexShrink: 0, zIndex: 10, boxShadow: '4px 0 20px rgba(0,0,0,0.25)' },
-  omsSidebarHeader: { fontSize: '11px', fontWeight: 'bold', letterSpacing: '1px', color: '#64748b', marginBottom: '15px', paddingLeft: '10px' },
+  omsContainer: { display: 'flex', width: '100vw', minHeight: '100vh', backgroundColor: '#f0f7ff', fontFamily: "'Inter', sans-serif" },
+  omsSidebar: { width: '240px', background: 'linear-gradient(180deg, #00acc1 0%, #00838f 35%, #0277bd 70%, #1565c0 100%)', color: '#ffffff', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '20px 15px', boxSizing: 'border-box', flexShrink: 0, zIndex: 10, boxShadow: '4px 0 20px rgba(0, 172, 193, 0.3)' },
+  omsSidebarHeader: { fontSize: '11px', fontWeight: 'bold', letterSpacing: '1px', color: 'rgba(255, 255, 255, 0.8)', marginBottom: '15px', paddingLeft: '10px' },
   omsNavList: { display: 'flex', flexDirection: 'column', gap: '6px' },
-  omsNavItem: { display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', borderRadius: '10px', fontSize: '13px', color: '#94a3b8', cursor: 'pointer', transition: 'all 0.25s ease' },
-  omsNavItemActive: { backgroundColor: '#2563eb', color: '#ffffff', fontWeight: 'bold', boxShadow: '0 6px 14px rgba(0, 0, 0, 0.4)' },
-  omsSidebarFooter: { borderTop: '1px solid #1e293b', paddingTop: '15px' },
+  omsNavItem: { display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', borderRadius: '10px', fontSize: '13px', color: 'rgba(255, 255, 255, 0.9)', cursor: 'pointer', transition: 'all 0.25s ease' },
+  omsNavItemActive: { backgroundColor: 'rgba(255, 255, 255, 0.25)', color: '#ffffff', fontWeight: 'bold', boxShadow: '0 4px 12px rgba(0, 0, 0, 0.18)' },
+  omsSidebarFooter: { borderTop: '1px solid rgba(255, 255, 255, 0.2)', paddingTop: '15px' },
   omsLogoutBtn: { width: '100%', padding: '10px', marginTop: '12px', backgroundColor: '#ef4444', color: '#ffffff', border: 'none', borderRadius: '20px', fontWeight: 'bold', cursor: 'pointer', fontSize: '12px', transition: 'all 0.3s ease' },
   omsMainArea: { flex: 1, display: 'flex', flexDirection: 'column', overflowX: 'hidden' },
   omsHeader: { height: '60px', backgroundColor: '#ffffff', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 25px' },
-  omsLogoSquare: { width: '32px', height: '32px', backgroundColor: '#2563eb', color: '#ffffff', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '18px' },
+  omsLogoSquare: { width: '32px', height: '32px', background: 'linear-gradient(135deg, #00acc1, #0284c7)', color: '#ffffff', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '18px' },
   omsRoleSelectWrapper: { display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: '#f1f5f9', padding: '4px 12px', borderRadius: '20px', border: '1px solid #cbd5e1' },
   omsRoleSelect: { border: 'none', backgroundColor: 'transparent', fontWeight: 'bold', fontSize: '12px', color: '#1e293b', outline: 'none', cursor: 'pointer' },
   omsUserAvatarPill: { display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', padding: '4px 10px', borderRadius: '20px', backgroundColor: '#ffffff', border: '1px solid #cbd5e1', transition: 'all 0.3s ease' },
-  omsAvatarIcon: { width: '30px', height: '30px', borderRadius: '50%', backgroundColor: '#2563eb', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' },
-  omsBanner: { backgroundColor: '#2563eb', color: '#ffffff', padding: '20px 25px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '15px', margin: '15px 25px 0 25px', borderRadius: '16px', boxShadow: '0 8px 20px rgba(0, 0, 0, 0.2)', transition: 'all 0.3s ease' },
+  omsAvatarIcon: { width: '30px', height: '30px', borderRadius: '50%', background: 'linear-gradient(135deg, #00acc1, #2563eb)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' },
+  omsBanner: { background: 'linear-gradient(135deg, #00acc1 0%, #0284c7 50%, #2563eb 100%)', color: '#ffffff', padding: '20px 25px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '15px', margin: '15px 25px 0 25px', borderRadius: '16px', boxShadow: '0 8px 20px rgba(0, 172, 193, 0.3)', transition: 'all 0.3s ease' },
   omsContentBody: { padding: '25px', flex: 1 },
   omsTabRow: { display: 'flex', gap: '12px', borderBottom: '2px solid #e2e8f0', marginBottom: '20px' },
   omsTabBtn: { padding: '10px 16px', backgroundColor: 'transparent', border: 'none', borderBottom: '3px solid transparent', fontSize: '13px', fontWeight: '600', color: '#64748b', cursor: 'pointer' },
-  omsTabBtnActive: { borderBottomColor: '#2563eb', color: '#2563eb' },
+  omsTabBtnActive: { borderBottomColor: '#0284c7', color: '#0284c7' },
   omsProdCard: { backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '16px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', boxShadow: '0 4px 12px rgba(0,0,0,0.03)', transition: 'all 0.3s ease' },
   omsProdSku: { fontSize: '10px', fontWeight: 'bold', color: '#64748b', fontFamily: 'monospace' },
   omsProdTitle: { margin: '6px 0', fontSize: '14px', color: '#0f172a', fontWeight: 'bold', lineHeight: '1.3' },
@@ -1555,35 +1569,35 @@ const styles = {
 
   outerContainerFullWidth: { width: '100vw', minHeight: '100vh', display: 'flex', flexWrap: 'wrap', fontFamily: "'Inter', sans-serif", margin: 0, padding: 0, backgroundColor: '#ffffff', overflowX: 'hidden' },
   leftPanelFullWidth: { flex: '1 1 380px', padding: 'min(4vw, 40px)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', backgroundColor: '#ffffff', minHeight: '100vh', boxSizing: 'border-box' },
-  rightPanelFullWidth: { flex: '2 1 450px', background: 'radial-gradient(circle at 80% 20%, #FBEFD5 0%, #3B72A4 45%, #182C61 90%)', padding: 'min(4vw, 40px)', display: 'flex', flexDirection: 'column', color: '#ffffff', minHeight: '100vh', boxSizing: 'border-box' },
+  rightPanelFullWidth: { flex: '2 1 450px', background: 'linear-gradient(180deg, #00acc1 0%, #0284c7 45%, #1565c0 90%)', padding: 'min(4vw, 40px)', display: 'flex', flexDirection: 'column', color: '#ffffff', minHeight: '100vh', boxSizing: 'border-box' },
   brand: { display: 'flex', alignItems: 'center', gap: '12px' },
   logoIcon: { position: 'relative', width: '28px', height: '28px' },
-  logoSquare1: { position: 'absolute', width: '18px', height: '18px', backgroundColor: '#1E2A78', borderRadius: '4px', top: 0, left: 0 },
-  logoSquare2: { position: 'absolute', width: '18px', height: '18px', border: '2px solid #1E2A78', borderRadius: '4px', bottom: 0, right: 0 },
-  brandText: { display: 'flex', flexDirection: 'column', fontSize: '11px', color: '#1E2A78', textTransform: 'uppercase' },
+  logoSquare1: { position: 'absolute', width: '18px', height: '18px', backgroundColor: '#00acc1', borderRadius: '4px', top: 0, left: 0 },
+  logoSquare2: { position: 'absolute', width: '18px', height: '18px', border: '2px solid #00acc1', borderRadius: '4px', bottom: 0, right: 0 },
+  brandText: { display: 'flex', flexDirection: 'column', fontSize: '11px', color: '#00838f', textTransform: 'uppercase' },
   formContainerResponsive: { display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', maxWidth: '380px', margin: '20px auto' },
-  formTitle: { color: '#1E2A78', fontSize: '16px', margin: '0 0 6px 0', fontWeight: 'bold' },
+  formTitle: { color: '#00838f', fontSize: '16px', margin: '0 0 6px 0', fontWeight: 'bold' },
   quickAccountContainer: { width: '100%', marginTop: '4px', marginBottom: '12px' },
-  quickAccountCard: { width: '100%', backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '20px', padding: '10px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer', textAlign: 'center', transition: 'all 0.3s ease' },
-  avatarCircle: { width: '50px', height: '50px', borderRadius: '50%', border: '2px solid #1E2A78', display: 'flex', justifyContent: 'center', alignItems: 'center', marginBottom: '10px', fontSize: '20px' },
+  quickAccountCard: { width: '100%', background: 'linear-gradient(135deg, #00acc1 0%, #0284c7 50%, #2563eb 100%)', color: '#ffffff', border: 'none', borderRadius: '20px', padding: '10px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer', textAlign: 'center', transition: 'all 0.3s ease' },
+  avatarCircle: { width: '50px', height: '50px', borderRadius: '50%', border: '2px solid #00acc1', display: 'flex', justifyContent: 'center', alignItems: 'center', marginBottom: '10px', fontSize: '20px' },
 
   inputWrapper: { width: '100%', position: 'relative', marginBottom: '10px', borderRadius: '30px', transition: 'all 0.3s ease' },
-  input: { width: '100%', padding: '12px 18px', borderRadius: '30px', border: '1.5px solid #1E2A78', outline: 'none', fontSize: '12px', boxSizing: 'border-box' },
-  inputWithEye: { width: '100%', padding: '12px 46px 12px 18px', borderRadius: '30px', border: '1.5px solid #1E2A78', outline: 'none', fontSize: '12px', boxSizing: 'border-box' },
-  inputSmall: { width: '100%', padding: '10px 18px', borderRadius: '30px', border: '1.5px solid #1E2A78', outline: 'none', fontSize: '12px', boxSizing: 'border-box' },
-  inputSmallWithEye: { width: '100%', padding: '10px 46px 10px 18px', borderRadius: '30px', border: '1.5px solid #1E2A78', outline: 'none', fontSize: '12px', boxSizing: 'border-box' },
+  input: { width: '100%', padding: '12px 18px', borderRadius: '30px', border: '1.5px solid #00acc1', outline: 'none', fontSize: '12px', boxSizing: 'border-box' },
+  inputWithEye: { width: '100%', padding: '12px 46px 12px 18px', borderRadius: '30px', border: '1.5px solid #00acc1', outline: 'none', fontSize: '12px', boxSizing: 'border-box' },
+  inputSmall: { width: '100%', padding: '10px 18px', borderRadius: '30px', border: '1.5px solid #00acc1', outline: 'none', fontSize: '12px', boxSizing: 'border-box' },
+  inputSmallWithEye: { width: '100%', padding: '10px 46px 10px 18px', borderRadius: '30px', border: '1.5px solid #00acc1', outline: 'none', fontSize: '12px', boxSizing: 'border-box' },
   profileInput: { width: '100%', padding: '12px 46px 12px 16px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '13px', boxSizing: 'border-box' },
   eyeBtn: { position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4px' },
-  actionBtn: { width: '100%', padding: '13px', borderRadius: '30px', backgroundColor: '#1E2A78', color: '#ffffff', border: 'none', fontWeight: 'bold', fontSize: '12px', cursor: 'pointer', transition: 'all 0.3s ease' },
-  linkText: { cursor: 'pointer', color: '#1E2A78', fontWeight: '500', fontSize: '12px' },
+  actionBtn: { width: '100%', padding: '13px', borderRadius: '30px', background: 'linear-gradient(135deg, #00acc1 0%, #0284c7 50%, #2563eb 100%)', color: '#ffffff', border: 'none', fontWeight: 'bold', fontSize: '12px', cursor: 'pointer', transition: 'all 0.3s ease' },
+  linkText: { cursor: 'pointer', color: '#0284c7', fontWeight: '500', fontSize: '12px' },
   navHeader: { display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '24px', width: '100%' },
   navLink: { color: 'rgba(255, 255, 255, 0.85)', textDecoration: 'none', fontSize: '12px', letterSpacing: '1px', fontWeight: '500', cursor: 'pointer', transition: 'all 0.3s ease' },
-  signInPillBtn: { backgroundColor: '#182C61', color: '#ffffff', border: 'none', padding: '8px 24px', borderRadius: '20px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.3s ease' },
+  signInPillBtn: { background: 'linear-gradient(135deg, #00acc1 0%, #2563eb 100%)', color: '#ffffff', border: 'none', padding: '8px 24px', borderRadius: '20px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.3s ease' },
   centerContainer: { flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100%', margin: '20px 0' },
-  glassCardCenter: { maxWidth: '460px', width: '100%', padding: '30px', borderRadius: '24px', backgroundColor: 'rgba(255, 255, 255, 0.12)', backdropFilter: 'blur(16px)', border: '1px solid rgba(255, 255, 255, 0.2)', boxShadow: '0 20px 40px rgba(0, 0, 0, 0.25)', textAlign: 'center' },
+  glassCardCenter: { maxWidth: '460px', width: '100%', padding: '30px', borderRadius: '24px', backgroundColor: 'rgba(255, 255, 255, 0.15)', backdropFilter: 'blur(16px)', border: '1px solid rgba(255, 255, 255, 0.25)', boxShadow: '0 20px 40px rgba(0, 172, 193, 0.2)', textAlign: 'center' },
   welcomeContentCenter: { maxWidth: '480px', width: '100%', padding: '24px', borderRadius: '20px', textAlign: 'center', transition: 'all 0.3s ease' },
   welcomeTitleCenter: { fontSize: 'clamp(36px, 5vw, 56px)', fontWeight: '800', margin: '0 0 8px 0', textAlign: 'center' },
-  sloganTagCenter: { fontSize: '11px', fontWeight: 'bold', letterSpacing: '2px', color: '#FBEFD5', marginBottom: '10px', textAlign: 'center' },
+  sloganTagCenter: { fontSize: '11px', fontWeight: 'bold', letterSpacing: '2px', color: '#e0f7fa', marginBottom: '10px', textAlign: 'center' },
   sloganTitleCenter: { fontSize: '22px', fontWeight: '700', margin: '0 0 14px 0', color: '#ffffff', textAlign: 'center' },
   welcomeDescCenter: { fontSize: '13px', lineHeight: '1.6', opacity: 0.95, marginBottom: '16px', textAlign: 'center' },
   webImageMockupCenter: { backgroundColor: 'rgba(15, 23, 42, 0.8)', borderRadius: '12px', padding: '14px', border: '1px solid rgba(255, 255, 255, 0.15)', boxShadow: '0 10px 25px rgba(0,0,0,0.3)', width: '100%', boxSizing: 'border-box', textAlign: 'left' },
@@ -1593,31 +1607,15 @@ const styles = {
   mockupBody: { display: 'flex', flexDirection: 'column', gap: '6px' },
   mockupBar: { backgroundColor: 'rgba(255, 255, 255, 0.08)', padding: '7px 10px', borderRadius: '6px', fontSize: '12px', color: '#f8fafc' },
 
-  elevatedInput3D: { transform: 'translateY(-3px)', boxShadow: '0 8px 18px rgba(0, 0, 0, 0.15)' },
-  elevatedBtnNavy: { transform: 'translateY(-3px)', backgroundColor: '#16205e', boxShadow: '0 10px 22px rgba(0, 0, 0, 0.35)' },
-  elevatedBtnBlue: { transform: 'translateY(-3px)', backgroundColor: '#1d4ed8', boxShadow: '0 10px 22px rgba(0, 0, 0, 0.35)' },
+  elevatedInput3D: { transform: 'translateY(-3px)', boxShadow: '0 8px 18px rgba(0, 172, 193, 0.2)' },
+  elevatedBtnNavy: { transform: 'translateY(-3px)', background: 'linear-gradient(135deg, #00838f 0%, #0277bd 100%)', boxShadow: '0 10px 22px rgba(0, 131, 143, 0.35)' },
+  elevatedBtnBlue: { transform: 'translateY(-3px)', background: 'linear-gradient(135deg, #0284c7 0%, #1d4ed8 100%)', boxShadow: '0 10px 22px rgba(2, 132, 199, 0.35)' },
   elevatedBtnDarkRed: { transform: 'translateY(-3px)', backgroundColor: '#dc2626', boxShadow: '0 10px 20px rgba(0, 0, 0, 0.45)' },
   elevatedBlockDark: { transform: 'translateY(-3px)', backgroundColor: '#1e293b', boxShadow: '0 8px 18px rgba(0, 0, 0, 0.4)' },
   elevatedCardLight: { transform: 'translateY(-4px)', boxShadow: '0 12px 28px rgba(15, 23, 42, 0.12)' },
   elevatedCard: { transform: 'translateY(-5px) scale(1.01)', boxShadow: '0 20px 40px rgba(0, 0, 0, 0.3)' },
-  elevatedBtnPill: { transform: 'translateY(-4px)', backgroundColor: '#0f1a3a', boxShadow: '0 10px 20px rgba(0, 0, 0, 0.4)' },
+  elevatedBtnPill: { transform: 'translateY(-4px)', background: 'linear-gradient(135deg, #00acc1 0%, #0284c7 100%)', boxShadow: '0 10px 20px rgba(0, 172, 193, 0.4)' },
   elevatedText: { transform: 'translateY(-2px)', color: '#ffffff', textShadow: '0 2px 8px rgba(0, 0, 0, 0.5)' },
 };
-
-const TogglePassBtn = ({ isVisible, onToggle }) => (
-  <button type="button" onClick={onToggle} style={styles.eyeBtn} title={isVisible ? "Ẩn mật khẩu" : "Hiện mật khẩu"}>
-    {isVisible ? (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1E2A78" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-        <circle cx="12" cy="12" r="3"></circle>
-      </svg>
-    ) : (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
-        <line x1="1" y1="1" x2="23" y2="23"></line>
-      </svg>
-    )}
-  </button>
-);
 
 export default App;
