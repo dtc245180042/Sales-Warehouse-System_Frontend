@@ -262,3 +262,71 @@
 .btn-login-quick:hover {
   opacity: 0.9;
 }
+
+/* SCRUM-303: Tối ưu hiển thị User Info trên màn hình nhỏ & 360px */
+@media (max-width: 480px) {
+  .user-badge {
+    padding: 4px 8px;
+    gap: 8px;
+    min-width: 0;
+    max-width: 175px;
+  }
+
+  .user-avatar {
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+    min-height: 32px;
+    font-size: 13px;
+  }
+
+  .user-name {
+    font-size: 12px;
+    max-width: 85px;
+  }
+
+  .role-badge {
+    font-size: 9px;
+    padding: 1px 6px;
+  }
+
+  .warehouse-name {
+    font-size: 11px;
+    max-width: 85px;
+  }
+
+  .user-sub-row {
+    font-size: 10px;
+  }
+
+  .quick-warehouse-select {
+    padding: 2px 6px;
+    font-size: 10px;
+  }
+}
+
+@media (max-width: 360px) {
+  .user-badge {
+    padding: 3px 6px;
+    gap: 6px;
+    max-width: 145px;
+  }
+
+  .user-avatar {
+    width: 28px;
+    height: 28px;
+    min-width: 28px;
+    min-height: 28px;
+    font-size: 12px;
+  }
+
+  .user-name {
+    font-size: 11.5px;
+    max-width: 70px;
+  }
+
+  .warehouse-name {
+    font-size: 10px;
+    max-width: 65px;
+  }
+}
