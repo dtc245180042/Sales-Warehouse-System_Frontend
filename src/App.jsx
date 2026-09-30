@@ -1,76 +1,18 @@
-import { useState, useEffect, useRef } from 'react';
-import './App.css';
+import { useState, useEffect, useCallback } from 'react';
+import { AuthProvider } from './context';
+import Navbar from './components/Navbar';
+import Scrum300Demo from './pages/Scrum300Demo';
+import Login from './pages/Login';
+import ErrorPage from './pages/ErrorPage';
+import TogglePassBtn from './components/TogglePassBtn';
+import UserManagement from './components/UserManagement';
+import ErrorBoundary from './components/ErrorBoundary';
+import UserRoleAssignmentPage from './pages/UserRoleAssignmentPage';
 
-// =========================================================================
-// 1. LOGO KHO HÀNG DẠNG SVG HOÀN HOẢN (KHÔNG LO BỊ LỖI ĐƯỜNG DẪN ẢNH)
-// =========================================================================
-const SalesWarehouseLogo = () => (
-  <svg width="42" height="42" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <circle cx="50" cy="50" r="46" stroke="#1E2A78" strokeWidth="6" />
-    {/* Biểu tượng nhà kho */}
-    <path d="M30 42L50 26L70 42V72H30V42Z" fill="#1E2A78" stroke="#1E2A78" strokeWidth="4" strokeLinejoin="round" />
-    <path d="M42 72V52H58V72" fill="#ffffff" />
-    {/* Mũi tên tăng trưởng màu vàng cam */}
-    <path d="M25 60L48 38L62 50L80 25" stroke="#F59E0B" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round" />
-    <path d="M68 25H80V37" stroke="#F59E0B" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>
-);
-
-// =========================================================================
-// 2. AVATAR BẢO MẬT/ĐĂNG NHẬP SANG TRỌNG THAY THẾ CHO EMOJI CŨ
-// =========================================================================
-const ModernLoginAvatar = () => (
-  <div style={styles.modernAvatarWrapper}>
-    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-      <circle cx="12" cy="7" r="4"></circle>
-    </svg>
-  </div>
-);
-
-const eyeBtnStyle = {
-  position: 'absolute',
-  right: '14px',
-  top: '50%',
-  transform: 'translateY(-50%)',
-  background: 'none',
-  border: 'none',
-  cursor: 'pointer',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  padding: '4px'
-};
-
-const TogglePassBtn = ({ isVisible, onToggle }) => (
-  <button type="button" onClick={onToggle} style={eyeBtnStyle} title={isVisible ? "Ẩn mật khẩu" : "Hiện mật khẩu"}>
-    {isVisible ? (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1E2A78" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-        <circle cx="12" cy="12" r="3"></circle>
-      </svg>
-    ) : (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
-        <line x1="1" y1="1" x2="23" y2="23"></line>
-      </svg>
-    )}
-  </button>
-);
-
-const MOCK_PRODUCTS = [
-  { id: '1', sku: 'SKU-BIA-SG-SPEC', name: 'Bia Sài Gòn Special Lon 330ml', pack: '24 lon / thùng (4 lốc x 6 lon)', unit: 'Lon', price: 15000, status: 'Có sẵn' },
-  { id: '2', sku: 'SKU-CHOCOPIE-OR', name: 'Bánh Chocopie Orion Hộp 12 Cái', pack: '8 hộp / thùng', unit: 'Hộp', price: 55000, status: 'Có sẵn' },
-  { id: '3', sku: 'SKU-LAVIE-500', name: 'Nước khoáng thiên nhiên Lavie Chai 500ml', pack: '24 chai / thùng', unit: 'Chai', price: 6000, status: 'Có sẵn' },
-  { id: '4', sku: 'SKU-STING-DAU', name: 'Nước tăng lực Sting Dâu Chai 330ml', pack: '24 chai / thùng', unit: 'Chai', price: 10000, status: 'Có sẵn' },
-  { id: '5', sku: 'SKU-SUA-VNM-180', name: 'Sữa tươi tiệt trùng Vinamilk Có đường 180ml', pack: '48 hộp / thùng (12 lốc x 4 hộp)', unit: 'Hộp', price: 8500, status: 'Có sẵn' },
-];
-
-const MOCK_ACCOUNTS = [
-  { fullName: 'Quản Trị Viên Hệ Thống', username: 'admin', password: 'admin123', email: 'admin@quanlykho.vn', phone: '0912345678', role: 'admin', roleTitle: 'Quản Trị Viên', workplace: 'Kho Tổng Hà Nội', createdAt: '01/01/2026' },
-  { fullName: 'Nguyễn Văn A', username: 'staff', password: 'staff123', email: 'staff@quanlykho.vn', phone: '0987654321', role: 'staff', roleTitle: 'Nhân viên CSKH', workplace: 'Kho Thái Nguyên', createdAt: '15/02/2026' },
-  { fullName: 'Công ty TNHH Thương mại Tuấn Phương (Đại lý cấp 1)', username: 'customer', password: 'customer123', email: 'tuanphuong@daily.vn', phone: '0933445566', role: 'customer', roleTitle: 'Đại lý phân phối', workplace: 'Địa bàn Thái Nguyên & Miền Bắc', createdAt: '20/03/2026' }
-];
+import { MOCK_PRODUCTS, MOCK_ACCOUNTS, MOCK_FINANCIAL_MARGINS } from './utils/mockData';
+import { useSessionManager } from './utils/useSessionManager';
+import { apiClient } from './api/apiClient';
+import { setupRouterGuardListener } from './routes/routerGuard';
 
 function App({
   orderHistory = [],
@@ -79,8 +21,9 @@ function App({
   onChangePassSubmit = (data) => console.log('[Backend API] Change Pass:', data),
   onSubmitOrder = (cart) => console.log('[Backend API] Submit Order:', cart),
 }) {
-  void staffPendingOrders;
-  void adminStats;
+  // -------------------------------------------------------------------------
+  // STATE CỦA HỆ THỐNG
+  // -------------------------------------------------------------------------
   const [user, setUser] = useState(() => {
     const saved = localStorage.getItem('auth_user');
     return saved ? JSON.parse(saved) : null;
@@ -95,18 +38,6 @@ function App({
     const saved = localStorage.getItem('auth_user');
     return saved ? JSON.parse(saved).role : 'customer';
   });
-
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (e.key === 'Escape' && isMobileMenuOpen) {
-        setIsMobileMenuOpen(false);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isMobileMenuOpen]);
 
   const [activeTab, setActiveTab] = useState('main');
   const [hoveredBlock, setHoveredBlock] = useState(null);
@@ -360,11 +291,54 @@ function App({
   useEffect(() => {
     const authChannel = new BroadcastChannel('auth_logout_channel');
 
-    isSelfLoggingOut.current = false;
-    const loggedUser = MOCK_ACCOUNTS.find(a => a.role === currentRole) || MOCK_ACCOUNTS[1];
-    setUser(loggedUser);
-    localStorage.setItem('auth_user', JSON.stringify(loggedUser));
-    setScreen('dashboard');
+    const triggerOtherTabLogoutPopup = () => {
+      destroySession();
+      setUser(null);
+      setScreen('login');
+      setPopup({
+        show: true,
+        title: 'Hết phiên đăng nhập',
+        message: 'Tài khoản của bạn vừa được đăng xuất từ một tab làm việc hoặc thiết bị khác!',
+        type: 'info',
+        onConfirm: () => setPopup({ show: false, title: '', message: '', type: 'info', onConfirm: null })
+      });
+    };
+
+    authChannel.onmessage = (event) => {
+      if (event.data && event.data.type === 'LOGOUT_EVENT') {
+        triggerOtherTabLogoutPopup();
+      } else if (event.data && event.data.type === 'PASSWORD_CHANGED_EVENT') {
+        destroySession();
+        setUser(null);
+        setScreen('login');
+        setPopup({
+          show: true,
+          title: '🔒 Mật khẩu đã thay đổi',
+          message: 'Mật khẩu tài khoản của bạn vừa được thay đổi từ một Tab/thiết bị khác. Vì lý do bảo mật, phiên làm việc này đã được tự động thu hồi. Vui lòng đăng nhập lại bằng mật khẩu mới!',
+          type: 'info',
+          onConfirm: () => setPopup({ show: false, title: '', message: '', type: 'info', onConfirm: null })
+        });
+      }
+    };
+
+    const handleStorageChange = (event) => {
+      if (event.key === 'auth_user' && event.newValue === null) {
+        triggerOtherTabLogoutPopup();
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => {
+      authChannel.close();
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, [destroySession]);
+
+  const handleRoleChange = (newRole) => {
+    setCurrentRole(newRole);
+    const matched = MOCK_ACCOUNTS.find(a => a.role === newRole) || MOCK_ACCOUNTS[0];
+    setUser(matched);
+    localStorage.setItem('auth_user', JSON.stringify(matched));
   };
 
   const handleRegisterSubmit = (e) => {
@@ -422,19 +396,8 @@ function App({
     });
   };
 
-  const handleRoleChange = (role) => {
-    setCurrentRole(role);
-    const matchingAccount = MOCK_ACCOUNTS.find(a => a.role === role);
-    if (matchingAccount) {
-      setUser(matchingAccount);
-      localStorage.setItem('auth_user', JSON.stringify(matchingAccount));
-    } else if (user) {
-      const updatedUser = { ...user, role };
-      setUser(updatedUser);
-      localStorage.setItem('auth_user', JSON.stringify(updatedUser));
-    }
-  };
 
+  // HÀM RENDER POP-UP MODAL HIỂN THỊ TOÀN CỤC
   const renderNotificationModal = () => {
     if (!popup.show) return null;
 
@@ -475,217 +438,111 @@ function App({
     );
   };
 
-  const OMSDashboardLayout = ({ children }) => {
+  // LAYOUT DASHBOARD OMS PRO
+  const renderOMSDashboardLayout = (children) => {
     const roleActive = user?.role || currentRole;
-
-    const currentUserInfo = {
-      fullName: user?.fullName || (roleActive === 'staff' ? 'Nguyễn Văn A' : roleActive === 'admin' ? 'Quản Trị Viên Hệ Thống' : 'Công ty TNHH Thương mại Tuấn Phương (Đại lý cấp 1)'),
-      roleTitle: user?.roleTitle || (roleActive === 'staff' ? 'Nhân viên CSKH' : roleActive === 'admin' ? 'Quản Trị Viên' : 'Đại lý phân phối'),
-      workplace: user?.workplace || (roleActive === 'staff' ? 'Kho Thái Nguyên' : roleActive === 'admin' ? 'Kho Tổng Hà Nội' : 'Kho Thái Nguyên & Miền Bắc')
-    };
-
-    const handleNavClick = (action) => {
-      setIsMobileMenuOpen(false);
-      if (typeof action === 'function') {
-        action();
-      }
-    };
 
     return (
       <div style={styles.omsContainer}>
-        {/* Backdrop overlay khi mở menu drawer trên mobile */}
-        <div
-          className={`oms-backdrop ${isMobileMenuOpen ? 'open' : ''}`}
-          onClick={() => setIsMobileMenuOpen(false)}
-          aria-hidden="true"
-        />
-
-        {/* Sidebar dạng Drawer trên Mobile và Sidebar cố định trên Desktop */}
-        <aside
-          className={`oms-sidebar-drawer ${isMobileMenuOpen ? 'open' : ''}`}
-          style={styles.omsSidebar}
-        >
+        <aside style={styles.omsSidebar}>
           <div>
-            <div className="oms-drawer-header-row">
-              <div style={styles.omsSidebarHeader}>PHÂN HỆ {roleActive.toUpperCase()}</div>
-              <button
-                type="button"
-                className="oms-drawer-close-btn"
-                onClick={() => setIsMobileMenuOpen(false)}
-                aria-label="Đóng menu"
-                title="Đóng menu điều hướng"
-              >
-                ✕
-              </button>
-            </div>
-
-            {/* VÙNG THÔNG TIN NGƯỜI DÙNG TỐI ƯU CHO 360PX THEO SCRUM-303 */}
-            <div
-              className="oms-user-card-drawer"
-              title={`${currentUserInfo.fullName} • ${currentUserInfo.roleTitle} • ${currentUserInfo.workplace}`}
-              onClick={() => {
-                setIsMobileMenuOpen(false);
-                setScreen('profile');
-              }}
-              style={{ cursor: 'pointer' }}
-            >
-              <div className="oms-user-card-top">
-                <div className="oms-user-card-avatar">
-                  {(user?.username || roleActive).charAt(0).toUpperCase()}
-                </div>
-                <div className="oms-user-card-details">
-                  <span className="oms-user-name">
-                    {currentUserInfo.fullName}
-                  </span>
-                  <span className="oms-user-role-badge">
-                    🎭 {currentUserInfo.roleTitle}
-                  </span>
-                </div>
-              </div>
-              <div className="oms-user-workplace">
-                <span>🏬</span>
-                <span className="oms-user-workplace-text">
-                  {currentUserInfo.workplace}
-                </span>
-              </div>
-            </div>
-
-            {/* CHUYỂN VAI TRÒ GIAO DIỆN TRONG DRAWER CHO MOBILE */}
-            <div style={{ marginBottom: '14px' }}>
-              <div style={{ fontSize: '11px', color: '#94a3b8', marginBottom: '6px', fontWeight: 'bold' }}>
-                🔍 CHUYỂN VAI TRÒ GIAO DIỆN:
-              </div>
-              <select
-                value={roleActive}
-                onChange={(e) => {
-                  handleRoleChange(e.target.value);
-                  setIsMobileMenuOpen(false);
-                }}
-                style={{
-                  width: '100%',
-                  padding: '10px 12px',
-                  borderRadius: '10px',
-                  backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                  color: '#ffffff',
-                  border: '1px solid rgba(255, 255, 255, 0.2)',
-                  fontSize: '12px',
-                  fontWeight: '600',
-                  outline: 'none',
-                  cursor: 'pointer',
-                  minHeight: '44px',
-                  touchAction: 'manipulation'
-                }}
-              >
-                <option value="customer" style={{ color: '#000' }}>Đại lý (Customer)</option>
-                <option value="staff" style={{ color: '#000' }}>Nhân viên CSKH (Staff)</option>
-                <option value="admin" style={{ color: '#000' }}>Quản trị viên (Admin)</option>
-              </select>
-            </div>
-
-            {/* DANH SÁCH MENU ITEMS ĐƯỢC TỐI ƯU TOUCH VÀ KHÔNG TRÀN VIEWPORT */}
+            <div style={styles.omsSidebarHeader}>PHÂN HỆ {roleActive.toUpperCase()}</div>
             <div style={styles.omsNavList}>
               {roleActive === 'customer' && (
                 <>
-                  <div
-                    onClick={() => handleNavClick(() => setActiveTab('main'))}
-                    className={`oms-nav-item-btn ${activeTab === 'main' ? 'active' : ''}`}
-                    style={hoveredBlock === 'nav-c1' ? styles.elevatedBlockDark : {}}
-                    onMouseEnter={() => setHoveredBlock('nav-c1')}
-                    onMouseLeave={() => setHoveredBlock(null)}
-                  >
-                    <span>🛒</span>
-                    <span className="oms-nav-item-text">Cổng Đặt hàng Đại lý</span>
-                  </div>
-                  <div
-                    onClick={() => handleNavClick(() => triggerErrorPopup(403))}
-                    className="oms-nav-item-btn"
-                    style={hoveredBlock === 'nav-c2' ? styles.elevatedBlockDark : {}}
-                    onMouseEnter={() => setHoveredBlock('nav-c2')}
-                    onMouseLeave={() => setHoveredBlock(null)}
-                  >
-                    <span>🔒</span>
-                    <span className="oms-nav-item-text">Tra cứu Công nợ (Demo 403)</span>
-                  </div>
-                  <div
-                    onClick={() => handleNavClick(() => triggerErrorPopup(404))}
-                    className="oms-nav-item-btn"
-                    style={hoveredBlock === 'nav-c3' ? styles.elevatedBlockDark : {}}
-                    onMouseEnter={() => setHoveredBlock('nav-c3')}
-                    onMouseLeave={() => setHoveredBlock(null)}
-                  >
-                    <span>🔍</span>
-                    <span className="oms-nav-item-text">Trang bị xóa (Demo 404)</span>
-                  </div>
+                  <a href="#dat-hang" style={{ ...styles.omsNavItem, ...styles.omsNavItemActive, textDecoration: 'none', ...(hoveredBlock === 'nav-c1' ? styles.elevatedBlockDark : {}) }} onMouseEnter={() => setHoveredBlock('nav-c1')} onMouseLeave={() => setHoveredBlock(null)}>
+                    <span>🛒</span> Cổng Đặt hàng Đại lý
+                  </a>
+                  <a href="#cong-no" style={{ ...styles.omsNavItem, textDecoration: 'none', ...(hoveredBlock === 'nav-c2' ? styles.elevatedBlockDark : {}) }} onMouseEnter={() => setHoveredBlock('nav-c2')} onMouseLeave={() => setHoveredBlock(null)}>
+                    <span>📜</span> Tra cứu Công nợ & Hạn mức
+                  </a>
                 </>
               )}
 
               {roleActive === 'sales_rep' && (
                 <>
-                  <div
-                    onClick={() => handleNavClick(() => setActiveTab('main'))}
-                    className={`oms-nav-item-btn ${activeTab === 'main' ? 'active' : ''}`}
-                    style={hoveredBlock === 'nav-s1' ? styles.elevatedBlockDark : {}}
-                    onMouseEnter={() => setHoveredBlock('nav-s1')}
-                    onMouseLeave={() => setHoveredBlock(null)}
-                  >
-                    <span>⚡</span>
-                    <span className="oms-nav-item-text">Bán hàng & Xuất kho (POS)</span>
-                  </div>
-                  <div
-                    onClick={() => handleNavClick(() => triggerErrorPopup(401))}
-                    className="oms-nav-item-btn"
-                    style={hoveredBlock === 'nav-s2' ? styles.elevatedBlockDark : {}}
-                    onMouseEnter={() => setHoveredBlock('nav-s2')}
-                    onMouseLeave={() => setHoveredBlock(null)}
-                  >
-                    <span>🔑</span>
-                    <span className="oms-nav-item-text">Hết phiên làm việc (Demo 401)</span>
-                  </div>
-                  <div
-                    onClick={() => handleNavClick(() => triggerErrorPopup(500))}
-                    className="oms-nav-item-btn"
-                    style={hoveredBlock === 'nav-s3' ? styles.elevatedBlockDark : {}}
-                    onMouseEnter={() => setHoveredBlock('nav-s3')}
-                    onMouseLeave={() => setHoveredBlock(null)}
-                  >
-                    <span>⚠️</span>
-                    <span className="oms-nav-item-text">Kiểm kê kho (Demo 500)</span>
-                  </div>
+                  <a href="#dai-ly-dia-ban" style={{ ...styles.omsNavItem, ...styles.omsNavItemActive, textDecoration: 'none', ...(hoveredBlock === 'nav-sr1' ? styles.elevatedBlockDark : {}) }} onMouseEnter={() => setHoveredBlock('nav-sr1')} onMouseLeave={() => setHoveredBlock(null)}>
+                    <span>👥</span> Đại lý Phụ trách (Địa bàn)
+                  </a>
+                  <a href="#tao-don-sales" style={{ ...styles.omsNavItem, textDecoration: 'none', ...(hoveredBlock === 'nav-sr2' ? styles.elevatedBlockDark : {}) }} onMouseEnter={() => setHoveredBlock('nav-sr2')} onMouseLeave={() => setHoveredBlock(null)}>
+                    <span>🛒</span> Lên đơn hàng Đại lý
+                  </a>
+                  <a href="#ton-kho-sales" style={{ ...styles.omsNavItem, textDecoration: 'none', ...(hoveredBlock === 'nav-sr3' ? styles.elevatedBlockDark : {}) }} onMouseEnter={() => setHoveredBlock('nav-sr3')} onMouseLeave={() => setHoveredBlock(null)}>
+                    <span>📦</span> Tra cứu tồn kho chi nhánh
+                  </a>
+                </>
+              )}
+
+              {roleActive === 'sales_mgr' && (
+                <>
+                  <a href="#tong-quan-kinh-doanh" style={{ ...styles.omsNavItem, ...styles.omsNavItemActive, textDecoration: 'none', ...(hoveredBlock === 'nav-sm1' ? styles.elevatedBlockDark : {}) }} onMouseEnter={() => setHoveredBlock('nav-sm1')} onMouseLeave={() => setHoveredBlock(null)}>
+                    <span>📊</span> Tổng quan Doanh thu
+                  </a>
+                  <a href="#gia-von-bien-loi-nhuan" style={{ ...styles.omsNavItem, textDecoration: 'none', ...(hoveredBlock === 'nav-sm2' ? styles.elevatedBlockDark : {}) }} onMouseEnter={() => setHoveredBlock('nav-sm2')} onMouseLeave={() => setHoveredBlock(null)}>
+                    <span>💎</span> Giá vốn & Biên lợi nhuận
+                  </a>
+                  <a href="#duyet-han-muc-mgr" style={{ ...styles.omsNavItem, textDecoration: 'none', ...(hoveredBlock === 'nav-sm3' ? styles.elevatedBlockDark : {}) }} onMouseEnter={() => setHoveredBlock('nav-sm3')} onMouseLeave={() => setHoveredBlock(null)}>
+                    <span>💳</span> Phê duyệt Hạn mức Tín dụng
+                  </a>
+                </>
+              )}
+
+              {roleActive === 'wh_mgr' && (
+                <>
+                  <a href="#kho-tong-hn" style={{ ...styles.omsNavItem, ...styles.omsNavItemActive, textDecoration: 'none', ...(hoveredBlock === 'nav-wm1' ? styles.elevatedBlockDark : {}) }} onMouseEnter={() => setHoveredBlock('nav-wm1')} onMouseLeave={() => setHoveredBlock(null)}>
+                    <span>🏭</span> Kho Tổng Hà Nội (Gán kho)
+                  </a>
+                  <a href="#phieu-nhap-xuat" style={{ ...styles.omsNavItem, textDecoration: 'none', ...(hoveredBlock === 'nav-wm2' ? styles.elevatedBlockDark : {}) }} onMouseEnter={() => setHoveredBlock('nav-wm2')} onMouseLeave={() => setHoveredBlock(null)}>
+                    <span>📥</span> Phiếu Nhập / Xuất / Điều chuyển
+                  </a>
+                  <a href="#kiem-ke-kho-tong" style={{ ...styles.omsNavItem, textDecoration: 'none', ...(hoveredBlock === 'nav-wm3' ? styles.elevatedBlockDark : {}) }} onMouseEnter={() => setHoveredBlock('nav-wm3')} onMouseLeave={() => setHoveredBlock(null)}>
+                    <span>📦</span> Kiểm kê Tồn kho toàn diện
+                  </a>
+                </>
+              )}
+
+              {roleActive === 'warehouse' && (
+                <>
+                  <a href="#pos" style={{ ...styles.omsNavItem, ...styles.omsNavItemActive, textDecoration: 'none', ...(hoveredBlock === 'nav-s1' ? styles.elevatedBlockDark : {}) }} onMouseEnter={() => setHoveredBlock('nav-s1')} onMouseLeave={() => setHoveredBlock(null)}>
+                    <span>⚡</span> Bán hàng & Xuất kho (POS)
+                  </a>
+                  <a href="#kiem-don" style={{ ...styles.omsNavItem, textDecoration: 'none', ...(hoveredBlock === 'nav-s2' ? styles.elevatedBlockDark : {}) }} onMouseEnter={() => setHoveredBlock('nav-s2')} onMouseLeave={() => setHoveredBlock(null)}>
+                    <span>📋</span> Tiếp nhận & Kiểm đơn
+                  </a>
+                  <a href="#ton-kho-dn" style={{ ...styles.omsNavItem, textDecoration: 'none', ...(hoveredBlock === 'nav-s3' ? styles.elevatedBlockDark : {}) }} onMouseEnter={() => setHoveredBlock('nav-s3')} onMouseLeave={() => setHoveredBlock(null)}>
+                    <span>📦</span> Kiểm kê Kho Đà Nẵng
+                  </a>
+                </>
+              )}
+
+              {roleActive === 'accountant' && (
+                <>
+                  <a href="#cong-no-daily" style={{ ...styles.omsNavItem, ...styles.omsNavItemActive, textDecoration: 'none', ...(hoveredBlock === 'nav-ac1' ? styles.elevatedBlockDark : {}) }} onMouseEnter={() => setHoveredBlock('nav-ac1')} onMouseLeave={() => setHoveredBlock(null)}>
+                    <span>📜</span> Sổ theo dõi Công nợ Đại lý
+                  </a>
+                  <a href="#doi-soat-han-muc" style={{ ...styles.omsNavItem, textDecoration: 'none', ...(hoveredBlock === 'nav-ac2' ? styles.elevatedBlockDark : {}) }} onMouseEnter={() => setHoveredBlock('nav-ac2')} onMouseLeave={() => setHoveredBlock(null)}>
+                    <span>💳</span> Đối soát Hạn mức Tín dụng
+                  </a>
+                  <a href="#bao-cao-tai-chinh" style={{ ...styles.omsNavItem, textDecoration: 'none', ...(hoveredBlock === 'nav-ac3' ? styles.elevatedBlockDark : {}) }} onMouseEnter={() => setHoveredBlock('nav-ac3')} onMouseLeave={() => setHoveredBlock(null)}>
+                    <span>📈</span> Báo cáo Doanh thu & Dòng tiền
+                  </a>
                 </>
               )}
 
               {roleActive === 'admin' && (
                 <>
-                  <div
-                    onClick={() => handleNavClick(() => setActiveTab('main'))}
-                    className={`oms-nav-item-btn ${activeTab === 'main' ? 'active' : ''}`}
-                    style={hoveredBlock === 'nav-a1' ? styles.elevatedBlockDark : {}}
-                    onMouseEnter={() => setHoveredBlock('nav-a1')}
-                    onMouseLeave={() => setHoveredBlock(null)}
-                  >
-                    <span>📊</span>
-                    <span className="oms-nav-item-text">Tổng quan Quản trị</span>
-                  </div>
-                  <div
-                    onClick={() => handleNavClick(() => triggerErrorPopup(403))}
-                    className="oms-nav-item-btn"
-                    style={hoveredBlock === 'nav-a2' ? styles.elevatedBlockDark : {}}
-                    onMouseEnter={() => setHoveredBlock('nav-a2')}
-                    onMouseLeave={() => setHoveredBlock(null)}
-                  >
-                    <span>🔒</span>
-                    <span className="oms-nav-item-text">Hệ thống Đại lý (Demo 403)</span>
-                  </div>
-                  <div
-                    onClick={() => handleNavClick(() => triggerErrorPopup(503))}
-                    className="oms-nav-item-btn"
-                    style={hoveredBlock === 'nav-a3' ? styles.elevatedBlockDark : {}}
-                    onMouseEnter={() => setHoveredBlock('nav-a3')}
-                    onMouseLeave={() => setHoveredBlock(null)}
-                  >
-                    <span>🛠️</span>
-                    <span className="oms-nav-item-text">Duyệt Hạn mức (Demo 503)</span>
-                  </div>
+                  <a href="#tong-quan" style={{ ...styles.omsNavItem, ...styles.omsNavItemActive, textDecoration: 'none', ...(hoveredBlock === 'nav-a1' ? styles.elevatedBlockDark : {}) }} onMouseEnter={() => setHoveredBlock('nav-a1')} onMouseLeave={() => setHoveredBlock(null)}>
+                    <span>📊</span> Tổng quan Quản trị
+                  </a>
+                  <a href="#quan-ly-user" style={{ ...styles.omsNavItem, textDecoration: 'none', ...(hoveredBlock === 'nav-a2' ? styles.elevatedBlockDark : {}) }} onMouseEnter={() => setHoveredBlock('nav-a2')} onMouseLeave={() => setHoveredBlock(null)}>
+                    <span>👥</span> Quản lý Người dùng
+                  </a>
+                  <a href="#khoa-tai-khoan" style={{ ...styles.omsNavItem, textDecoration: 'none', ...(hoveredBlock === 'nav-a3' ? styles.elevatedBlockDark : {}) }} onMouseEnter={() => setHoveredBlock('nav-a3')} onMouseLeave={() => setHoveredBlock(null)}>
+                    <span>🔒</span> Khóa tài khoản & Bàn giao
+                  </a>
+                  <a href="#phan-quyen-7-vai-tro" style={{ ...styles.omsNavItem, textDecoration: 'none', ...(hoveredBlock === 'nav-a4' ? styles.elevatedBlockDark : {}) }} onMouseEnter={() => setHoveredBlock('nav-a4')} onMouseLeave={() => setHoveredBlock(null)}>
+                    <span>🎭</span> Phân quyền vai trò hệ thống
+                  </a>
                 </>
               )}
             </div>
@@ -702,14 +559,9 @@ function App({
             </div>
             <button
               type="button"
-              onClick={() => {
-                setIsMobileMenuOpen(false);
-                handleLogout();
-              }}
+              onClick={handleLogout}
               style={{
                 ...styles.omsLogoutBtn,
-                minHeight: '44px',
-                touchAction: 'manipulation',
                 ...(hoveredBlock === 'sidebar-logout' ? styles.elevatedBtnDarkRed : {}),
               }}
               onMouseEnter={() => setHoveredBlock('sidebar-logout')}
@@ -721,35 +573,18 @@ function App({
         </aside>
 
         <div style={styles.omsMainArea}>
-          <header className="oms-header-container" style={styles.omsHeader}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
-              {/* Nút Hamburger cho Mobile 360px */}
-              <button
-                type="button"
-                className="oms-hamburger-btn"
-                onClick={() => setIsMobileMenuOpen(true)}
-                aria-label="Mở menu điều hướng"
-                title="Mở menu"
-              >
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="3" y1="6" x2="21" y2="6"></line>
-                  <line x1="3" y1="12" x2="21" y2="12"></line>
-                  <line x1="3" y1="18" x2="21" y2="18"></line>
-                </svg>
-              </button>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
-                <SalesWarehouseLogo />
-                <div style={{ minWidth: 0 }}>
-                  <h3 className="oms-header-brand-title" style={{ margin: 0, fontSize: '16px', color: '#0f172a', fontWeight: '800', lineHeight: 1.2 }}>OMS Pro</h3>
-                  <span className="oms-header-brand-sub" style={{ fontSize: '11px', color: '#64748b' }}>Hệ thống Quản lý Bán hàng & Kho</span>
-                </div>
+          <header style={styles.omsHeader}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={styles.omsLogoSquare}>O</div>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '16px', color: '#0f172a', fontWeight: '800' }}>OMS Pro</h3>
+                <span style={{ fontSize: '11px', color: '#64748b' }}>Hệ thống Quản lý Bán hàng & Kho</span>
               </div>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
-              <div className="oms-role-select-box" style={styles.omsRoleSelectWrapper}>
-                <span style={{ fontSize: '12px', color: '#64748b' }}>🔍 Xem Giao Diện:</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <div style={styles.omsRoleSelectWrapper}>
+                <span style={{ fontSize: '12px', color: '#64748b' }}>🔍 Xem Giao Diện 7 Vai Trò:</span>
                 <select
                   value={roleActive}
                   onChange={(e) => handleRoleChange(e.target.value)}
@@ -765,28 +600,31 @@ function App({
                 </select>
               </div>
 
-              <div
-                className="oms-header-user-pill"
-                onClick={() => setScreen('profile')}
-                title={`Xem Hồ sơ: ${currentUserInfo.fullName} • ${currentUserInfo.workplace}`}
+              <a
+                href="#profile"
+                onClick={(e) => {
+                  e.preventDefault();
+                  setScreen('profile');
+                }}
+                style={{
+                  ...styles.omsUserAvatarPill,
+                  textDecoration: 'none',
+                  ...(hoveredBlock === 'header-profile' ? styles.elevatedCardLight : {}),
+                }}
+                onMouseEnter={() => setHoveredBlock('header-profile')}
+                onMouseLeave={() => setHoveredBlock(null)}
+                title="Xem Hồ sơ cá nhân"
               >
-                <div style={styles.omsAvatarIcon}>
-                  {(user?.username || roleActive).charAt(0).toUpperCase()}
-                </div>
-                <div style={{ minWidth: 0, overflow: 'hidden' }}>
-                  <div className="oms-header-user-name">
-                    {currentUserInfo.fullName}
-                  </div>
-                  <div className="oms-header-user-sub">
-                    {currentUserInfo.workplace}
-                  </div>
+                <div style={styles.omsAvatarIcon}>{(user?.username || roleActive).charAt(0).toUpperCase()}</div>
+                <div>
+                  <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#1e293b' }}>{user?.fullName || 'Demo Account'}</div>
+                  <div style={{ fontSize: '10px', color: '#64748b' }}>{roleActive}</div>
                 </div>
               </a>
             </div>
           </header>
 
           <div
-            className="oms-banner-container"
             style={{
               ...styles.omsBanner,
               ...(hoveredBlock === 'oms-banner' ? styles.elevatedCard : {}),
@@ -794,16 +632,29 @@ function App({
             onMouseEnter={() => setHoveredBlock('oms-banner')}
             onMouseLeave={() => setHoveredBlock(null)}
           >
-            <div style={{ minWidth: 0, flex: 1 }}>
-              <h2 style={{ margin: '0 0 6px 0', fontSize: '18px', fontWeight: 'bold' }}>
-                {roleActive === 'admin' ? "Bảng Điều Khiển Quản Trị Hệ Thống (ADMIN)" : roleActive === 'staff' ? "Phân Hệ Xử Lý Bán Hàng & Kho (STAFF)" : "Cổng Đặt Hàng Trực Tuyến Đại Lý (CUSTOMER)"}
+            <div>
+              <h2 style={{ margin: '0 0 6px 0', fontSize: '20px', fontWeight: 'bold' }}>
+                {roleActive === 'admin'
+                  ? "Bảng Điều Khiển Quản Trị Hệ Thống (ADMIN)"
+                  : roleActive === 'sales_mgr'
+                    ? "Bảng Phân Tích & Điều Hành Kinh Doanh (SALES MANAGER)"
+                    : roleActive === 'sales_rep'
+                      ? "Cổng Nghiệp Vụ Nhân Viên Kinh Doanh (SALES REP)"
+                      : roleActive === 'wh_mgr'
+                        ? "Trung Tâm Quản Lý Kho Hàng (WH MANAGER)"
+                        : roleActive === 'warehouse'
+                          ? "Quầy Bán Hàng & Xuất Kho POS (WAREHOUSE)"
+                          : roleActive === 'accountant'
+                            ? "Phân Hệ Kế Toán & Quản Lý Công Nợ (ACCOUNTANT)"
+                            : "Cổng Đặt Hàng Trực Tuyến Đại Lý (CUSTOMER)"}
               </h2>
-              <p style={{ margin: 0, fontSize: '12.5px', opacity: 0.9 }}>
-                {roleActive === 'admin' ? "Quản lý toàn bộ chi nhánh, hạn mức đại lý & kho hàng" : roleActive === 'staff' ? `Phân hệ kiểm duyệt đơn, kiểm kê kho & quầy POS • ${currentUserInfo.workplace}` : currentUserInfo.fullName}
+              <p style={{ margin: 0, fontSize: '13px', opacity: 0.9 }}>
+                {user?.fullName || "Người dùng hệ thống"} • Vai trò: <strong>{user?.roleTitle || roleActive.toUpperCase()}</strong>
+                {user?.warehouse && <span> | 🏢 Kho gán: <strong>{user.warehouse}</strong></span>}
               </p>
             </div>
 
-            <div className="oms-banner-stats" style={{ display: 'flex', gap: '20px', textAlign: 'right', flexShrink: 0 }}>
+            <div style={{ display: 'flex', gap: '24px', textAlign: 'right' }}>
               {roleActive === 'customer' && (
                 <>
                   <div>
@@ -849,7 +700,7 @@ function App({
             </div>
           </div>
 
-          <main className="oms-body-content" style={styles.omsContentBody}>{children}</main>
+          <main style={styles.omsContentBody}>{children}</main>
         </div>
       </div>
     );
@@ -1222,8 +1073,7 @@ function App({
                 <div style={{ textAlign: 'left', borderTop: '1px solid #f1f5f9', paddingTop: '15px', fontSize: '12px', color: '#334155' }}>
                   <p>📧 <strong>Email:</strong> {user?.email || 'demo@quanlykho.vn'}</p>
                   <p>📱 <strong>SĐT:</strong> {user?.phone || '0912345678'}</p>
-                  <p>🎭 <strong>Vai trò:</strong> {user?.roleTitle || (user?.role === 'staff' ? 'Nhân viên CSKH' : user?.role === 'admin' ? 'Quản Trị Viên' : 'Đại lý phân phối')}</p>
-                  <p>🏬 <strong>Kho / Địa bàn:</strong> {user?.workplace || (user?.role === 'staff' ? 'Kho Thái Nguyên' : user?.role === 'admin' ? 'Kho Tổng Hà Nội' : 'Kho Thái Nguyên & Miền Bắc')}</p>
+                  <p>🎭 <strong>Vai trò:</strong> {user?.role || 'customer'}</p>
                   <p>📅 <strong>Ngày tham gia:</strong> {user?.createdAt || '01/01/2026'}</p>
                 </div>
                 <button
@@ -1375,10 +1225,7 @@ function App({
     // 3. MAN HINH DANG NHAP / DANG KY / ABOUT / CONTACT (MÃ NGUỒN CŨ BAN ĐẦU)
     return (
       <div style={styles.outerContainerFullWidth}>
-        <div className="auth-left-panel" style={styles.leftPanelFullWidth}>
-          {/* ========================================================================= */}
-          {/* GÓC TRÊN BÊN TRÁI: LOGO SVG TỰ ĐỘNG CHUẨN ĐẸP KHÔNG BỊ RÁC/LỖI FILE */}
-          {/* ========================================================================= */}
+        <div style={styles.leftPanelFullWidth}>
           <div style={styles.brand}>
             <div style={styles.logoIcon}>
               <div style={styles.logoSquare1}></div>
@@ -1392,71 +1239,20 @@ function App({
 
           {/* FORM ĐĂNG NHẬP */}
           {screen === 'login' && (
-            <form onSubmit={handleLoginSubmit} className="auth-form-box" style={styles.formContainerResponsive}>
-              {/* AVATAR TRÒN SANG TRỌNG ĐƯỢC THAY THẾ MỚI */}
-              <ModernLoginAvatar />
-
-              <h3 style={styles.formTitle}>ĐĂNG NHẬP HỆ THỐNG</h3>
-
-              <div
-                style={{
-                  ...styles.inputWrapper,
-                  ...(hoveredBlock === 'inp-user' ? styles.elevatedInput3D : {}),
-                }}
-                onMouseEnter={() => setHoveredBlock('inp-user')}
-                onMouseLeave={() => setHoveredBlock(null)}
-              >
-                <input type="text" placeholder="USERNAME" style={styles.input} />
-              </div>
-
-              <div
-                style={{
-                  ...styles.inputWrapper,
-                  ...(hoveredBlock === 'inp-pass' ? styles.elevatedInput3D : {}),
-                }}
-                onMouseEnter={() => setHoveredBlock('inp-pass')}
-                onMouseLeave={() => setHoveredBlock(null)}
-              >
-                <input type={showLoginPass ? "text" : "password"} placeholder="MẬT KHẨU" style={styles.inputWithEye} />
-                <TogglePassBtn isVisible={showLoginPass} onToggle={() => setShowLoginPass(!showLoginPass)} />
-              </div>
-
-              <div style={styles.quickAccountContainer}>
-                <button
-                  type="submit"
-                  style={{
-                    ...styles.quickAccountCard,
-                    ...(hoveredBlock === 'quick-demo' ? styles.elevatedBtnBlue : {}),
-                  }}
-                  onMouseEnter={() => setHoveredBlock('quick-demo')}
-                  onMouseLeave={() => setHoveredBlock(null)}
-                >
-                  🚀 DÙNG TÀI KHOẢN MẪU & VÀO DASHBOARD
-                </button>
-              </div>
-
-              <button
-                type="submit"
-                style={{
-                  ...styles.actionBtn,
-                  ...(hoveredBlock === 'btn-login' ? styles.elevatedBtnNavy : {}),
-                }}
-                onMouseEnter={() => setHoveredBlock('btn-login')}
-                onMouseLeave={() => setHoveredBlock(null)}
-              >
-                ĐĂNG NHẬP
-              </button>
-
-              <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', fontSize: '12px', marginTop: '8px' }}>
-                <span onClick={() => setScreen('register')} style={styles.linkText}>+ Tạo tài khoản</span>
-                <span onClick={() => setScreen('forgot')} style={styles.linkText}>Quên mật khẩu?</span>
-              </div>
-            </form>
+            <Login
+              userList={userList}
+              setUser={setUser}
+              setCurrentRole={setCurrentRole}
+              setScreen={setScreen}
+              setPopup={setPopup}
+              styles={styles}
+              onLoginSubmit={onLoginSubmit}
+            />
           )}
 
           {/* FORM ĐĂNG KÝ */}
           {screen === 'register' && (
-            <form onSubmit={handleRegisterSubmit} className="auth-form-box" style={styles.formContainerResponsive}>
+            <form onSubmit={handleRegisterSubmit} style={styles.formContainerResponsive}>
               <h3 style={styles.formTitle}>ĐĂNG KÝ TÀI KHOẢN MỚI</h3>
 
               <div style={{ ...styles.inputWrapper, ...(hoveredBlock === 'reg-fullname' ? styles.elevatedInput3D : {}) }} onMouseEnter={() => setHoveredBlock('reg-fullname')} onMouseLeave={() => setHoveredBlock(null)}>
@@ -1547,7 +1343,7 @@ function App({
           )}
 
           {screen === 'forgot' && (
-            <form onSubmit={(e) => { e.preventDefault(); setScreen('login'); }} className="auth-form-box" style={styles.formContainerResponsive}>
+            <form onSubmit={handleForgotSubmit} style={styles.formContainerResponsive}>
               <h3 style={styles.formTitle}>KHÔI PHỤC MẬT KHẨU</h3>
               <p style={{ fontSize: '12px', color: '#64748b', marginBottom: '14px', lineHeight: '1.5' }}>
                 Nhập địa chỉ email đăng ký để nhận liên kết đặt lại mật khẩu bảo mật (Hiệu lực 30 phút, chỉ sử dụng 1 lần).
@@ -1579,10 +1375,15 @@ function App({
           </div>
         </div>
 
-        <div className="auth-right-panel" style={styles.rightPanelFullWidth}>
-          <div className="auth-nav-header" style={styles.navHeader}>
-            <span
-              onClick={() => setScreen(screen === 'about' ? 'login' : 'about')}
+        {/* BÊN PHẢI GIAO DIỆN CỦ BAN ĐẦU */}
+        <div style={styles.rightPanelFullWidth}>
+          <div style={styles.navHeader}>
+            <a
+              href="#about"
+              onClick={(e) => {
+                e.preventDefault();
+                setScreen(screen === 'about' ? 'login' : 'about');
+              }}
               style={{
                 ...styles.navLink,
                 textDecoration: 'none',
@@ -1683,10 +1484,64 @@ function App({
   // MAIN RETURN WRAPPER
   // =========================================================================
   return (
-    <>
-      {renderNotificationModal()}
-      {renderMainContent()}
-    </>
+    <AuthProvider>
+      <div style={{ position: 'fixed', bottom: '16px', right: '16px', zIndex: 999999, display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+        <button
+          type="button"
+          onClick={() => setViewMode(viewMode === 'roleAssignment' ? 'oms' : 'roleAssignment')}
+          style={{
+            padding: '10px 16px',
+            backgroundColor: viewMode === 'roleAssignment' ? '#0f172a' : '#7c3aed',
+            color: '#ffffff',
+            border: 'none',
+            borderRadius: '24px',
+            boxShadow: '0 4px 14px rgba(0,0,0,0.3)',
+            cursor: 'pointer',
+            fontWeight: 'bold',
+            fontSize: '12px',
+            transition: 'all 0.2s ease',
+          }}
+        >
+          {viewMode === 'roleAssignment' ? '📦 Về Giao Diện OMS' : '🎭 Gán Vai Trò & Kho/Địa Bàn (SCRUM-206)'}
+        </button>
+        <button
+          type="button"
+          onClick={() => setViewMode(viewMode === 'scrum300' ? 'oms' : 'scrum300')}
+          style={{
+            padding: '10px 16px',
+            backgroundColor: viewMode === 'scrum300' ? '#0f172a' : '#2563eb',
+            color: '#ffffff',
+            border: 'none',
+            borderRadius: '24px',
+            boxShadow: '0 4px 14px rgba(0,0,0,0.3)',
+            cursor: 'pointer',
+            fontWeight: 'bold',
+            fontSize: '12px',
+            transition: 'all 0.2s ease',
+          }}
+        >
+          {viewMode === 'scrum300' ? '📦 Về Giao Diện OMS' : '🔍 Xem Header & Kho (SCRUM-300)'}
+        </button>
+      </div>
+
+      <ErrorBoundary userRole={user?.roleTitle || currentRole} onError={() => { setErrorType(500); setScreen('error'); }}>
+        {viewMode === 'roleAssignment' ? (
+          <UserRoleAssignmentPage />
+        ) : viewMode === 'scrum300' ? (
+          <div>
+            <Navbar />
+            <main>
+              <Scrum300Demo />
+            </main>
+          </div>
+        ) : (
+          <>
+            {renderNotificationModal()}
+            {renderMainContent()}
+          </>
+        )}
+      </ErrorBoundary>
+    </AuthProvider>
   );
 }
 
@@ -1738,9 +1593,9 @@ const styles = {
     boxShadow: '0 6px 16px rgba(0,0,0,0.2)',
   },
 
-  omsContainer: { display: 'flex', width: '100%', minHeight: '100vh', backgroundColor: '#f8fafc', fontFamily: "'Inter', sans-serif" },
-  omsSidebar: { width: '240px', backgroundColor: '#0b132b', color: '#ffffff', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '20px 15px', boxSizing: 'border-box', flexShrink: 0, zIndex: 10, boxShadow: '4px 0 20px rgba(0,0,0,0.25)' },
-  omsSidebarHeader: { fontSize: '11px', fontWeight: 'bold', letterSpacing: '1px', color: '#64748b', marginBottom: '15px', paddingLeft: '10px' },
+  omsContainer: { display: 'flex', width: '100vw', minHeight: '100vh', backgroundColor: '#f0f7ff', fontFamily: "'Inter', sans-serif" },
+  omsSidebar: { width: '240px', background: 'linear-gradient(180deg, #00acc1 0%, #00838f 35%, #0277bd 70%, #1565c0 100%)', color: '#ffffff', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '20px 15px', boxSizing: 'border-box', flexShrink: 0, zIndex: 10, boxShadow: '4px 0 20px rgba(0, 172, 193, 0.3)' },
+  omsSidebarHeader: { fontSize: '11px', fontWeight: 'bold', letterSpacing: '1px', color: 'rgba(255, 255, 255, 0.8)', marginBottom: '15px', paddingLeft: '10px' },
   omsNavList: { display: 'flex', flexDirection: 'column', gap: '6px' },
   omsNavItem: { display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', borderRadius: '10px', fontSize: '13px', color: 'rgba(255, 255, 255, 0.9)', cursor: 'pointer', transition: 'all 0.25s ease' },
   omsNavItemActive: { backgroundColor: 'rgba(255, 255, 255, 0.25)', color: '#ffffff', fontWeight: 'bold', boxShadow: '0 4px 12px rgba(0, 0, 0, 0.18)' },
@@ -1768,7 +1623,7 @@ const styles = {
   staffStatCard: { backgroundColor: '#ffffff', padding: '15px 20px', borderRadius: '12px', border: '1px solid #e2e8f0', cursor: 'pointer', transition: 'all 0.3s ease' },
   adminStatCard: { backgroundColor: '#ffffff', padding: '15px 20px', borderRadius: '12px', border: '1px solid #e2e8f0', cursor: 'pointer', transition: 'all 0.3s ease' },
 
-  outerContainerFullWidth: { width: '100%', minHeight: '100vh', display: 'flex', flexWrap: 'wrap', fontFamily: "'Inter', sans-serif", margin: 0, padding: 0, backgroundColor: '#ffffff', overflowX: 'hidden' },
+  outerContainerFullWidth: { width: '100vw', minHeight: '100vh', display: 'flex', flexWrap: 'wrap', fontFamily: "'Inter', sans-serif", margin: 0, padding: 0, backgroundColor: '#ffffff', overflowX: 'hidden' },
   leftPanelFullWidth: { flex: '1 1 380px', padding: 'min(4vw, 40px)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', backgroundColor: '#ffffff', minHeight: '100vh', boxSizing: 'border-box' },
   rightPanelFullWidth: { flex: '2 1 450px', background: 'linear-gradient(180deg, #00acc1 0%, #0284c7 45%, #1565c0 90%)', padding: 'min(4vw, 40px)', display: 'flex', flexDirection: 'column', color: '#ffffff', minHeight: '100vh', boxSizing: 'border-box' },
   brand: { display: 'flex', alignItems: 'center', gap: '12px' },
