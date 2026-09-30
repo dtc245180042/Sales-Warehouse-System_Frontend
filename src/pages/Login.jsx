@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import TogglePassBtn from '../components/TogglePassBtn';
 
 const DEMO_ACCOUNTS = [
@@ -37,21 +37,62 @@ const Login = ({ userList, setUser, setCurrentRole, setScreen, setPopup, styles,
   const [showLoginPass, setShowLoginPass] = useState(false);
   const [hoveredBlock, setHoveredBlock] = useState(null);
 
-  const doLogin = (username, password) => {
-    const foundAccount = userList.find(
-      (a) => a.username.toLowerCase() === username.toLowerCase()
-    );
+  const doLogin = useCallback((username, password) => {
+    const userKey = `login_attempts_${username.toLowerCase()}`;
+    const now = Date.now();
+    let attemptData = { count: 0, lockedUntil: null };
 
-    if (!foundAccount || foundAccount.password !== password) {
+    try {
+      const stored = localStorage.getItem(userKey);
+      if (stored) {
+        attemptData = JSON.parse(stored);
+      }
+    } catch {
+      // Fallback if parsing fails
+    }
+
+    // Kiểm tra nếu tài khoản đang bị tạm khóa 15 phút do 5 lần nhập sai
+    if (attemptData.lockedUntil && now < attemptData.lockedUntil) {
+      const remainingMinutes = Math.ceil((attemptData.lockedUntil - now) / 60000);
       setPopup({
         show: true,
-        title: 'Đăng nhập thất bại',
-        message: 'Tên đăng nhập hoặc mật khẩu không chính xác!',
+        title: 'Tài khoản tạm thời bị khóa (15 phút)',
+        message: `Bạn đã nhập sai thông tin 5 lần liên tiếp. Tài khoản tạm thời bị khóa vì lý do an toàn. Vui lòng thử lại sau ${remainingMinutes} phút!`,
         type: 'error',
         onConfirm: () => setPopup(p => ({ ...p, show: false }))
       });
       return;
     }
+
+    const foundAccount = userList.find(
+      (a) => a.username.toLowerCase() === username.toLowerCase()
+    );
+
+    // Không tiết lộ tài khoản có tồn tại hay không - thông báo chung
+    if (!foundAccount || foundAccount.password !== password) {
+      const newCount = (attemptData.count || 0) + 1;
+      let newLockedUntil = null;
+      let alertMsg = `Tên đăng nhập hoặc mật khẩu không chính xác! (Lần sai: ${newCount}/5)`;
+
+      if (newCount >= 5) {
+        newLockedUntil = now + 15 * 60 * 1000; // Khóa tạm 15 phút
+        alertMsg = 'Bạn đã nhập sai thông tin 5 lần liên tiếp! Tài khoản bị tạm khóa 15 phút để đảm bảo an toàn.';
+      }
+
+      localStorage.setItem(userKey, JSON.stringify({ count: newCount >= 5 ? 0 : newCount, lockedUntil: newLockedUntil }));
+
+      setPopup({
+        show: true,
+        title: 'Đăng nhập thất bại',
+        message: alertMsg,
+        type: 'error',
+        onConfirm: () => setPopup(p => ({ ...p, show: false }))
+      });
+      return;
+    }
+
+    // Đăng nhập thành công -> Xóa bộ đếm số lần sai
+    localStorage.removeItem(userKey);
 
     if (foundAccount.isLocked) {
       setPopup({
@@ -68,7 +109,7 @@ const Login = ({ userList, setUser, setCurrentRole, setScreen, setPopup, styles,
     setCurrentRole(foundAccount.role);
     localStorage.setItem('auth_user', JSON.stringify(foundAccount));
     setScreen('dashboard');
-  };
+  }, [userList, setUser, setCurrentRole, setScreen, setPopup]);
 
   const handleLoginSubmit = (e) => {
     e.preventDefault();

@@ -169,6 +169,36 @@ function App({
 
   const [resetStep, setResetStep] = useState(1);
   const [showForgotInProfile, setShowForgotInProfile] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+
+  // Xử lý gửi liên kết đặt lại mật khẩu qua email (SCRUM-200)
+  const handleForgotSubmit = (e) => {
+    e.preventDefault();
+    const email = forgotEmail.trim();
+    if (!email) {
+      setPopup({
+        show: true,
+        title: 'Thiếu thông tin email',
+        message: 'Vui lòng nhập địa chỉ email của bạn!',
+        type: 'error',
+        onConfirm: () => setPopup((p) => ({ ...p, show: false })),
+      });
+      return;
+    }
+
+    // Tiêu chí SCRUM-200: Email không tồn tại vẫn hiển thị cùng một thông báo, liên kết có hiệu lực 30 phút và chỉ dùng 1 lần
+    setPopup({
+      show: true,
+      title: 'Đã gửi liên kết khôi phục mật khẩu',
+      message: `Nếu email '${email}' tồn tại trong hệ thống, bạn sẽ nhận được một liên kết đặt lại mật khẩu có hiệu lực trong vòng 30 phút.\n\n⚠️ Lưu ý bảo mật: Liên kết chỉ có giá trị sử dụng đúng 1 lần duy nhất.`,
+      type: 'info',
+      onConfirm: () => {
+        setPopup((p) => ({ ...p, show: false }));
+        setScreen('login');
+        setForgotEmail('');
+      },
+    });
+  };
 
   // STATE ĐỔI MẬT KHẨU & THÔNG BÁO LỖI
   const [changePassForm, setChangePassForm] = useState({
@@ -200,9 +230,10 @@ function App({
       return;
     }
 
-    // 3. Kịch bản 2: Mật khẩu mới không đạt yêu cầu
-    if (newPassword.length < 6) {
-      setChangePassError('❌ Mật khẩu mới phải có độ dài tối thiểu 6 ký tự!');
+    // 3. Kịch bản 2: Mật khẩu mới không đạt yêu cầu (SCRUM-201: Tối thiểu 8 ký tự, có chữ và số)
+    const passwordPattern = /^(?=.*[A-Za-z])(?=.*\d).{8,}$/;
+    if (!passwordPattern.test(newPassword)) {
+      setChangePassError('❌ Mật khẩu mới phải có tối thiểu 8 ký tự, bao gồm cả chữ cái và chữ số!');
       return;
     }
 
@@ -1102,7 +1133,7 @@ function App({
                       <div style={{ position: 'relative', marginBottom: '12px' }}>
                         <input
                           type={showProfNewPass ? "text" : "password"}
-                          placeholder="Mật khẩu mới (Tối thiểu 6 ký tự)"
+                          placeholder="Mật khẩu mới (Tối thiểu 8 ký tự, gồm chữ và số)"
                           value={changePassForm.newPassword}
                           onChange={(e) => setChangePassForm(prev => ({ ...prev, newPassword: e.target.value }))}
                           style={styles.profileInput}
@@ -1311,10 +1342,20 @@ function App({
           )}
 
           {screen === 'forgot' && (
-            <form onSubmit={(e) => { e.preventDefault(); setScreen('login'); }} style={styles.formContainerResponsive}>
+            <form onSubmit={handleForgotSubmit} style={styles.formContainerResponsive}>
               <h3 style={styles.formTitle}>KHÔI PHỤC MẬT KHẨU</h3>
-              <input type="email" placeholder="ENTER YOUR EMAIL" style={styles.input} />
-              <button type="submit" style={{ ...styles.actionBtn, marginTop: '12px' }}>SEND RESET LINK</button>
+              <p style={{ fontSize: '12px', color: '#64748b', marginBottom: '14px', lineHeight: '1.5' }}>
+                Nhập địa chỉ email đăng ký để nhận liên kết đặt lại mật khẩu bảo mật (Hiệu lực 30 phút, chỉ sử dụng 1 lần).
+              </p>
+              <input
+                type="email"
+                placeholder="ENTER YOUR EMAIL (ví dụ: user@example.com)"
+                value={forgotEmail}
+                onChange={(e) => setForgotEmail(e.target.value)}
+                style={styles.input}
+                required
+              />
+              <button type="submit" style={{ ...styles.actionBtn, marginTop: '12px' }}>GỬI LIÊN KẾT ĐẶT LẠI</button>
               <a
                 href="#login"
                 onClick={(e) => {
