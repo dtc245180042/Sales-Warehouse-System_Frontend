@@ -1,5 +1,8 @@
 import { useState, useMemo } from 'react';
 import TogglePassBtn from './TogglePassBtn';
+import LockAccountModal from './LockAccountModal';
+import UnlockAccountModal from './UnlockAccountModal';
+import { MIN_PASSWORD_LENGTH } from '../utils/constants';
 import './UserManagement.css';
 
 // Danh sách Vai trò chuẩn trong hệ thống OMS
@@ -62,10 +65,9 @@ export default function UserManagement({
   const [duplicateFields, setDuplicateFields] = useState({ username: false, email: false, phone: false });
   const [showPassword, setShowPassword] = useState(false);
 
-  // Modal Khóa Tài Khoản
+  // Modal Khóa Tài Khoản & Mở Khóa Tài Khoản (SCRUM-300 / SCRUM-344)
   const [lockModalTarget, setLockModalTarget] = useState(null);
-  const [lockReasonInput, setLockReasonInput] = useState('');
-  const [lockReasonError, setLockReasonError] = useState('');
+  const [unlockModalTarget, setUnlockModalTarget] = useState(null);
 
   // Modal Reset Password
   const [resetPassTarget, setResetPassTarget] = useState(null);
@@ -245,19 +247,19 @@ export default function UserManagement({
         }
       }
 
-      // Tạo mới -> Validate Mật khẩu
+      // Tạo mới -> Validate Mật khẩu (SCRUM-201: Tối thiểu 8 ký tự)
       if (!formData.password) {
         errors.password = 'Mật khẩu là bắt buộc khi tạo tài khoản mới';
         detailsList.push('Vui lòng nhập mật khẩu đăng nhập.');
-      } else if (formData.password.length < 6) {
-        errors.password = 'Mật khẩu phải có tối thiểu 6 ký tự';
-        detailsList.push('Mật khẩu quá ngắn (tối thiểu 6 ký tự).');
+      } else if (formData.password.length < MIN_PASSWORD_LENGTH) {
+        errors.password = `Mật khẩu phải có tối thiểu ${MIN_PASSWORD_LENGTH} ký tự`;
+        detailsList.push(`Mật khẩu quá ngắn (tối thiểu ${MIN_PASSWORD_LENGTH} ký tự).`);
       }
     } else {
-      // Chỉnh sửa -> Validate Mật khẩu mới nếu có nhập
-      if (formData.password && formData.password.length < 6) {
-        errors.password = 'Mật khẩu mới phải có tối thiểu 6 ký tự';
-        detailsList.push('Mật khẩu mới phải có tối thiểu 6 ký tự.');
+      // Chỉnh sửa -> Validate Mật khẩu mới nếu có nhập (SCRUM-201: Tối thiểu 8 ký tự)
+      if (formData.password && formData.password.length < MIN_PASSWORD_LENGTH) {
+        errors.password = `Mật khẩu mới phải có tối thiểu ${MIN_PASSWORD_LENGTH} ký tự`;
+        detailsList.push(`Mật khẩu mới phải có tối thiểu ${MIN_PASSWORD_LENGTH} ký tự.`);
       }
     }
 
@@ -427,7 +429,7 @@ export default function UserManagement({
   };
 
   // -------------------------------------------------------------------------
-  // XỬ LÝ KHÓA / MỞ KHÓA TÀI KHOẢN
+  // XỬ LÝ KHÓA / MỞ KHÓA TÀI KHOẢN (LockAccountModal & UnlockAccountModal)
   // -------------------------------------------------------------------------
   const handleOpenLockModal = (u) => {
     if (u.role === 'admin') {
@@ -435,25 +437,16 @@ export default function UserManagement({
       return;
     }
     setLockModalTarget(u);
-    setLockReasonInput('');
-    setLockReasonError('');
   };
 
-  const handleConfirmLockAccount = () => {
-    if (!lockReasonInput.trim()) {
-      setLockReasonError('Bắt buộc ghi rõ lý do khóa tài khoản!');
-      return;
-    }
-
-    const targetUsername = lockModalTarget.username;
-    const reason = lockReasonInput.trim();
-
+  const handleConfirmLockAccount = (targetUsername, reason) => {
+    const target = userList.find(u => u.username === targetUsername);
     let warningMsg = `Tài khoản '${targetUsername}' đã bị khóa và thu hồi toàn bộ phiên làm việc. Lý do: "${reason}".`;
-    if (lockModalTarget.role === 'sales_rep' || lockModalTarget.role === 'sales_mgr') {
-      warningMsg += `\n\n⚠️ CẢNH BÁO BÀN GIAO: Nhân viên kinh doanh phụ trách danh sách đại lý. Yêu cầu bàn giao lại cho nhân viên khác!`;
+    if (target && (target.role === 'sales_rep' || target.role === 'sales_mgr')) {
+      warningMsg += `\n\n⚠️ CẢNH BÁO BÀN GIAO: Nhân sự này phụ trách danh sách đại lý địa bàn. Yêu cầu Quản trị viên phân công bàn giao ngay lập tức cho nhân viên khác!`;
     }
 
-    setUserList(prev => prev.map(u => u.username === targetUsername ? { ...u, isLocked: true, lockReason: reason } : u));
+    setUserList(prev => prev.map(u => u.username === targetUsername ? { ...u, isLocked: true, lockReason: reason, lockedAt: new Date().toLocaleDateString('vi-VN') } : u));
     setLockModalTarget(null);
 
     setPopup({
@@ -465,12 +458,17 @@ export default function UserManagement({
     });
   };
 
-  const handleUnlockAccount = (u) => {
-    setUserList(prev => prev.map(item => item.username === u.username ? { ...item, isLocked: false, lockReason: null } : item));
+  const handleOpenUnlockModal = (u) => {
+    setUnlockModalTarget(u);
+  };
+
+  const handleConfirmUnlockAccount = (targetUsername) => {
+    setUserList(prev => prev.map(item => item.username === targetUsername ? { ...item, isLocked: false, lockReason: null } : item));
+    setUnlockModalTarget(null);
     setPopup({
       show: true,
       title: '🔓 Mở khóa thành công',
-      message: `Tài khoản '${u.username}' đã được mở khóa và có thể đăng nhập bình thường.`,
+      message: `Tài khoản '${targetUsername}' đã được mở khóa và có thể đăng nhập bình thường.`,
       type: 'success',
       onConfirm: () => setPopup(p => ({ ...p, show: false }))
     });
@@ -491,8 +489,8 @@ export default function UserManagement({
       setResetPassError('Vui lòng nhập hoặc tạo mật khẩu mới!');
       return;
     }
-    if (newPasswordInput.length < 6) {
-      setResetPassError('Mật khẩu mới phải có tối thiểu 6 ký tự!');
+    if (newPasswordInput.length < MIN_PASSWORD_LENGTH) {
+      setResetPassError(`Mật khẩu mới phải có tối thiểu ${MIN_PASSWORD_LENGTH} ký tự!`);
       return;
     }
 
@@ -774,7 +772,7 @@ export default function UserManagement({
                             <button
                               type="button"
                               className="btn-icon-action unlock"
-                              onClick={() => handleUnlockAccount(u)}
+                              onClick={() => handleOpenUnlockModal(u)}
                               title="Mở khóa tài khoản"
                             >
                               🔓
@@ -940,7 +938,7 @@ export default function UserManagement({
                     <input
                       type={showPassword ? 'text' : 'password'}
                       className={`form-control ${formErrors.password ? 'has-error' : ''}`}
-                      placeholder={editingUser ? 'Nhập mật khẩu mới nếu muốn thay đổi...' : 'Nhập mật khẩu (tối thiểu 6 ký tự)...'}
+                      placeholder={editingUser ? 'Nhập mật khẩu mới nếu muốn thay đổi...' : `Nhập mật khẩu (tối thiểu ${MIN_PASSWORD_LENGTH} ký tự)...`}
                       value={formData.password}
                       onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
                     />
@@ -1086,48 +1084,20 @@ export default function UserManagement({
       )}
 
       {/* ------------------------------------------------------------------- */}
-      {/* MODAL 2: KHÓA TÀI KHOẢN (VỚI LÝ DO BẮT BUỘC) */}
+      {/* MODAL 2: KHÓA TÀI KHOẢN (LockAccountModal) & MỞ KHÓA (UnlockAccountModal) */}
       {/* ------------------------------------------------------------------- */}
-      {lockModalTarget && (
-        <div className="um-modal-overlay">
-          <div className="um-modal-content" style={{ maxWidth: '480px' }}>
-            <div className="um-modal-header" style={{ backgroundColor: '#fef2f2' }}>
-              <h3 style={{ color: '#991b1b' }}>🔒 Khóa Tài Khoản: {lockModalTarget.username}</h3>
-              <button type="button" className="btn-modal-close" onClick={() => setLockModalTarget(null)}>✕</button>
-            </div>
-            <div className="um-modal-body">
-              <p style={{ fontSize: '13px', color: '#334155', margin: 0 }}>
-                Khóa tài khoản <strong>{lockModalTarget.fullName}</strong> (<code>@{lockModalTarget.username}</code>) sẽ hủy tức thì mọi phiên đăng nhập đang hoạt động.
-              </p>
-
-              {(lockModalTarget.role === 'sales_rep' || lockModalTarget.role === 'sales_mgr') && (
-                <div style={{ backgroundColor: '#fffbeb', border: '1px solid #fde68a', borderRadius: '10px', padding: '12px', fontSize: '12px', color: '#92400e' }}>
-                  ⚠️ <strong>Cảnh báo bàn giao:</strong> Đây là tài khoản Nhân viên kinh doanh. Hãy đảm bảo đã bàn giao lại các Đại lý phụ trách cho nhân viên khác.
-                </div>
-              )}
-
-              <div className="form-group">
-                <label style={{ color: '#991b1b' }}>Lý do khóa tài khoản <span className="required">* (Bắt buộc)</span></label>
-                <textarea
-                  rows="3"
-                  className={`form-control ${lockReasonError ? 'has-error' : ''}`}
-                  placeholder="Nhập nguyên nhân cụ thể (Ví dụ: Nghỉ việc, Tạm ngưng công tác, Vi phạm quy chế...)"
-                  value={lockReasonInput}
-                  onChange={(e) => {
-                    setLockReasonInput(e.target.value);
-                    if (e.target.value.trim()) setLockReasonError('');
-                  }}
-                />
-                {lockReasonError && <span className="field-error">{lockReasonError}</span>}
-              </div>
-            </div>
-            <div className="um-modal-footer">
-              <button type="button" className="btn-modal-cancel" onClick={() => setLockModalTarget(null)}>Hủy</button>
-              <button type="button" className="btn-modal-submit danger" onClick={handleConfirmLockAccount}>🔒 Xác nhận Khóa</button>
-            </div>
-          </div>
-        </div>
-      )}
+      <LockAccountModal
+        isOpen={!!lockModalTarget}
+        targetUser={lockModalTarget}
+        onClose={() => setLockModalTarget(null)}
+        onConfirmLock={handleConfirmLockAccount}
+      />
+      <UnlockAccountModal
+        isOpen={!!unlockModalTarget}
+        targetUser={unlockModalTarget}
+        onClose={() => setUnlockModalTarget(null)}
+        onConfirmUnlock={handleConfirmUnlockAccount}
+      />
 
       {/* ------------------------------------------------------------------- */}
       {/* MODAL 3: RESET MẬT KHẨU NHANH */}
@@ -1150,7 +1120,7 @@ export default function UserManagement({
                   <input
                     type={showNewPassword ? 'text' : 'password'}
                     className={`form-control ${resetPassError ? 'has-error' : ''}`}
-                    placeholder="Nhập mật khẩu mới (min 6 ký tự)..."
+                    placeholder={`Nhập mật khẩu mới (tối thiểu ${MIN_PASSWORD_LENGTH} ký tự)...`}
                     value={newPasswordInput}
                     onChange={(e) => {
                       setNewPasswordInput(e.target.value);

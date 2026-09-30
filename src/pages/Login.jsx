@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import TogglePassBtn from '../components/TogglePassBtn';
+import { MAX_LOGIN_ATTEMPTS, ACCOUNT_LOCKOUT_DURATION_MS, ACCOUNT_LOCKOUT_DURATION_MINUTES } from '../utils/constants';
 
 const DEMO_ACCOUNTS = [
   {
@@ -52,16 +53,22 @@ const Login = ({ userList, setUser, setCurrentRole, setScreen, setPopup, styles,
     }
 
     // Kiểm tra nếu tài khoản đang bị tạm khóa 15 phút do 5 lần nhập sai
-    if (attemptData.lockedUntil && now < attemptData.lockedUntil) {
-      const remainingMinutes = Math.ceil((attemptData.lockedUntil - now) / 60000);
-      setPopup({
-        show: true,
-        title: 'Tài khoản tạm thời bị khóa (15 phút)',
-        message: `Bạn đã nhập sai thông tin 5 lần liên tiếp. Tài khoản tạm thời bị khóa vì lý do an toàn. Vui lòng thử lại sau ${remainingMinutes} phút!`,
-        type: 'error',
-        onConfirm: () => setPopup(p => ({ ...p, show: false }))
-      });
-      return;
+    if (attemptData.lockedUntil) {
+      if (now < attemptData.lockedUntil) {
+        const remainingMinutes = Math.ceil((attemptData.lockedUntil - now) / 60000);
+        setPopup({
+          show: true,
+          title: `Tài khoản tạm thời bị khóa (${ACCOUNT_LOCKOUT_DURATION_MINUTES} phút)`,
+          message: `Bạn đã nhập sai thông tin ${MAX_LOGIN_ATTEMPTS} lần liên tiếp. Tài khoản tạm thời bị khóa vì lý do an toàn. Vui lòng thử lại sau ${remainingMinutes} phút!`,
+          type: 'error',
+          onConfirm: () => setPopup(p => ({ ...p, show: false }))
+        });
+        return;
+      } else {
+        // Hết thời hạn khóa -> reset trạng thái đếm
+        attemptData = { count: 0, lockedUntil: null };
+        localStorage.setItem(userKey, JSON.stringify(attemptData));
+      }
     }
 
     const foundAccount = userList.find(
@@ -72,14 +79,14 @@ const Login = ({ userList, setUser, setCurrentRole, setScreen, setPopup, styles,
     if (!foundAccount || foundAccount.password !== password) {
       const newCount = (attemptData.count || 0) + 1;
       let newLockedUntil = null;
-      let alertMsg = `Tên đăng nhập hoặc mật khẩu không chính xác! (Lần sai: ${newCount}/5)`;
+      let alertMsg = `Tên đăng nhập hoặc mật khẩu không chính xác! (Lần sai: ${newCount}/${MAX_LOGIN_ATTEMPTS})`;
 
-      if (newCount >= 5) {
-        newLockedUntil = now + 15 * 60 * 1000; // Khóa tạm 15 phút
-        alertMsg = 'Bạn đã nhập sai thông tin 5 lần liên tiếp! Tài khoản bị tạm khóa 15 phút để đảm bảo an toàn.';
+      if (newCount >= MAX_LOGIN_ATTEMPTS) {
+        newLockedUntil = now + ACCOUNT_LOCKOUT_DURATION_MS; // Khóa tạm 15 phút
+        alertMsg = `Bạn đã nhập sai thông tin ${MAX_LOGIN_ATTEMPTS} lần liên tiếp! Tài khoản bị tạm khóa ${ACCOUNT_LOCKOUT_DURATION_MINUTES} phút để đảm bảo an toàn.`;
       }
 
-      localStorage.setItem(userKey, JSON.stringify({ count: newCount >= 5 ? 0 : newCount, lockedUntil: newLockedUntil }));
+      localStorage.setItem(userKey, JSON.stringify({ count: newCount >= MAX_LOGIN_ATTEMPTS ? 0 : newCount, lockedUntil: newLockedUntil }));
 
       setPopup({
         show: true,
