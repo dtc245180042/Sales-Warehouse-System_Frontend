@@ -7,6 +7,7 @@ import ErrorPage from './pages/ErrorPage';
 import TogglePassBtn from './components/TogglePassBtn';
 import UserManagement from './components/UserManagement';
 import ErrorBoundary from './components/ErrorBoundary';
+import UserRoleAssignmentPage from './pages/UserRoleAssignmentPage';
 
 import { MOCK_PRODUCTS, MOCK_ACCOUNTS, MOCK_FINANCIAL_MARGINS } from './utils/mockData';
 import { useSessionManager } from './utils/useSessionManager';
@@ -1484,35 +1485,49 @@ function App({
   // =========================================================================
   return (
     <AuthProvider>
-      <div style={{ position: 'fixed', bottom: '16px', right: '16px', zIndex: 999999, display: 'flex', gap: '8px' }}>
-        <a
-          href={viewMode === 'oms' ? '#header-kho-demo' : '#oms-pro'}
-          role="button"
-          onClick={(e) => {
-            e.preventDefault();
-            setViewMode(viewMode === 'oms' ? 'scrum300' : 'oms');
-          }}
+      <div style={{ position: 'fixed', bottom: '16px', right: '16px', zIndex: 999999, display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+        <button
+          type="button"
+          onClick={() => setViewMode(viewMode === 'roleAssignment' ? 'oms' : 'roleAssignment')}
           style={{
-            textDecoration: 'none',
-            display: 'inline-block',
-            padding: '10px 18px',
-            backgroundColor: '#2563eb',
+            padding: '10px 16px',
+            backgroundColor: viewMode === 'roleAssignment' ? '#0f172a' : '#7c3aed',
             color: '#ffffff',
             border: 'none',
             borderRadius: '24px',
             boxShadow: '0 4px 14px rgba(0,0,0,0.3)',
             cursor: 'pointer',
             fontWeight: 'bold',
-            fontSize: '13px',
+            fontSize: '12px',
             transition: 'all 0.2s ease',
           }}
         >
-          {viewMode === 'oms' ? '🔍 Xem Giao Diện Header & Kho' : '📦 Về Giao Diện OMS Pro'}
-        </a>
+          {viewMode === 'roleAssignment' ? '📦 Về Giao Diện OMS' : '🎭 Gán Vai Trò & Kho/Địa Bàn (SCRUM-206)'}
+        </button>
+        <button
+          type="button"
+          onClick={() => setViewMode(viewMode === 'scrum300' ? 'oms' : 'scrum300')}
+          style={{
+            padding: '10px 16px',
+            backgroundColor: viewMode === 'scrum300' ? '#0f172a' : '#2563eb',
+            color: '#ffffff',
+            border: 'none',
+            borderRadius: '24px',
+            boxShadow: '0 4px 14px rgba(0,0,0,0.3)',
+            cursor: 'pointer',
+            fontWeight: 'bold',
+            fontSize: '12px',
+            transition: 'all 0.2s ease',
+          }}
+        >
+          {viewMode === 'scrum300' ? '📦 Về Giao Diện OMS' : '🔍 Xem Header & Kho (SCRUM-300)'}
+        </button>
       </div>
 
       <ErrorBoundary userRole={user?.roleTitle || currentRole} onError={() => { setErrorType(500); setScreen('error'); }}>
-        {viewMode === 'scrum300' ? (
+        {viewMode === 'roleAssignment' ? (
+          <UserRoleAssignmentPage />
+        ) : viewMode === 'scrum300' ? (
           <div>
             <Navbar />
             <main>
