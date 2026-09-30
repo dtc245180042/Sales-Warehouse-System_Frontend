@@ -74,8 +74,6 @@ const MOCK_ACCOUNTS = [
 
 function App({
   orderHistory = [],
-  staffPendingOrders = [],
-  adminStats = { totalAgencies: 0, totalOrders: 0, monthlyRevenue: 0, pendingLimitRequests: 0 },
   onLoginSubmit = (data) => console.log('[Backend API] Login:', data),
   onRegisterSubmit = (data) => console.log('[Backend API] Register:', data),
   onChangePassSubmit = (data) => console.log('[Backend API] Change Pass:', data),
@@ -112,21 +110,117 @@ function App({
 
   const [activeTab, setActiveTab] = useState('main');
   const [hoveredBlock, setHoveredBlock] = useState(null);
+  const [viewMode, setViewMode] = useState('oms'); // 'oms' | 'scrum300'
+  const [userList, setUserList] = useState(MOCK_ACCOUNTS);
+  const [errorType, setErrorType] = useState(null); // null | 404 | 403 | 401 | 500
 
+  // STATE POP-UP THÔNG BÁO (MODAL ALERT)
   const [popup, setPopup] = useState({
     show: false,
     title: '',
     message: '',
-    type: 'info',
-    badgeText: '',
-    primaryBtnText: '',
-    onPrimaryAction: null,
-    secondaryBtnText: '',
-    onSecondaryAction: null
+    type: 'success', // 'success' | 'error' | 'info'
+    onConfirm: null
   });
 
-  const isSelfLoggingOut = useRef(false);
+  // =========================================================================
+  // QUẢN LÝ PHIÊN ĐĂNG NHẬP (Session Manager)
+  // =========================================================================
+  const handleSessionExpired = useCallback(() => {
+    setUser(null);
+    localStorage.removeItem('auth_user');
+    setScreen('login');
+    setPopup({
+      show: true,
+      title: '⏱️ Phiên đã hết hạn',
+      message: 'Phiên làm việc của bạn đã hết hạn do không hoạt động trong thời gian dài. Vui lòng đăng nhập lại để tiếp tục.',
+      type: 'info',
+      onConfirm: () => setPopup({ show: false, title: '', message: '', type: 'info', onConfirm: null })
+    });
+  }, []);
 
+  const handleSessionWarning = useCallback((minutesLeft) => {
+    setPopup({
+      show: true,
+      title: '⚠️ Sắp hết phiên làm việc',
+      message: `Phiên đăng nhập của bạn sẽ hết hạn trong ${minutesLeft} phút nữa. Di chuyển chuột hoặc thực hiện thao tác bất kỳ để gia hạn phiên tự động.\n\n💾 Đơn hàng đang gõ dở sẽ không bị mất nếu bạn tiếp tục hoạt động.`,
+      type: 'info',
+      onConfirm: () => setPopup({ show: false, title: '', message: '', type: 'info', onConfirm: null })
+    });
+  }, []);
+
+  const handleSessionRenewed = useCallback(() => {
+    // Khi phiên được gia hạn (người dùng quay lại hoạt động sau cảnh báo) -> đóng popup cảnh báo
+    setPopup(prev => prev.title === '⚠️ Sắp hết phiên làm việc'
+      ? { show: false, title: '', message: '', type: 'info', onConfirm: null }
+      : prev
+    );
+  }, []);
+
+  const { destroySession } = useSessionManager({
+    user,
+    onSessionExpired: handleSessionExpired,
+    onSessionWarning: handleSessionWarning,
+    onSessionRenewed: handleSessionRenewed,
+    enabled: !!user, // Chỉ bật khi đã đăng nhập
+  });
+
+  // =========================================================================
+  // BỘ XỬ LÝ LỖI API & ĐIỀU HƯỚNG ROUTING TỰ ĐỘNG
+  // =========================================================================
+  useEffect(() => {
+    // 1. Đăng ký Interceptor bắt lỗi HTTP status code từ API (401, 403, 404, 500)
+    apiClient.setErrorHandler((statusCode) => {
+      setErrorType(statusCode);
+      setScreen('error');
+    });
+  }, []);
+
+  useEffect(() => {
+    // 2. Lắng nghe URL Hash Router để kiểm tra phân quyền trang và điều hướng lỗi
+    const cleanup = setupRouterGuardListener(
+      () => user,
+      (errType) => {
+        setErrorType(errType);
+        setScreen('error');
+      }
+    );
+    return cleanup;
+  }, [user]);
+
+  // =========================================================================
+  // XỚ LÝ ĐĂNG XUẤT CHO TAB BẤM ĐĂNG XUẤT (ĐÃ ĐĂNG XUẤT THÀNH CÔNG)
+  // =========================================================================
+  const handleLogout = () => {
+    // 1. Hủy phiên làm việc tức thì (mô phỏng thu hồi token phía server)
+    destroySession();
+
+    // 2. Xoá thông tin người dùng
+    setUser(null);
+    localStorage.removeItem('auth_user');
+
+    // 3. Gửi thông điệp báo cho TẤT CẢ các tab khác
+    try {
+      const authChannel = new BroadcastChannel('auth_logout_channel');
+      authChannel.postMessage({ type: 'LOGOUT_EVENT', timestamp: Date.now() });
+      authChannel.close();
+    } catch (e) {
+      console.log('BroadcastChannel error:', e);
+    }
+
+    // 4. Hiển thị Pop-up "ĐÃ ĐĂNG XUẤT THÀNH CÔNG"
+    setScreen('login');
+    setPopup({
+      show: true,
+      title: 'Đăng xuất thành công',
+      message: 'Tài khoản của bạn đã được đăng xuất an toàn. Phiên làm việc đã bị thu hồi ngay lập tức khỏi hệ thống!',
+      type: 'info',
+      onConfirm: () => setPopup({ show: false, title: '', message: '', type: 'info', onConfirm: null })
+    });
+  };
+
+  // STATE DỮ LIỆU ĐĂNG NHẬP (Đã chuyển sang Login.jsx)
+  // STATE DỮ LIỆU FORM ĐĂNG KÝ
   const [regForm, setRegForm] = useState({
     fullName: '',
     username: '',
@@ -136,7 +230,7 @@ function App({
     confirmPassword: ''
   });
 
-  const [showLoginPass, setShowLoginPass] = useState(false);
+  // STATE BẬT/TẮT HIỂN THỊ MẬT KHẨU
   const [showRegPass, setShowRegPass] = useState(false);
   const [showRegConfirmPass, setShowRegConfirmPass] = useState(false);
   const [showProfCurrentPass, setShowProfCurrentPass] = useState(false);
@@ -145,131 +239,126 @@ function App({
 
   const [resetStep, setResetStep] = useState(1);
   const [showForgotInProfile, setShowForgotInProfile] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
 
-  useEffect(() => {
-    let channel;
-    try {
-      channel = new BroadcastChannel('oms_logout_channel');
-      channel.onmessage = (event) => {
-        if (isSelfLoggingOut.current) return;
-
-        if (event.data && event.data.action === 'OTHER_TAB_LOGOUT') {
-          setUser(null);
-          setScreen('login');
-          setPopup({
-            show: true,
-            title: 'Hết phiên đăng nhập',
-            message: 'Tài khoản của bạn vừa được đăng xuất từ một tab làm việc hoặc thiết bị khác!',
-            type: 'warning',
-            badgeText: 'TRẠNG THÁI: PHIÊN ĐĂNG NHẬP HẾT HẠN (401)',
-            primaryBtnText: '🔐 Đăng Nhập Lại Ngay',
-            onPrimaryAction: () => setPopup({ ...popup, show: false })
-          });
-        }
-      };
-    } catch (e) {
-      console.log('BroadcastChannel error', e);
+  // Xử lý gửi liên kết đặt lại mật khẩu qua email (SCRUM-200)
+  const handleForgotSubmit = (e) => {
+    e.preventDefault();
+    const email = forgotEmail.trim();
+    if (!email) {
+      setPopup({
+        show: true,
+        title: 'Thiếu thông tin email',
+        message: 'Vui lòng nhập địa chỉ email của bạn!',
+        type: 'error',
+        onConfirm: () => setPopup((p) => ({ ...p, show: false })),
+      });
+      return;
     }
 
-    return () => {
-      if (channel) channel.close();
-    };
-  }, []);
-
-  const handleLogout = () => {
-    isSelfLoggingOut.current = true;
-    setUser(null);
-    localStorage.removeItem('auth_user');
-
-    try {
-      const channel = new BroadcastChannel('oms_logout_channel');
-      channel.postMessage({ action: 'OTHER_TAB_LOGOUT', time: Date.now() });
-      channel.close();
-    } catch (e) {
-      console.log(e);
-    }
-
-    setScreen('login');
-
+    // Tiêu chí SCRUM-200: Email không tồn tại vẫn hiển thị cùng một thông báo, liên kết có hiệu lực 30 phút và chỉ dùng 1 lần
     setPopup({
       show: true,
-      title: 'Đăng xuất thành công',
-      message: 'Tài khoản của bạn đã được đăng xuất an toàn khỏi hệ thống!',
+      title: 'Đã gửi liên kết khôi phục mật khẩu',
+      message: `Nếu email '${email}' tồn tại trong hệ thống, bạn sẽ nhận được một liên kết đặt lại mật khẩu có hiệu lực trong vòng 30 phút.\n\n⚠️ Lưu ý bảo mật: Liên kết chỉ có giá trị sử dụng đúng 1 lần duy nhất.`,
       type: 'info',
-      primaryBtnText: 'ĐÃ HIỂU & TIẾP TỤC',
-      onPrimaryAction: () => {
-        isSelfLoggingOut.current = false;
-        setPopup({ ...popup, show: false });
-      }
+      onConfirm: () => {
+        setPopup((p) => ({ ...p, show: false }));
+        setScreen('login');
+        setForgotEmail('');
+      },
     });
   };
 
-  const triggerErrorPopup = (code) => {
-    if (code === 403) {
-      setPopup({
-        show: true,
-        title: 'Bạn không có quyền truy cập tính năng này',
-        message: 'Rất tiếc! Tài khoản hiện tại của bạn chưa được phân quyền để mở khu vực này. Bạn cần làm gì tiếp theo?',
-        type: 'error',
-        badgeText: 'TRẠNG THÁI: KHÔNG ĐỦ QUYỀN TRUY CẬP (403)',
-        primaryBtnText: '🔙 Quay Về Trang Chủ Dashboard',
-        onPrimaryAction: () => setPopup({ ...popup, show: false }),
-        secondaryBtnText: '🔑 Đăng Nhập Lại Bằng Tài Khoản Khác',
-        onSecondaryAction: () => handleLogout()
-      });
-    } else if (code === 404) {
-      setPopup({
-        show: true,
-        title: 'Không tìm thấy trang hoặc đường dẫn',
-        message: 'Trang bạn đang truy cập có thể đã bị xóa hoặc thay đổi địa chỉ. Vui lòng chọn hướng xử lý tiếp theo:',
-        type: 'info',
-        badgeText: 'TRẠNG THÁI: TRUY CẬP NHẦM ĐỊA CHỈ (404)',
-        primaryBtnText: '🛒 Về Cổng Đặt Hàng Trực Tuyến',
-        onPrimaryAction: () => { setActiveTab('main'); setPopup({ ...popup, show: false }); },
-        secondaryBtnText: '📜 Xem Lịch Sử Đơn Hàng',
-        onSecondaryAction: () => { setActiveTab('history'); setPopup({ ...popup, show: false }); }
-      });
-    } else if (code === 401) {
-      setPopup({
-        show: true,
-        title: 'Phiên làm việc của bạn đã hết hạn',
-        message: 'Tài khoản không tương tác trong thời gian dài hoặc phiên đăng nhập không hợp lệ.',
-        type: 'warning',
-        badgeText: 'TRẠNG THÁI: PHIÊN ĐĂNG NHẬP HẾT HẠN (401)',
-        primaryBtnText: '🔐 Đăng Nhập Lại Ngay',
-        onPrimaryAction: () => handleLogout()
-      });
-    } else if (code === 500) {
-      setPopup({
-        show: true,
-        title: 'Hệ thống máy chủ gặp sự cố nội bộ',
-        message: 'Máy chủ dữ liệu tạm thời không thể xử lý yêu cầu. Kỹ thuật viên đã nhận được cảnh báo tự động.',
-        type: 'error',
-        badgeText: 'TRẠNG THÁI: LỖI MÁY CHỦ (500)',
-        primaryBtnText: '🔄 Thử Tải Lại Dữ Liệu',
-        onPrimaryAction: () => setPopup({ ...popup, show: false }),
-        secondaryBtnText: '📞 Báo Sự Cố Cho IT Support',
-        onSecondaryAction: () => {
-          alert('Đã gửi thông báo yêu cầu hỗ trợ tới bộ phận IT!');
-          setPopup({ ...popup, show: false });
-        }
-      });
-    } else if (code === 503) {
-      setPopup({
-        show: true,
-        title: 'Tính năng đang bảo trì định kỳ',
-        message: 'Phân hệ này đang được nâng cấp hiệu năng. Vui lòng quay lại sau ít phút!',
-        type: 'warning',
-        badgeText: 'TRẠNG THÁI: BẢO TRÌ HỆ THỐNG (503)',
-        primaryBtnText: '🏠 Đã Hiểu & Quay Về Dashboard',
-        onPrimaryAction: () => setPopup({ ...popup, show: false })
-      });
+  // STATE ĐỔI MẬT KHẨU & THÔNG BÁO LỖI
+  const [changePassForm, setChangePassForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
+  const [changePassError, setChangePassError] = useState('');
+
+  // -------------------------------------------------------------------------
+  // XỬ LÝ ĐỔI MẬT KHẨU VÀ THU HỒI TẤT CẢ CÁC PHIÊN LÀM VIỆC KHÁC
+  // -------------------------------------------------------------------------
+  const handleChangePasswordSubmit = (e) => {
+    e.preventDefault();
+    setChangePassError('');
+
+    const { currentPassword, newPassword, confirmPassword } = changePassForm;
+
+    // 1. Kiểm tra điền đủ thông tin
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      setChangePassError('Vui lòng điền đầy đủ cả 3 thông tin mật khẩu!');
+      return;
     }
+
+    // 2. Kịch bản 1: Nhập sai mật khẩu hiện tại
+    const actualPassword = user?.password || '123456';
+    if (currentPassword !== actualPassword) {
+      setChangePassError('❌ Mật khẩu hiện tại không chính xác. Vui lòng kiểm tra lại!');
+      return;
+    }
+
+    // 3. Kịch bản 2: Mật khẩu mới không đạt yêu cầu (SCRUM-201: Tối thiểu 8 ký tự, có chữ và số)
+    const passwordPattern = /^(?=.*[A-Za-z])(?=.*\d).{8,}$/;
+    if (!passwordPattern.test(newPassword)) {
+      setChangePassError('❌ Mật khẩu mới phải có tối thiểu 8 ký tự, bao gồm cả chữ cái và chữ số!');
+      return;
+    }
+
+    if (newPassword === currentPassword) {
+      setChangePassError('❌ Mật khẩu mới không được trùng với mật khẩu hiện tại!');
+      return;
+    }
+
+    if (confirmPassword !== newPassword) {
+      setChangePassError('❌ Mật khẩu xác nhận không trùng khớp với mật khẩu mới!');
+      return;
+    }
+
+    // 4. Kịch bản 3: Đổi mật khẩu thành công & Thu hồi phiên khác
+    const updatedUser = { ...user, password: newPassword };
+    setUser(updatedUser);
+    localStorage.setItem('auth_user', JSON.stringify(updatedUser));
+
+    // Cập nhật lại userList hệ thống
+    if (user?.username) {
+      setUserList(prev => prev.map(u => u.username === user.username ? { ...u, password: newPassword } : u));
+    }
+
+    // Thu hồi toàn bộ phiên làm việc trên các Tab/thiết bị khác qua BroadcastChannel
+    try {
+      const authChannel = new BroadcastChannel('auth_logout_channel');
+      authChannel.postMessage({
+        type: 'PASSWORD_CHANGED_EVENT',
+        username: user?.username,
+        timestamp: Date.now()
+      });
+      authChannel.close();
+    } catch (err) {
+      console.log('BroadcastChannel error:', err);
+    }
+
+    // Reset Form & gọi callback API
+    setChangePassForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+    onChangePassSubmit({ username: user?.username, newPassword });
+
+    // Hiển thị Popup thành công kèm xác nhận thu hồi phiên
+    setPopup({
+      show: true,
+      title: '🎉 Đổi Mật Khẩu Thành Công',
+      message: `Mật khẩu tài khoản '@${user?.username || 'user'}' đã được cập nhật thành công!\n\n🔒 THU HỒI PHIÊN TỰ ĐỘNG: Tất cả các phiên đăng nhập đang hoạt động trên thiết bị/Tab khác đã được tự động ngắt để bảo vệ an toàn tài khoản.`,
+      type: 'success',
+      onConfirm: () => setPopup(p => ({ ...p, show: false }))
+    });
   };
 
-  const handleLoginSubmit = (e) => {
-    e.preventDefault();
-    onLoginSubmit({});
+  // =========================================================================
+  // XỚ LÝ LẮNG NGHE ĐĂNG XUẤT CHO TAB PHỤ (HẾT PHIÊN ĐĂNG NHẬP)
+  // =========================================================================
+  useEffect(() => {
+    const authChannel = new BroadcastChannel('auth_logout_channel');
 
     isSelfLoggingOut.current = false;
     const loggedUser = MOCK_ACCOUNTS.find(a => a.role === currentRole) || MOCK_ACCOUNTS[1];
@@ -287,8 +376,7 @@ function App({
         title: 'Đăng ký không thành công',
         message: 'Vui lòng điền đầy đủ tất cả các trường thông tin bắt buộc!',
         type: 'error',
-        primaryBtnText: 'ĐÃ HIỂU',
-        onPrimaryAction: () => setPopup({ ...popup, show: false })
+        onConfirm: () => setPopup({ ...popup, show: false })
       });
       return;
     }
@@ -299,8 +387,7 @@ function App({
         title: 'Mật khẩu không trùng khớp',
         message: 'Xác nhận mật khẩu không giống với mật khẩu đã nhập. Vui lòng kiểm tra lại!',
         type: 'error',
-        primaryBtnText: 'ĐÃ HIỂU',
-        onPrimaryAction: () => setPopup({ ...popup, show: false })
+        onConfirm: () => setPopup({ ...popup, show: false })
       });
       return;
     }
@@ -312,9 +399,11 @@ function App({
       email: regForm.email,
       phone: regForm.phone,
       role: 'customer',
+      roleTitle: 'Đại lý cấp 1 (Customer)',
       createdAt: new Date().toLocaleDateString('vi-VN')
     };
 
+    setUserList(prev => [newCustomerUser, ...prev]);
     onRegisterSubmit(newCustomerUser);
 
     setPopup({
@@ -322,10 +411,8 @@ function App({
       title: '🎉 Tạo tài khoản thành công!',
       message: `Chúc mừng đại lý "${regForm.fullName}" đã đăng ký tài khoản thành công. Hệ thống tự động chuyển bạn đến Cổng Đặt Hàng Đại Lý!`,
       type: 'success',
-      primaryBtnText: 'VÀO DASHBOARD NGAY',
-      onPrimaryAction: () => {
+      onConfirm: () => {
         setPopup({ ...popup, show: false });
-        isSelfLoggingOut.current = false;
         setUser(newCustomerUser);
         setCurrentRole('customer');
         localStorage.setItem('auth_user', JSON.stringify(newCustomerUser));
@@ -353,30 +440,19 @@ function App({
 
     const isSuccess = popup.type === 'success';
     const isError = popup.type === 'error';
-    const isWarning = popup.type === 'warning';
 
     return (
       <div style={styles.modalOverlay}>
         <div style={styles.modalBox}>
-          {popup.badgeText && (
-            <div style={{
-              ...styles.modalBadge,
-              backgroundColor: isError ? '#fee2e2' : isWarning ? '#fef3c7' : '#e0f2fe',
-              color: isError ? '#991b1b' : isWarning ? '#92400e' : '#075985'
-            }}>
-              {popup.badgeText}
-            </div>
-          )}
-
           <div style={{
             ...styles.modalHeaderIcon,
-            backgroundColor: isSuccess ? '#dcfce7' : isError ? '#fee2e2' : isWarning ? '#fef3c7' : '#e0f2fe',
-            color: isSuccess ? '#166534' : isError ? '#991b1b' : isWarning ? '#92400e' : '#075985'
+            backgroundColor: isSuccess ? '#dcfce7' : isError ? '#fee2e2' : '#e0f2fe',
+            color: isSuccess ? '#166534' : isError ? '#991b1b' : '#075985'
           }}>
-            {isSuccess ? '✅' : isError ? '🔒' : isWarning ? '⚠️' : 'ℹ️'}
+            {isSuccess ? '✅' : isError ? '⚠️' : 'ℹ️'}
           </div>
 
-          <h3 style={{ margin: '10px 0 8px 0', color: '#1e293b', fontSize: '17px', fontWeight: 'bold' }}>
+          <h3 style={{ margin: '10px 0 8px 0', color: '#1e293b', fontSize: '18px', fontWeight: 'bold' }}>
             {popup.title}
           </h3>
 
@@ -384,28 +460,16 @@ function App({
             {popup.message}
           </p>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <button
-              type="button"
-              onClick={popup.onPrimaryAction || (() => setPopup({ ...popup, show: false }))}
-              style={{
-                ...styles.modalBtnPrimary,
-                backgroundColor: isError ? '#2563eb' : isWarning ? '#d97706' : '#1E2A78',
-              }}
-            >
-              {popup.primaryBtnText || 'ĐÃ HIỂU & TIẾP TỤC'}
-            </button>
-
-            {popup.secondaryBtnText && (
-              <button
-                type="button"
-                onClick={popup.onSecondaryAction || (() => setPopup({ ...popup, show: false }))}
-                style={styles.modalBtnSecondary}
-              >
-                {popup.secondaryBtnText}
-              </button>
-            )}
-          </div>
+          <button
+            type="button"
+            onClick={popup.onConfirm || (() => setPopup({ ...popup, show: false }))}
+            style={{
+              ...styles.modalBtn,
+              backgroundColor: isSuccess ? '#2563eb' : isError ? '#ef4444' : '#1E2A78',
+            }}
+          >
+            ĐÃ HIỂU & TIẾP TỤC
+          </button>
         </div>
       </div>
     );
@@ -555,7 +619,7 @@ function App({
                 </>
               )}
 
-              {roleActive === 'staff' && (
+              {roleActive === 'sales_rep' && (
                 <>
                   <div
                     onClick={() => handleNavClick(() => setActiveTab('main'))}
@@ -630,6 +694,11 @@ function App({
           <div style={styles.omsSidebarFooter}>
             <div style={{ fontSize: '11px', color: '#94a3b8' }}>
               Vai trò: <strong style={{ color: '#fff' }}>{roleActive.toUpperCase()}</strong>
+              {user?.warehouse && (
+                <div style={{ color: '#38bdf8', fontSize: '10px', marginTop: '2px' }}>
+                  🏢 {user.warehouse}
+                </div>
+              )}
             </div>
             <button
               type="button"
@@ -686,9 +755,13 @@ function App({
                   onChange={(e) => handleRoleChange(e.target.value)}
                   style={styles.omsRoleSelect}
                 >
-                  <option value="customer">Đại lý (Customer)</option>
-                  <option value="staff">Nhân viên (Staff)</option>
-                  <option value="admin">Quản trị (Admin)</option>
+                  <option value="customer">1. Đại lý (Customer)</option>
+                  <option value="sales_rep">2. Nhân viên kinh doanh (Sales Rep)</option>
+                  <option value="sales_mgr">3. Quản lý kinh doanh (Sales Manager)</option>
+                  <option value="wh_mgr">4. Quản lý kho (WH Manager)</option>
+                  <option value="warehouse">5. Thủ kho (Warehouse)</option>
+                  <option value="accountant">6. Kế toán (Accountant)</option>
+                  <option value="admin">7. Quản trị hệ thống (Admin)</option>
                 </select>
               </div>
 
@@ -708,7 +781,7 @@ function App({
                     {currentUserInfo.workplace}
                   </div>
                 </div>
-              </div>
+              </a>
             </div>
           </header>
 
@@ -735,24 +808,42 @@ function App({
                 <>
                   <div>
                     <div style={{ fontSize: '11px', textTransform: 'uppercase', opacity: 0.8 }}>HẠN MỨC TÍN DỤNG</div>
-                    <div style={{ fontSize: '18px', fontWeight: 'bold' }}>0 đ</div>
+                    <div style={{ fontSize: '18px', fontWeight: 'bold' }}>50.000.000 đ</div>
                   </div>
                   <div>
                     <div style={{ fontSize: '11px', textTransform: 'uppercase', opacity: 0.8 }}>KHẢ DỤNG CÒN LẠI</div>
-                    <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#86efac' }}>0 đ</div>
+                    <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#86efac' }}>38.500.000 đ</div>
                   </div>
                 </>
               )}
-              {roleActive === 'staff' && (
+              {roleActive === 'sales_rep' && (
                 <div>
-                  <div style={{ fontSize: '11px', textTransform: 'uppercase', opacity: 0.8 }}>ĐƠN CHỜ XỬ LÝ</div>
-                  <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#fde047' }}>0 Đơn hàng</div>
+                  <div style={{ fontSize: '11px', textTransform: 'uppercase', opacity: 0.8 }}>ĐẠI LÝ PHỤ TRÁCH</div>
+                  <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#fde047' }}>3 Đại lý</div>
+                </div>
+              )}
+              {roleActive === 'sales_mgr' && (
+                <div>
+                  <div style={{ fontSize: '11px', textTransform: 'uppercase', opacity: 0.8 }}>BIÊN LỢI NHUẬN TB</div>
+                  <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#86efac' }}>26.1%</div>
+                </div>
+              )}
+              {(roleActive === 'warehouse' || roleActive === 'wh_mgr') && (
+                <div>
+                  <div style={{ fontSize: '11px', textTransform: 'uppercase', opacity: 0.8 }}>MẶT HÀNG TRONG KHO</div>
+                  <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#38bdf8' }}>5 Mã hàng</div>
+                </div>
+              )}
+              {roleActive === 'accountant' && (
+                <div>
+                  <div style={{ fontSize: '11px', textTransform: 'uppercase', opacity: 0.8 }}>TỔNG CÔNG NỢ ĐẠI LÝ</div>
+                  <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#fca5a5' }}>11.500.000 đ</div>
                 </div>
               )}
               {roleActive === 'admin' && (
                 <div>
-                  <div style={{ fontSize: '11px', textTransform: 'uppercase', opacity: 0.8 }}>TỔNG DOANH THU THÁNG</div>
-                  <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#86efac' }}>0 đ</div>
+                  <div style={{ fontSize: '11px', textTransform: 'uppercase', opacity: 0.8 }}>TỔNG TÀI KHOẢN MẪU</div>
+                  <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#86efac' }}>7 Vai trò</div>
                 </div>
               )}
             </div>
@@ -764,12 +855,44 @@ function App({
     );
   };
 
+  // =========================================================================
+  // HAM RENDER NOI DUNG CHINH THEO SCREEN
+  // =========================================================================
   const renderMainContent = () => {
+    // 0. MAN HINH LOI (404, 403, 401, 500)
+    if (screen === 'error' && errorType) {
+      return (
+        <ErrorPage
+          errorType={errorType}
+          userRole={user?.roleTitle || currentRole}
+          onGoHome={() => {
+            setErrorType(null);
+            setScreen(user ? 'dashboard' : 'login');
+          }}
+          onGoBack={() => {
+            setErrorType(null);
+            setScreen(user ? 'dashboard' : 'login');
+          }}
+          onLogin={() => {
+            setErrorType(null);
+            setUser(null);
+            localStorage.removeItem('auth_user');
+            setScreen('login');
+          }}
+          onRetry={() => {
+            setErrorType(null);
+            setScreen(user ? 'dashboard' : 'login');
+          }}
+        />
+      );
+    }
+
+    // 1. MAN HINH DASHBOARD
     if (screen === 'dashboard') {
       const roleActive = user?.role || currentRole;
 
-      return (
-        <OMSDashboardLayout>
+      return renderOMSDashboardLayout(
+        <>
           {roleActive === 'customer' && (
             <>
               <div style={styles.omsTabRow}>
@@ -817,72 +940,266 @@ function App({
             </>
           )}
 
-          {roleActive === 'staff' && (
+          {roleActive === 'sales_rep' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '15px' }}>
-                <div style={{ ...styles.staffStatCard, ...(hoveredBlock === 's-stat-1' ? styles.elevatedCardLight : {}) }} onMouseEnter={() => setHoveredBlock('s-stat-1')} onMouseLeave={() => setHoveredBlock(null)}>
-                  <span style={{ fontSize: '12px', color: '#64748b' }}>Đơn hàng chờ kiểm duyệt</span>
-                  <h3 style={{ margin: '5px 0', fontSize: '22px', color: '#d97706' }}>0 Đơn</h3>
+                <div style={styles.staffStatCard}>
+                  <span style={{ fontSize: '12px', color: '#64748b' }}>Đại lý phụ trách theo địa bàn</span>
+                  <h3 style={{ margin: '5px 0', fontSize: '22px', color: '#2563eb' }}>3 Đại lý</h3>
                 </div>
-                <div style={{ ...styles.staffStatCard, ...(hoveredBlock === 's-stat-2' ? styles.elevatedCardLight : {}) }} onMouseEnter={() => setHoveredBlock('s-stat-2')} onMouseLeave={() => setHoveredBlock(null)}>
-                  <span style={{ fontSize: '12px', color: '#64748b' }}>Đơn đang đóng gói kho</span>
-                  <h3 style={{ margin: '5px 0', fontSize: '22px', color: '#2563eb' }}>0 Đơn</h3>
+                <div style={styles.staffStatCard}>
+                  <span style={{ fontSize: '12px', color: '#64748b' }}>Đơn hàng bán ra trong tuần</span>
+                  <h3 style={{ margin: '5px 0', fontSize: '22px', color: '#059669' }}>12 Đơn</h3>
                 </div>
-                <div style={{ ...styles.staffStatCard, ...(hoveredBlock === 's-stat-3' ? styles.elevatedCardLight : {}) }} onMouseEnter={() => setHoveredBlock('s-stat-3')} onMouseLeave={() => setHoveredBlock(null)}>
-                  <span style={{ fontSize: '12px', color: '#64748b' }}>Đã xuất kho hôm nay</span>
-                  <h3 style={{ margin: '5px 0', fontSize: '22px', color: '#059669' }}>0 Đơn</h3>
+                <div style={styles.staffStatCard}>
+                  <span style={{ fontSize: '12px', color: '#64748b' }}>Quy định an ninh nhân sự</span>
+                  <h3 style={{ margin: '5px 0', fontSize: '14px', color: '#d97706' }}>Yêu cầu bàn giao khi khóa</h3>
                 </div>
               </div>
 
-              <div style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '30px 20px', textAlign: 'center', transition: 'all 0.3s ease', ...(hoveredBlock === 's-list-box' ? styles.elevatedCardLight : {}) }} onMouseEnter={() => setHoveredBlock('s-list-box')} onMouseLeave={() => setHoveredBlock(null)}>
-                <h3 style={{ margin: '0 0 8px 0', fontSize: '15px', color: '#1e293b' }}>📋 Danh Sách Đơn Hàng Cần Xử Lý (Nhân Viên)</h3>
-                <p style={{ fontSize: '13px', color: '#94a3b8', margin: 0 }}>Hiện tại chưa có đơn hàng nào cần tiếp nhận hoặc xử lý.</p>
+              <div style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '24px' }}>
+                <h3 style={{ margin: '0 0 12px 0', fontSize: '16px', color: '#1e293b' }}>
+                  👥 Danh Sách Đại Lý Gán Theo Địa Bàn Phụ Trách:
+                </h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {(user?.assignedAgencies || ['Công ty TNHH Tuấn Phương (Cấp 1)', 'Đại lý Minh Phát (Cấp 2)', 'Đại lý Hồng Hà (Cấp 2)']).map((ag, i) => (
+                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                      <span style={{ fontWeight: '600', fontSize: '14px', color: '#1e293b' }}>🏢 {ag}</span>
+                      <span style={{ fontSize: '12px', color: '#059669', backgroundColor: '#dcfce7', padding: '4px 10px', borderRadius: '12px', fontWeight: 'bold' }}>Đang phụ trách</span>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ marginTop: '16px', padding: '12px', backgroundColor: '#fffbeb', borderRadius: '8px', border: '1px dashed #f59e0b', fontSize: '12px', color: '#b45309' }}>
+                  ⚠️ <strong>Quy định an ninh:</strong> Danh sách đại lý do nhân viên kinh doanh này phụ trách sẽ tự động được cảnh báo cần bàn giao gấp khi tài khoản bị Quản trị viên khóa.
+                </div>
+              </div>
+            </div>
+          )}
+
+          {roleActive === 'sales_mgr' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '15px' }}>
+                <div style={styles.staffStatCard}>
+                  <span style={{ fontSize: '12px', color: '#64748b' }}>Doanh số toàn đội ngũ</span>
+                  <h3 style={{ margin: '5px 0', fontSize: '22px', color: '#059669' }}>450.000.000 đ</h3>
+                </div>
+                <div style={styles.staffStatCard}>
+                  <span style={{ fontSize: '12px', color: '#64748b' }}>Lợi nhuận gộp ước tính</span>
+                  <h3 style={{ margin: '5px 0', fontSize: '22px', color: '#2563eb' }}>117.450.000 đ</h3>
+                </div>
+                <div style={styles.staffStatCard}>
+                  <span style={{ fontSize: '12px', color: '#64748b' }}>Quyền xem giá vốn</span>
+                  <h3 style={{ margin: '5px 0', fontSize: '14px', color: '#7c3aed' }}>Đặc quyền Sales Manager</h3>
+                </div>
+              </div>
+
+              <div style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '24px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                  <h3 style={{ margin: 0, fontSize: '16px', color: '#1e293b' }}>
+                    💎 Bảng Tra Cứu Giá Vốn & Biên Lợi Nhuận
+                  </h3>
+                  <span style={{ fontSize: '12px', color: '#7c3aed', backgroundColor: '#f5f3ff', border: '1px solid #ddd6fe', padding: '4px 10px', borderRadius: '12px', fontWeight: 'bold' }}>
+                    🔒 Bảo mật Server: GET /api/v1/auth/financial/cost-and-margin
+                  </span>
+                </div>
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', textAlign: 'left' }}>
+                    <thead>
+                      <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
+                        <th style={{ padding: '10px 14px' }}>Mã SKU</th>
+                        <th style={{ padding: '10px 14px' }}>Tên Sản Phẩm</th>
+                        <th style={{ padding: '10px 14px', textAlign: 'right' }}>Giá Bán Đại Lý</th>
+                        <th style={{ padding: '10px 14px', textAlign: 'right', color: '#dc2626' }}>Giá Vốn (COGS)</th>
+                        <th style={{ padding: '10px 14px', textAlign: 'right', color: '#059669' }}>Lợi Nhuận Gộp</th>
+                        <th style={{ padding: '10px 14px', textAlign: 'center' }}>Biên Lợi Nhuận</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {MOCK_FINANCIAL_MARGINS.map((prod) => (
+                        <tr key={prod.sku} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                          <td style={{ padding: '10px 14px', fontWeight: 'bold', color: '#64748b' }}>{prod.sku}</td>
+                          <td style={{ padding: '10px 14px', fontWeight: '600' }}>{prod.name}</td>
+                          <td style={{ padding: '10px 14px', textAlign: 'right' }}>{prod.salePrice.toLocaleString('vi-VN')} đ</td>
+                          <td style={{ padding: '10px 14px', textAlign: 'right', color: '#dc2626', fontWeight: '600' }}>{prod.costPrice.toLocaleString('vi-VN')} đ</td>
+                          <td style={{ padding: '10px 14px', textAlign: 'right', color: '#059669', fontWeight: '600' }}>{(prod.salePrice - prod.costPrice).toLocaleString('vi-VN')} đ</td>
+                          <td style={{ padding: '10px 14px', textAlign: 'center' }}>
+                            <span style={{ backgroundColor: '#dcfce7', color: '#15803d', padding: '3px 8px', borderRadius: '8px', fontWeight: 'bold', fontSize: '12px' }}>
+                              {prod.margin}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {roleActive === 'wh_mgr' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '15px' }}>
+                <div style={styles.staffStatCard}>
+                  <span style={{ fontSize: '12px', color: '#64748b' }}>Kho phụ trách</span>
+                  <h3 style={{ margin: '5px 0', fontSize: '18px', color: '#2563eb' }}>Kho Tổng Hà Nội</h3>
+                </div>
+                <div style={styles.staffStatCard}>
+                  <span style={{ fontSize: '12px', color: '#64748b' }}>Phiếu điều chuyển chờ duyệt</span>
+                  <h3 style={{ margin: '5px 0', fontSize: '22px', color: '#d97706' }}>2 Phiếu</h3>
+                </div>
+                <div style={styles.staffStatCard}>
+                  <span style={{ fontSize: '12px', color: '#64748b' }}>Mặt hàng tồn kho</span>
+                  <h3 style={{ margin: '5px 0', fontSize: '22px', color: '#059669' }}>5 Mặt hàng</h3>
+                </div>
+              </div>
+              <div style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '24px' }}>
+                <h3 style={{ margin: '0 0 12px 0', fontSize: '16px', color: '#1e293b' }}>🏭 Quản Lý Tồn Kho Tại Kho Tổng Hà Nội</h3>
+                <p style={{ fontSize: '13px', color: '#64748b', margin: 0 }}>Quản lý kho có thẩm quyền phê duyệt phiếu nhập/xuất kho trung tâm và lệnh điều chuyển hàng hóa về các chi nhánh kho vệ tinh (Đà Nẵng, TP.HCM).</p>
+              </div>
+            </div>
+          )}
+
+          {roleActive === 'warehouse' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '15px' }}>
+                <div style={styles.staffStatCard}>
+                  <span style={{ fontSize: '12px', color: '#64748b' }}>Kho phụ trách</span>
+                  <h3 style={{ margin: '5px 0', fontSize: '18px', color: '#2563eb' }}>Kho Đà Nẵng</h3>
+                </div>
+                <div style={styles.staffStatCard}>
+                  <span style={{ fontSize: '12px', color: '#64748b' }}>Đơn hàng chờ xuất quầy POS</span>
+                  <h3 style={{ margin: '5px 0', fontSize: '22px', color: '#d97706' }}>4 Đơn</h3>
+                </div>
+                <div style={styles.staffStatCard}>
+                  <span style={{ fontSize: '12px', color: '#64748b' }}>Đã xuất kho trong ngày</span>
+                  <h3 style={{ margin: '5px 0', fontSize: '22px', color: '#059669' }}>18 Đơn</h3>
+                </div>
+              </div>
+              <div style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '24px' }}>
+                <h3 style={{ margin: '0 0 12px 0', fontSize: '16px', color: '#1e293b' }}>⚡ Quầy Xuất Kho & POS Chi Nhánh Đà Nẵng</h3>
+                <p style={{ fontSize: '13px', color: '#64748b', margin: 0 }}>Thủ kho phụ trách kiểm đếm số lượng thực tế khi xuất hàng cho xe tải đại lý và lập biên bản kiểm kê định kỳ.</p>
+              </div>
+            </div>
+          )}
+
+          {roleActive === 'accountant' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '15px' }}>
+                <div style={styles.staffStatCard}>
+                  <span style={{ fontSize: '12px', color: '#64748b' }}>Tổng công nợ đại lý</span>
+                  <h3 style={{ margin: '5px 0', fontSize: '22px', color: '#dc2626' }}>11.500.000 đ</h3>
+                </div>
+                <div style={styles.staffStatCard}>
+                  <span style={{ fontSize: '12px', color: '#64748b' }}>Hạn mức tín dụng bảo lãnh</span>
+                  <h3 style={{ margin: '5px 0', fontSize: '22px', color: '#2563eb' }}>50.000.000 đ</h3>
+                </div>
+                <div style={styles.staffStatCard}>
+                  <span style={{ fontSize: '12px', color: '#64748b' }}>Hóa đơn đối soát tháng</span>
+                  <h3 style={{ margin: '5px 0', fontSize: '22px', color: '#059669' }}>100% Hoàn tất</h3>
+                </div>
+              </div>
+              <div style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '24px' }}>
+                <h3 style={{ margin: '0 0 12px 0', fontSize: '16px', color: '#1e293b' }}>📜 Sổ Theo Dõi Công Nợ & Hạn Mức Tín Dụng</h3>
+                <p style={{ fontSize: '13px', color: '#64748b', margin: 0 }}>Kế toán theo dõi sát sao vòng quay công nợ, đối chiếu chứng từ giao nhận kho và lập báo cáo tài chính định kỳ theo đúng phân quyền nghiệp vụ.</p>
               </div>
             </div>
           )}
 
           {roleActive === 'admin' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px' }}>
-                <div style={{ ...styles.adminStatCard, ...(hoveredBlock === 'a-stat-1' ? styles.elevatedCardLight : {}) }} onMouseEnter={() => setHoveredBlock('a-stat-1')} onMouseLeave={() => setHoveredBlock(null)}>
-                  <span style={{ fontSize: '11px', color: '#64748b' }}>TỔNG ĐẠI LÝ</span>
-                  <h2 style={{ margin: '4px 0', color: '#1e293b' }}>0</h2>
-                </div>
-                <div style={{ ...styles.adminStatCard, ...(hoveredBlock === 'a-stat-2' ? styles.elevatedCardLight : {}) }} onMouseEnter={() => setHoveredBlock('a-stat-2')} onMouseLeave={() => setHoveredBlock(null)}>
-                  <span style={{ fontSize: '11px', color: '#64748b' }}>ĐƠN HÀNG TOÀN HỆ THỐNG</span>
-                  <h2 style={{ margin: '4px 0', color: '#2563eb' }}>0</h2>
-                </div>
-                <div style={{ ...styles.adminStatCard, ...(hoveredBlock === 'a-stat-3' ? styles.elevatedCardLight : {}) }} onMouseEnter={() => setHoveredBlock('a-stat-3')} onMouseLeave={() => setHoveredBlock(null)}>
-                  <span style={{ fontSize: '11px', color: '#64748b' }}>DOANH THU THÁNG NÀY</span>
-                  <h2 style={{ margin: '4px 0', color: '#059669' }}>0 đ</h2>
-                </div>
-                <div style={{ ...styles.adminStatCard, borderLeft: '4px solid #d97706', ...(hoveredBlock === 'a-stat-4' ? styles.elevatedCardLight : {}) }} onMouseEnter={() => setHoveredBlock('a-stat-4')} onMouseLeave={() => setHoveredBlock(null)}>
-                  <span style={{ fontSize: '11px', color: '#64748b' }}>YÊU CẦU CẤP HẠN MỨC</span>
-                  <h2 style={{ margin: '4px 0', color: '#d97706' }}>0 Yêu cầu</h2>
-                </div>
-              </div>
+              <UserManagement
+                userList={userList}
+                setUserList={setUserList}
+                setPopup={setPopup}
+                currentUser={user}
+              />
 
-              <div style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '30px 20px', textAlign: 'center', transition: 'all 0.3s ease', ...(hoveredBlock === 'a-main-box' ? styles.elevatedCardLight : {}) }} onMouseEnter={() => setHoveredBlock('a-main-box')} onMouseLeave={() => setHoveredBlock(null)}>
-                <h3 style={{ margin: '0 0 8px 0', fontSize: '15px', color: '#1e293b' }}>👑 Trung Tâm Quản Lý & Điều Phối Hạn Mức Tín Dụng</h3>
-                <p style={{ fontSize: '13px', color: '#94a3b8', margin: 0 }}>Khu vực hiển thị danh sách đại lý và yêu cầu điều chỉnh hạn mức. Đang đợi API Backend kết nối.</p>
+              {/* Bảng Test Error Pages & API/Router Interceptor (chỉ Admin thấy) */}
+              <div style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '24px', marginTop: '20px' }}>
+                <h3 style={{ margin: '0 0 8px 0', fontSize: '16px', color: '#1e293b' }}>
+                  🧪 Kiểm Tra Điều Hướng Bẫy Lỗi Router & API Interceptor
+                </h3>
+                <p style={{ fontSize: '12px', color: '#64748b', marginBottom: '16px' }}>
+                  Bấm các nút dưới đây để kiểm tra khả năng tự động bắt lỗi từ tầng gọi API (HTTP status code) và tầng Router (URL Hash & Phân quyền):
+                </p>
+
+                <div style={{ marginBottom: '16px' }}>
+                  <strong style={{ fontSize: '12px', color: '#334155', display: 'block', marginBottom: '8px' }}>1. Bắt lỗi trực tiếp (Error Screen Views):</strong>
+                  <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                    <button type="button" onClick={() => { setErrorType(404); setScreen('error'); }} style={{ flex: '1 1 0', padding: '8px 12px', borderRadius: '8px', border: '1px solid #93c5fd', backgroundColor: '#eff6ff', color: '#1d4ed8', fontWeight: '700', fontSize: '12px', cursor: 'pointer' }}>
+                      🗺️ 404 Không tìm thấy
+                    </button>
+                    <button type="button" onClick={() => { setErrorType(403); setScreen('error'); }} style={{ flex: '1 1 0', padding: '8px 12px', borderRadius: '8px', border: '1px solid #fca5a5', backgroundColor: '#fef2f2', color: '#dc2626', fontWeight: '700', fontSize: '12px', cursor: 'pointer' }}>
+                      🔒 403 Không đủ quyền
+                    </button>
+                    <button type="button" onClick={() => { setErrorType(401); setScreen('error'); }} style={{ flex: '1 1 0', padding: '8px 12px', borderRadius: '8px', border: '1px solid #fde68a', backgroundColor: '#fffbeb', color: '#b45309', fontWeight: '700', fontSize: '12px', cursor: 'pointer' }}>
+                      ⏱️ 401 Phiên hết hạn
+                    </button>
+                    <button type="button" onClick={() => { setErrorType(500); setScreen('error'); }} style={{ flex: '1 1 0', padding: '8px 12px', borderRadius: '8px', border: '1px solid #c4b5fd', backgroundColor: '#f5f3ff', color: '#7c3aed', fontWeight: '700', fontSize: '12px', cursor: 'pointer' }}>
+                      ⚙️ 500 Lỗi hệ thống
+                    </button>
+                  </div>
+                </div>
+
+                <div style={{ marginBottom: '12px' }}>
+                  <strong style={{ fontSize: '12px', color: '#334155', display: 'block', marginBottom: '8px' }}>2. Bắt lỗi tự động từ Tầng API Interceptor (`apiClient`):</strong>
+                  <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                    <button type="button" onClick={() => apiClient.simulateApiCall(401).catch(() => { })} style={{ flex: '1 1 0', padding: '8px 12px', borderRadius: '8px', border: '1px stroke #cbd5e1', backgroundColor: '#f8fafc', color: '#0f172a', fontWeight: '600', fontSize: '11px', cursor: 'pointer' }}>
+                      📡 Giả lập API 401
+                    </button>
+                    <button type="button" onClick={() => apiClient.simulateApiCall(403).catch(() => { })} style={{ flex: '1 1 0', padding: '8px 12px', borderRadius: '8px', border: '1px stroke #cbd5e1', backgroundColor: '#f8fafc', color: '#0f172a', fontWeight: '600', fontSize: '11px', cursor: 'pointer' }}>
+                      📡 Giả lập API 403
+                    </button>
+                    <button type="button" onClick={() => apiClient.simulateApiCall(404).catch(() => { })} style={{ flex: '1 1 0', padding: '8px 12px', borderRadius: '8px', border: '1px stroke #cbd5e1', backgroundColor: '#f8fafc', color: '#0f172a', fontWeight: '600', fontSize: '11px', cursor: 'pointer' }}>
+                      📡 Giả lập API 404
+                    </button>
+                    <button type="button" onClick={() => apiClient.simulateApiCall(500).catch(() => { })} style={{ flex: '1 1 0', padding: '8px 12px', borderRadius: '8px', border: '1px stroke #cbd5e1', backgroundColor: '#f8fafc', color: '#0f172a', fontWeight: '600', fontSize: '11px', cursor: 'pointer' }}>
+                      📡 Giả lập API 500
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <strong style={{ fontSize: '12px', color: '#334155', display: 'block', marginBottom: '8px' }}>3. Bắt lỗi tự động từ Tầng Router Guard (`routerGuard`):</strong>
+                  <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                    <button type="button" onClick={() => { window.location.hash = '#/unknown-page-route'; }} style={{ flex: '1 1 0', padding: '8px 12px', borderRadius: '8px', border: '1px dashed #64748b', backgroundColor: '#ffffff', color: '#334155', fontWeight: '600', fontSize: '11px', cursor: 'pointer' }}>
+                      🛣️ Hash URL sai path (#/unknown) → 404
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           )}
-        </OMSDashboardLayout>
+        </>
       );
     }
 
+    // 2. MAN HINH PROFILE
     if (screen === 'profile') {
       return (
         <div style={{ minHeight: '100vh', width: '100vw', backgroundColor: '#1C2758', padding: '40px 20px', fontFamily: 'Arial, sans-serif', display: 'flex', justifyContent: 'center', alignItems: 'center', boxSizing: 'border-box' }}>
           <div style={{ maxWidth: '850px', width: '100%' }}>
-            <button
-              type="button"
-              onClick={() => setScreen('dashboard')}
-              style={{ marginBottom: '20px', padding: '8px 18px', borderRadius: '20px', border: 'none', backgroundColor: 'rgba(255,255,255,0.15)', color: '#ffffff', cursor: 'pointer', fontWeight: 'bold' }}
+            <a
+              href="#dashboard"
+              onClick={(e) => {
+                e.preventDefault();
+                setScreen('dashboard');
+              }}
+              style={{
+                display: 'inline-block',
+                textDecoration: 'none',
+                marginBottom: '20px',
+                padding: '8px 18px',
+                borderRadius: '20px',
+                border: 'none',
+                backgroundColor: 'rgba(255,255,255,0.15)',
+                color: '#ffffff',
+                cursor: 'pointer',
+                fontWeight: 'bold',
+              }}
             >
               ← Quay lại Dashboard
-            </button>
+            </a>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
               <div
@@ -946,19 +1263,46 @@ function App({
                 {!showForgotInProfile ? (
                   <div>
                     <h3 style={{ borderBottom: '2px solid #f1f5f9', paddingBottom: '10px' }}>🔒 Thay Đổi Mật Khẩu</h3>
-                    <form onSubmit={(e) => { e.preventDefault(); onChangePassSubmit({}); }}>
+                    <form onSubmit={handleChangePasswordSubmit}>
+                      {changePassError && (
+                        <div style={{ backgroundColor: '#fef2f2', border: '1px solid #fca5a5', color: '#991b1b', padding: '10px 14px', borderRadius: '8px', fontSize: '12px', marginBottom: '14px', fontWeight: '500' }}>
+                          {changePassError}
+                        </div>
+                      )}
+
                       <div style={{ position: 'relative', marginBottom: '12px' }}>
-                        <input type={showProfCurrentPass ? "text" : "password"} placeholder="Mật khẩu hiện tại" style={styles.profileInput} />
+                        <input
+                          type={showProfCurrentPass ? "text" : "password"}
+                          placeholder="Mật khẩu hiện tại"
+                          value={changePassForm.currentPassword}
+                          onChange={(e) => setChangePassForm(prev => ({ ...prev, currentPassword: e.target.value }))}
+                          style={styles.profileInput}
+                        />
                         <TogglePassBtn isVisible={showProfCurrentPass} onToggle={() => setShowProfCurrentPass(!showProfCurrentPass)} />
                       </div>
+
                       <div style={{ position: 'relative', marginBottom: '12px' }}>
-                        <input type={showProfNewPass ? "text" : "password"} placeholder="Mật khẩu mới" style={styles.profileInput} />
+                        <input
+                          type={showProfNewPass ? "text" : "password"}
+                          placeholder="Mật khẩu mới (Tối thiểu 8 ký tự, gồm chữ và số)"
+                          value={changePassForm.newPassword}
+                          onChange={(e) => setChangePassForm(prev => ({ ...prev, newPassword: e.target.value }))}
+                          style={styles.profileInput}
+                        />
                         <TogglePassBtn isVisible={showProfNewPass} onToggle={() => setShowProfNewPass(!showProfNewPass)} />
                       </div>
+
                       <div style={{ position: 'relative', marginBottom: '15px' }}>
-                        <input type={showProfConfirmPass ? "text" : "password"} placeholder="Xác nhận mật khẩu mới" style={styles.profileInput} />
+                        <input
+                          type={showProfConfirmPass ? "text" : "password"}
+                          placeholder="Xác nhận mật khẩu mới"
+                          value={changePassForm.confirmPassword}
+                          onChange={(e) => setChangePassForm(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                          style={styles.profileInput}
+                        />
                         <TogglePassBtn isVisible={showProfConfirmPass} onToggle={() => setShowProfConfirmPass(!showProfConfirmPass)} />
                       </div>
+
                       <button
                         type="submit"
                         style={{
@@ -968,13 +1312,21 @@ function App({
                         onMouseEnter={() => setHoveredBlock('btn-chgpass')}
                         onMouseLeave={() => setHoveredBlock(null)}
                       >
-                        CẬP NHẬT MẬT KHẨU
+                        🔒 ĐỔI MẬT KHẨU & THU HỒI PHIÊN KẾT NỐI
                       </button>
                     </form>
                     <div style={{ textAlign: 'center', marginTop: '15px' }}>
-                      <span onClick={() => { setShowForgotInProfile(true); setResetStep(1); }} style={{ fontSize: '12px', color: '#ef4444', cursor: 'pointer', fontWeight: 'bold' }}>
+                      <a
+                        href="#forgot-password-otp"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setShowForgotInProfile(true);
+                          setResetStep(1);
+                        }}
+                        style={{ fontSize: '12px', color: '#ef4444', cursor: 'pointer', fontWeight: 'bold', textDecoration: 'none' }}
+                      >
                         Quên mật khẩu? Khôi phục qua OTP
-                      </span>
+                      </a>
                     </div>
                   </div>
                 ) : (
@@ -1000,7 +1352,16 @@ function App({
                       </form>
                     )}
                     <div style={{ textAlign: 'center', marginTop: '15px' }}>
-                      <span onClick={() => setShowForgotInProfile(false)} style={{ fontSize: '12px', cursor: 'pointer' }}>← Quay lại</span>
+                      <a
+                        href="#profile-main"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setShowForgotInProfile(false);
+                        }}
+                        style={{ fontSize: '12px', cursor: 'pointer', color: '#64748b', textDecoration: 'none' }}
+                      >
+                        ← Quay lại
+                      </a>
                     </div>
                   </div>
                 )}
@@ -1011,6 +1372,7 @@ function App({
       );
     }
 
+    // 3. MAN HINH DANG NHAP / DANG KY / ABOUT / CONTACT (MÃ NGUỒN CŨ BAN ĐẦU)
     return (
       <div style={styles.outerContainerFullWidth}>
         <div className="auth-left-panel" style={styles.leftPanelFullWidth}>
@@ -1018,13 +1380,17 @@ function App({
           {/* GÓC TRÊN BÊN TRÁI: LOGO SVG TỰ ĐỘNG CHUẨN ĐẸP KHÔNG BỊ RÁC/LỖI FILE */}
           {/* ========================================================================= */}
           <div style={styles.brand}>
-            <SalesWarehouseLogo />
+            <div style={styles.logoIcon}>
+              <div style={styles.logoSquare1}></div>
+              <div style={styles.logoSquare2}></div>
+            </div>
             <div style={styles.brandText}>
               <strong>QUẢN LÝ KHO HÀNG</strong>
               <span>OMS PRO UI TEMPLATE</span>
             </div>
           </div>
 
+          {/* FORM ĐĂNG NHẬP */}
           {screen === 'login' && (
             <form onSubmit={handleLoginSubmit} className="auth-form-box" style={styles.formContainerResponsive}>
               {/* AVATAR TRÒN SANG TRỌNG ĐƯỢC THAY THẾ MỚI */}
@@ -1088,6 +1454,7 @@ function App({
             </form>
           )}
 
+          {/* FORM ĐĂNG KÝ */}
           {screen === 'register' && (
             <form onSubmit={handleRegisterSubmit} className="auth-form-box" style={styles.formContainerResponsive}>
               <h3 style={styles.formTitle}>ĐĂNG KÝ TÀI KHOẢN MỚI</h3>
@@ -1166,16 +1533,44 @@ function App({
               >
                 TẠO TÀI KHOẢN
               </button>
-              <span onClick={() => setScreen('login')} style={{ ...styles.linkText, marginTop: '10px' }}>← Đã có tài khoản? Đăng nhập</span>
+              <a
+                href="#login"
+                onClick={(e) => {
+                  e.preventDefault();
+                  setScreen('login');
+                }}
+                style={{ ...styles.linkText, textDecoration: 'none', marginTop: '10px', display: 'inline-block' }}
+              >
+                ← Đã có tài khoản? Đăng nhập
+              </a>
             </form>
           )}
 
           {screen === 'forgot' && (
             <form onSubmit={(e) => { e.preventDefault(); setScreen('login'); }} className="auth-form-box" style={styles.formContainerResponsive}>
               <h3 style={styles.formTitle}>KHÔI PHỤC MẬT KHẨU</h3>
-              <input type="email" placeholder="ENTER YOUR EMAIL" style={styles.input} />
-              <button type="submit" style={{ ...styles.actionBtn, marginTop: '12px' }}>SEND RESET LINK</button>
-              <span onClick={() => setScreen('login')} style={{ ...styles.linkText, marginTop: '10px' }}>Quay lại Đăng nhập</span>
+              <p style={{ fontSize: '12px', color: '#64748b', marginBottom: '14px', lineHeight: '1.5' }}>
+                Nhập địa chỉ email đăng ký để nhận liên kết đặt lại mật khẩu bảo mật (Hiệu lực 30 phút, chỉ sử dụng 1 lần).
+              </p>
+              <input
+                type="email"
+                placeholder="ENTER YOUR EMAIL (ví dụ: user@example.com)"
+                value={forgotEmail}
+                onChange={(e) => setForgotEmail(e.target.value)}
+                style={styles.input}
+                required
+              />
+              <button type="submit" style={{ ...styles.actionBtn, marginTop: '12px' }}>GỬI LIÊN KẾT ĐẶT LẠI</button>
+              <a
+                href="#login"
+                onClick={(e) => {
+                  e.preventDefault();
+                  setScreen('login');
+                }}
+                style={{ ...styles.linkText, textDecoration: 'none', marginTop: '10px', display: 'inline-block' }}
+              >
+                Quay lại Đăng nhập
+              </a>
             </form>
           )}
 
@@ -1190,37 +1585,52 @@ function App({
               onClick={() => setScreen(screen === 'about' ? 'login' : 'about')}
               style={{
                 ...styles.navLink,
+                textDecoration: 'none',
+                cursor: 'pointer',
                 ...(hoveredBlock === 'nav-about' ? styles.elevatedText : {}),
               }}
               onMouseEnter={() => setHoveredBlock('nav-about')}
               onMouseLeave={() => setHoveredBlock(null)}
             >
               ABOUT
-            </span>
-            <span
-              onClick={() => setScreen(screen === 'contact' ? 'login' : 'contact')}
+            </a>
+            <a
+              href="#contact"
+              onClick={(e) => {
+                e.preventDefault();
+                setScreen(screen === 'contact' ? 'login' : 'contact');
+              }}
               style={{
                 ...styles.navLink,
+                textDecoration: 'none',
+                cursor: 'pointer',
                 ...(hoveredBlock === 'nav-contact' ? styles.elevatedText : {}),
               }}
               onMouseEnter={() => setHoveredBlock('nav-contact')}
               onMouseLeave={() => setHoveredBlock(null)}
             >
               CONTACT
-            </span>
+            </a>
 
-            <button
-              type="button"
-              onClick={() => setScreen('register')}
+            <a
+              href="#register"
+              onClick={(e) => {
+                e.preventDefault();
+                setScreen('register');
+              }}
               style={{
                 ...styles.signInPillBtn,
+                display: 'inline-block',
+                textDecoration: 'none',
+                textAlign: 'center',
+                lineHeight: '34px',
                 ...(hoveredBlock === 'btn-signup-pill' ? styles.elevatedBtnPill : {}),
               }}
               onMouseEnter={() => setHoveredBlock('btn-signup-pill')}
               onMouseLeave={() => setHoveredBlock(null)}
             >
               SIGN UP
-            </button>
+            </a>
           </div>
 
           <div style={styles.centerContainer}>
@@ -1269,6 +1679,9 @@ function App({
     );
   };
 
+  // =========================================================================
+  // MAIN RETURN WRAPPER
+  // =========================================================================
   return (
     <>
       {renderNotificationModal()}
@@ -1278,7 +1691,7 @@ function App({
 }
 
 // =========================================================================
-// BỘ STYLES GIAO DIỆN CẬP NHẬT CHUẨN ĐẸP
+// BỘ STYLES GIAO DIỆN CŨ VÀ NỔI KHỐI 3D SẮC NÉT
 // =========================================================================
 const styles = {
   modalOverlay: {
@@ -1296,33 +1709,24 @@ const styles = {
   },
   modalBox: {
     width: '90%',
-    maxWidth: '420px',
+    maxWidth: '380px',
     backgroundColor: '#ffffff',
-    borderRadius: '24px',
-    padding: '28px 24px',
+    borderRadius: '20px',
+    padding: '24px',
     textAlign: 'center',
-    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.35)',
-  },
-  modalBadge: {
-    display: 'inline-block',
-    padding: '4px 12px',
-    borderRadius: '16px',
-    fontSize: '10.5px',
-    fontWeight: '800',
-    letterSpacing: '0.5px',
-    marginBottom: '14px',
+    boxShadow: '0 20px 40px rgba(0, 0, 0, 0.3)',
   },
   modalHeaderIcon: {
-    width: '60px',
-    height: '60px',
+    width: '56px',
+    height: '56px',
     borderRadius: '50%',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    fontSize: '28px',
+    fontSize: '26px',
     margin: '0 auto 12px auto',
   },
-  modalBtnPrimary: {
+  modalBtn: {
     width: '100%',
     padding: '12px',
     borderRadius: '25px',
@@ -1331,41 +1735,29 @@ const styles = {
     fontWeight: 'bold',
     fontSize: '13px',
     cursor: 'pointer',
-    boxShadow: '0 6px 16px rgba(0,0,0,0.18)',
-    transition: 'all 0.2s ease',
-  },
-  modalBtnSecondary: {
-    width: '100%',
-    padding: '11px',
-    borderRadius: '25px',
-    backgroundColor: '#ffffff',
-    color: '#475569',
-    border: '1.5px solid #cbd5e1',
-    fontWeight: 'bold',
-    fontSize: '12.5px',
-    cursor: 'pointer',
-    transition: 'all 0.2s ease',
+    boxShadow: '0 6px 16px rgba(0,0,0,0.2)',
   },
 
   omsContainer: { display: 'flex', width: '100%', minHeight: '100vh', backgroundColor: '#f8fafc', fontFamily: "'Inter', sans-serif" },
   omsSidebar: { width: '240px', backgroundColor: '#0b132b', color: '#ffffff', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '20px 15px', boxSizing: 'border-box', flexShrink: 0, zIndex: 10, boxShadow: '4px 0 20px rgba(0,0,0,0.25)' },
   omsSidebarHeader: { fontSize: '11px', fontWeight: 'bold', letterSpacing: '1px', color: '#64748b', marginBottom: '15px', paddingLeft: '10px' },
   omsNavList: { display: 'flex', flexDirection: 'column', gap: '6px' },
-  omsNavItem: { display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', borderRadius: '10px', fontSize: '13px', color: '#94a3b8', cursor: 'pointer', transition: 'all 0.25s ease' },
-  omsNavItemActive: { backgroundColor: '#2563eb', color: '#ffffff', fontWeight: 'bold', boxShadow: '0 6px 14px rgba(0, 0, 0, 0.4)' },
-  omsSidebarFooter: { borderTop: '1px solid #1e293b', paddingTop: '15px' },
+  omsNavItem: { display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', borderRadius: '10px', fontSize: '13px', color: 'rgba(255, 255, 255, 0.9)', cursor: 'pointer', transition: 'all 0.25s ease' },
+  omsNavItemActive: { backgroundColor: 'rgba(255, 255, 255, 0.25)', color: '#ffffff', fontWeight: 'bold', boxShadow: '0 4px 12px rgba(0, 0, 0, 0.18)' },
+  omsSidebarFooter: { borderTop: '1px solid rgba(255, 255, 255, 0.2)', paddingTop: '15px' },
   omsLogoutBtn: { width: '100%', padding: '10px', marginTop: '12px', backgroundColor: '#ef4444', color: '#ffffff', border: 'none', borderRadius: '20px', fontWeight: 'bold', cursor: 'pointer', fontSize: '12px', transition: 'all 0.3s ease' },
   omsMainArea: { flex: 1, display: 'flex', flexDirection: 'column', overflowX: 'hidden' },
   omsHeader: { height: '60px', backgroundColor: '#ffffff', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 25px' },
+  omsLogoSquare: { width: '32px', height: '32px', background: 'linear-gradient(135deg, #00acc1, #0284c7)', color: '#ffffff', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '18px' },
   omsRoleSelectWrapper: { display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: '#f1f5f9', padding: '4px 12px', borderRadius: '20px', border: '1px solid #cbd5e1' },
   omsRoleSelect: { border: 'none', backgroundColor: 'transparent', fontWeight: 'bold', fontSize: '12px', color: '#1e293b', outline: 'none', cursor: 'pointer' },
   omsUserAvatarPill: { display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', padding: '4px 10px', borderRadius: '20px', backgroundColor: '#ffffff', border: '1px solid #cbd5e1', transition: 'all 0.3s ease' },
-  omsAvatarIcon: { width: '30px', height: '30px', borderRadius: '50%', backgroundColor: '#2563eb', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' },
-  omsBanner: { backgroundColor: '#2563eb', color: '#ffffff', padding: '20px 25px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '15px', margin: '15px 25px 0 25px', borderRadius: '16px', boxShadow: '0 8px 20px rgba(0, 0, 0, 0.2)', transition: 'all 0.3s ease' },
+  omsAvatarIcon: { width: '30px', height: '30px', borderRadius: '50%', background: 'linear-gradient(135deg, #00acc1, #2563eb)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' },
+  omsBanner: { background: 'linear-gradient(135deg, #00acc1 0%, #0284c7 50%, #2563eb 100%)', color: '#ffffff', padding: '20px 25px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '15px', margin: '15px 25px 0 25px', borderRadius: '16px', boxShadow: '0 8px 20px rgba(0, 172, 193, 0.3)', transition: 'all 0.3s ease' },
   omsContentBody: { padding: '25px', flex: 1 },
   omsTabRow: { display: 'flex', gap: '12px', borderBottom: '2px solid #e2e8f0', marginBottom: '20px' },
   omsTabBtn: { padding: '10px 16px', backgroundColor: 'transparent', border: 'none', borderBottom: '3px solid transparent', fontSize: '13px', fontWeight: '600', color: '#64748b', cursor: 'pointer' },
-  omsTabBtnActive: { borderBottomColor: '#2563eb', color: '#2563eb' },
+  omsTabBtnActive: { borderBottomColor: '#0284c7', color: '#0284c7' },
   omsProdCard: { backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '16px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', boxShadow: '0 4px 12px rgba(0,0,0,0.03)', transition: 'all 0.3s ease' },
   omsProdSku: { fontSize: '10px', fontWeight: 'bold', color: '#64748b', fontFamily: 'monospace' },
   omsProdTitle: { margin: '6px 0', fontSize: '14px', color: '#0f172a', fontWeight: 'bold', lineHeight: '1.3' },
@@ -1378,46 +1770,35 @@ const styles = {
 
   outerContainerFullWidth: { width: '100%', minHeight: '100vh', display: 'flex', flexWrap: 'wrap', fontFamily: "'Inter', sans-serif", margin: 0, padding: 0, backgroundColor: '#ffffff', overflowX: 'hidden' },
   leftPanelFullWidth: { flex: '1 1 380px', padding: 'min(4vw, 40px)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', backgroundColor: '#ffffff', minHeight: '100vh', boxSizing: 'border-box' },
-  rightPanelFullWidth: { flex: '2 1 450px', background: 'radial-gradient(circle at 80% 20%, #FBEFD5 0%, #3B72A4 45%, #182C61 90%)', padding: 'min(4vw, 40px)', display: 'flex', flexDirection: 'column', color: '#ffffff', minHeight: '100vh', boxSizing: 'border-box' },
-
+  rightPanelFullWidth: { flex: '2 1 450px', background: 'linear-gradient(180deg, #00acc1 0%, #0284c7 45%, #1565c0 90%)', padding: 'min(4vw, 40px)', display: 'flex', flexDirection: 'column', color: '#ffffff', minHeight: '100vh', boxSizing: 'border-box' },
   brand: { display: 'flex', alignItems: 'center', gap: '12px' },
-  brandText: { display: 'flex', flexDirection: 'column', fontSize: '11px', color: '#1E2A78', textTransform: 'uppercase' },
-
-  // STYLE CỦA AVATAR TRÒN TRÊN MÀN ĐĂNG NHẬP
-  modernAvatarWrapper: {
-    width: '56px',
-    height: '56px',
-    borderRadius: '50%',
-    backgroundColor: '#1E2A78',
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: '12px',
-    boxShadow: '0 8px 20px rgba(30, 42, 120, 0.3)',
-  },
-
+  logoIcon: { position: 'relative', width: '28px', height: '28px' },
+  logoSquare1: { position: 'absolute', width: '18px', height: '18px', backgroundColor: '#00acc1', borderRadius: '4px', top: 0, left: 0 },
+  logoSquare2: { position: 'absolute', width: '18px', height: '18px', border: '2px solid #00acc1', borderRadius: '4px', bottom: 0, right: 0 },
+  brandText: { display: 'flex', flexDirection: 'column', fontSize: '11px', color: '#00838f', textTransform: 'uppercase' },
   formContainerResponsive: { display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', maxWidth: '380px', margin: '20px auto' },
-  formTitle: { color: '#1E2A78', fontSize: '16px', margin: '0 0 12px 0', fontWeight: 'bold' },
+  formTitle: { color: '#00838f', fontSize: '16px', margin: '0 0 6px 0', fontWeight: 'bold' },
   quickAccountContainer: { width: '100%', marginTop: '4px', marginBottom: '12px' },
-  quickAccountCard: { width: '100%', backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '20px', padding: '10px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer', textAlign: 'center', transition: 'all 0.3s ease' },
+  quickAccountCard: { width: '100%', background: 'linear-gradient(135deg, #00acc1 0%, #0284c7 50%, #2563eb 100%)', color: '#ffffff', border: 'none', borderRadius: '20px', padding: '10px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer', textAlign: 'center', transition: 'all 0.3s ease' },
+  avatarCircle: { width: '50px', height: '50px', borderRadius: '50%', border: '2px solid #00acc1', display: 'flex', justifyContent: 'center', alignItems: 'center', marginBottom: '10px', fontSize: '20px' },
 
   inputWrapper: { width: '100%', position: 'relative', marginBottom: '10px', borderRadius: '30px', transition: 'all 0.3s ease' },
-  input: { width: '100%', padding: '12px 18px', borderRadius: '30px', border: '1.5px solid #1E2A78', outline: 'none', fontSize: '12px', boxSizing: 'border-box' },
-  inputWithEye: { width: '100%', padding: '12px 46px 12px 18px', borderRadius: '30px', border: '1.5px solid #1E2A78', outline: 'none', fontSize: '12px', boxSizing: 'border-box' },
-  inputSmall: { width: '100%', padding: '10px 18px', borderRadius: '30px', border: '1.5px solid #1E2A78', outline: 'none', fontSize: '12px', boxSizing: 'border-box' },
-  inputSmallWithEye: { width: '100%', padding: '10px 46px 10px 18px', borderRadius: '30px', border: '1.5px solid #1E2A78', outline: 'none', fontSize: '12px', boxSizing: 'border-box' },
+  input: { width: '100%', padding: '12px 18px', borderRadius: '30px', border: '1.5px solid #00acc1', outline: 'none', fontSize: '12px', boxSizing: 'border-box' },
+  inputWithEye: { width: '100%', padding: '12px 46px 12px 18px', borderRadius: '30px', border: '1.5px solid #00acc1', outline: 'none', fontSize: '12px', boxSizing: 'border-box' },
+  inputSmall: { width: '100%', padding: '10px 18px', borderRadius: '30px', border: '1.5px solid #00acc1', outline: 'none', fontSize: '12px', boxSizing: 'border-box' },
+  inputSmallWithEye: { width: '100%', padding: '10px 46px 10px 18px', borderRadius: '30px', border: '1.5px solid #00acc1', outline: 'none', fontSize: '12px', boxSizing: 'border-box' },
   profileInput: { width: '100%', padding: '12px 46px 12px 16px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '13px', boxSizing: 'border-box' },
   eyeBtn: { position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4px' },
-  actionBtn: { width: '100%', padding: '13px', borderRadius: '30px', backgroundColor: '#1E2A78', color: '#ffffff', border: 'none', fontWeight: 'bold', fontSize: '12px', cursor: 'pointer', transition: 'all 0.3s ease' },
-  linkText: { cursor: 'pointer', color: '#1E2A78', fontWeight: '500', fontSize: '12px' },
+  actionBtn: { width: '100%', padding: '13px', borderRadius: '30px', background: 'linear-gradient(135deg, #00acc1 0%, #0284c7 50%, #2563eb 100%)', color: '#ffffff', border: 'none', fontWeight: 'bold', fontSize: '12px', cursor: 'pointer', transition: 'all 0.3s ease' },
+  linkText: { cursor: 'pointer', color: '#0284c7', fontWeight: '500', fontSize: '12px' },
   navHeader: { display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '24px', width: '100%' },
   navLink: { color: 'rgba(255, 255, 255, 0.85)', textDecoration: 'none', fontSize: '12px', letterSpacing: '1px', fontWeight: '500', cursor: 'pointer', transition: 'all 0.3s ease' },
-  signInPillBtn: { backgroundColor: '#182C61', color: '#ffffff', border: 'none', padding: '8px 24px', borderRadius: '20px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.3s ease' },
+  signInPillBtn: { background: 'linear-gradient(135deg, #00acc1 0%, #2563eb 100%)', color: '#ffffff', border: 'none', padding: '8px 24px', borderRadius: '20px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.3s ease' },
   centerContainer: { flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100%', margin: '20px 0' },
-  glassCardCenter: { maxWidth: '460px', width: '100%', padding: '30px', borderRadius: '24px', backgroundColor: 'rgba(255, 255, 255, 0.12)', backdropFilter: 'blur(16px)', border: '1px solid rgba(255, 255, 255, 0.2)', boxShadow: '0 20px 40px rgba(0, 0, 0, 0.25)', textAlign: 'center' },
+  glassCardCenter: { maxWidth: '460px', width: '100%', padding: '30px', borderRadius: '24px', backgroundColor: 'rgba(255, 255, 255, 0.15)', backdropFilter: 'blur(16px)', border: '1px solid rgba(255, 255, 255, 0.25)', boxShadow: '0 20px 40px rgba(0, 172, 193, 0.2)', textAlign: 'center' },
   welcomeContentCenter: { maxWidth: '480px', width: '100%', padding: '24px', borderRadius: '20px', textAlign: 'center', transition: 'all 0.3s ease' },
   welcomeTitleCenter: { fontSize: 'clamp(36px, 5vw, 56px)', fontWeight: '800', margin: '0 0 8px 0', textAlign: 'center' },
-  sloganTagCenter: { fontSize: '11px', fontWeight: 'bold', letterSpacing: '2px', color: '#FBEFD5', marginBottom: '10px', textAlign: 'center' },
+  sloganTagCenter: { fontSize: '11px', fontWeight: 'bold', letterSpacing: '2px', color: '#e0f7fa', marginBottom: '10px', textAlign: 'center' },
   sloganTitleCenter: { fontSize: '22px', fontWeight: '700', margin: '0 0 14px 0', color: '#ffffff', textAlign: 'center' },
   welcomeDescCenter: { fontSize: '13px', lineHeight: '1.6', opacity: 0.95, marginBottom: '16px', textAlign: 'center' },
   webImageMockupCenter: { backgroundColor: 'rgba(15, 23, 42, 0.8)', borderRadius: '12px', padding: '14px', border: '1px solid rgba(255, 255, 255, 0.15)', boxShadow: '0 10px 25px rgba(0,0,0,0.3)', width: '100%', boxSizing: 'border-box', textAlign: 'left' },
@@ -1427,14 +1808,14 @@ const styles = {
   mockupBody: { display: 'flex', flexDirection: 'column', gap: '6px' },
   mockupBar: { backgroundColor: 'rgba(255, 255, 255, 0.08)', padding: '7px 10px', borderRadius: '6px', fontSize: '12px', color: '#f8fafc' },
 
-  elevatedInput3D: { transform: 'translateY(-3px)', boxShadow: '0 8px 18px rgba(0, 0, 0, 0.15)' },
-  elevatedBtnNavy: { transform: 'translateY(-3px)', backgroundColor: '#16205e', boxShadow: '0 10px 22px rgba(0, 0, 0, 0.35)' },
-  elevatedBtnBlue: { transform: 'translateY(-3px)', backgroundColor: '#1d4ed8', boxShadow: '0 10px 22px rgba(0, 0, 0, 0.35)' },
+  elevatedInput3D: { transform: 'translateY(-3px)', boxShadow: '0 8px 18px rgba(0, 172, 193, 0.2)' },
+  elevatedBtnNavy: { transform: 'translateY(-3px)', background: 'linear-gradient(135deg, #00838f 0%, #0277bd 100%)', boxShadow: '0 10px 22px rgba(0, 131, 143, 0.35)' },
+  elevatedBtnBlue: { transform: 'translateY(-3px)', background: 'linear-gradient(135deg, #0284c7 0%, #1d4ed8 100%)', boxShadow: '0 10px 22px rgba(2, 132, 199, 0.35)' },
   elevatedBtnDarkRed: { transform: 'translateY(-3px)', backgroundColor: '#dc2626', boxShadow: '0 10px 20px rgba(0, 0, 0, 0.45)' },
   elevatedBlockDark: { transform: 'translateY(-3px)', backgroundColor: '#1e293b', boxShadow: '0 8px 18px rgba(0, 0, 0, 0.4)' },
   elevatedCardLight: { transform: 'translateY(-4px)', boxShadow: '0 12px 28px rgba(15, 23, 42, 0.12)' },
   elevatedCard: { transform: 'translateY(-5px) scale(1.01)', boxShadow: '0 20px 40px rgba(0, 0, 0, 0.3)' },
-  elevatedBtnPill: { transform: 'translateY(-4px)', backgroundColor: '#0f1a3a', boxShadow: '0 10px 20px rgba(0, 0, 0, 0.4)' },
+  elevatedBtnPill: { transform: 'translateY(-4px)', background: 'linear-gradient(135deg, #00acc1 0%, #0284c7 100%)', boxShadow: '0 10px 20px rgba(0, 172, 193, 0.4)' },
   elevatedText: { transform: 'translateY(-2px)', color: '#ffffff', textShadow: '0 2px 8px rgba(0, 0, 0, 0.5)' },
 };
 
