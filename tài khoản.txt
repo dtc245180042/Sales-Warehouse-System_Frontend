@@ -1,0 +1,9 @@
+Admin:
+Email: admin@khovanpro.vn
+Mật khẩu: admin@1234
+Manager:
+Email: manager@khovanpro.vn
+Mật khẩu: manager@1234
+Staff:
+Email: staff@khovanpro.vn
+Mật khẩu: staff@1234
