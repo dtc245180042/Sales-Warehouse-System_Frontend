@@ -37,7 +37,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onMobileClose,
   isCollapsed,
 }) => {
-  const { role } = useAuth();
+  const { role, user } = useAuth();
   const location = useLocation();
   const [openSubmenus, setOpenSubmenus] = useState<Record<string, boolean>>({});
 
@@ -208,9 +208,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
         })}
       </div>
 
-      {/* Role Badge Footer */}
+      {/* Role & Location Badge Footer (SCRUM-203) */}
       {!isCollapsed && (
-        <div className="p-3 border-t border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/50">
+        <div className="p-3 border-t border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/50 space-y-2">
+          {/* User name */}
+          <div className="flex items-center gap-2">
+            {user?.avatar && (
+              <img
+                src={user.avatar}
+                alt={user.name}
+                className="w-6 h-6 rounded-full object-cover shrink-0"
+              />
+            )}
+            <span className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">
+              {user?.name || 'Người dùng'}
+            </span>
+          </div>
+          {/* Role badge */}
           <div className="flex items-center justify-between text-xs">
             <span className="text-slate-500 dark:text-slate-400">Vai trò:</span>
             <span
@@ -231,6 +245,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
               {getRoleDisplayName(role)}
             </span>
           </div>
+          {/* Kho hoặc địa bàn (SCRUM-203) */}
+          {(user?.warehouse || user?.territory) && (
+            <div className="text-[11px] text-slate-400 truncate" title={user?.warehouse || user?.territory}>
+              📍 {user?.warehouse || user?.territory}
+            </div>
+          )}
         </div>
       )}
     </div>

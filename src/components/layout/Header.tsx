@@ -186,7 +186,7 @@ export const Header: React.FC<HeaderProps> = ({
         title="Xác nhận đăng xuất"
         message="Bạn có chắc chắn muốn đăng xuất khỏi hệ thống? Phiên làm việc hiện tại sẽ lập tức bị hủy bỏ."
         confirmText="Đăng xuất"
-        type="danger"
+        variant="danger"
       />
 
       {/* Change Password Modal (SCRUM-201) */}

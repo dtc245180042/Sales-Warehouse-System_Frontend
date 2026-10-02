@@ -84,7 +84,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = async (): Promise<void> => {
     setIsLoading(true);
     try {
-      localStorage.removeItem('kv_session_expires_at');
+      // SCRUM-199: authService.logout() now clears all session data including kv_session_expires_at
       await authService.logout();
       setUser(null);
     } finally {

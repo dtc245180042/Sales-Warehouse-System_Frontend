@@ -97,17 +97,8 @@ export const userService = {
     return users[index];
   },
 
-  toggleLock: async (id: string): Promise<User> => {
-    await new Promise((r) => setTimeout(r, 200));
-    const users = getStorageItem<User[]>(STORAGE_KEY, initialUsers);
-    const index = users.findIndex((u) => u.id === id);
-    if (index === -1) throw new Error('Không tìm thấy người dùng');
-
-    const newStatus = users[index].status === 'locked' ? 'active' : 'locked';
-    users[index] = { ...users[index], status: newStatus };
-    setStorageItem(STORAGE_KEY, [...users]);
-    return users[index];
-  },
+  // SCRUM-207: toggleLock() removed - always use lockAccount(id, reason) to enforce mandatory reason
+  // and unlockAccount(id) for unlock. This ensures audit trail compliance.
 
   delete: async (id: string): Promise<boolean> => {
     await new Promise((r) => setTimeout(r, 200));

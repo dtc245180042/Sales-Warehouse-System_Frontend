@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
-import { ShieldAlert, FileQuestion, ArrowLeft, Home, ShoppingBag, LogOut } from 'lucide-react';
+import { ShieldAlert, FileQuestion, ArrowLeft, Home, LogOut, ServerCrash } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { getHomePathForRole, getHomeTitleForRole } from '../../utils/roleUtils';
 
@@ -20,6 +20,7 @@ export const ErrorPage: React.FC<ErrorPageProps> = ({
   const { role, user, logout } = useAuth();
 
   const is403 = code === '403';
+  const is500 = code === '500';
 
   // Determine home path based on user role
   const getHomePath = () => getHomePathForRole(role);
@@ -27,10 +28,14 @@ export const ErrorPage: React.FC<ErrorPageProps> = ({
 
   const defaultTitle = is403
     ? 'Không có quyền truy cập'
+    : is500
+    ? 'Lỗi hệ thống nội bộ'
     : 'Không tìm thấy trang yêu cầu';
 
   const defaultMessage = is403
     ? `Tài khoản "${user?.name || 'Hiện tại'}" với vai trò ${role} không được phân quyền truy cập trang "${location.pathname}".`
+    : is500
+    ? 'Máy chủ gặp lỗi không mong muốn. Đội kỹ thuật đã được thông báo. Vui lòng thử lại sau vài phút.'
     : `Đường dẫn "${location.pathname}" không tồn tại hoặc đã bị di dời sang địa chỉ khác.`;
 
   return (
@@ -42,16 +47,22 @@ export const ErrorPage: React.FC<ErrorPageProps> = ({
             className={`w-20 h-20 rounded-3xl flex items-center justify-center shadow-lg ${
               is403
                 ? 'bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 shadow-rose-500/20'
+                : is500
+                ? 'bg-orange-50 dark:bg-orange-950/50 text-orange-600 dark:text-orange-400 shadow-orange-500/20'
                 : 'bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 shadow-indigo-500/20'
             }`}
           >
-            {is403 ? <ShieldAlert className="w-10 h-10" /> : <FileQuestion className="w-10 h-10" />}
+            {is403 ? <ShieldAlert className="w-10 h-10" /> : is500 ? <ServerCrash className="w-10 h-10" /> : <FileQuestion className="w-10 h-10" />}
           </div>
         </div>
 
         {/* Code & Title */}
         <div>
-          <span className="text-4xl font-black text-rose-600 dark:text-rose-400 tracking-wider font-mono">
+          <span className={`text-4xl font-black tracking-wider font-mono ${
+            is403 ? 'text-rose-600 dark:text-rose-400'
+            : is500 ? 'text-orange-600 dark:text-orange-400'
+            : 'text-indigo-600 dark:text-indigo-400'
+          }`}>
             {code}
           </span>
           <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white mt-1">

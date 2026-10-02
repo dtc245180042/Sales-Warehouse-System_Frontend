@@ -1,4 +1,4 @@
-import { User } from '../types/User';
+import { User, UserRole } from '../types/User';
 import { initialUsers } from '../mock/users';
 import { getStorageItem, setStorageItem, removeStorageItem } from './storage';
 
@@ -23,14 +23,10 @@ export const authService = {
   },
 
   getCurrentUser: (): User | null => {
+    // SCRUM-198: Only return user if a valid auth token AND user session exist
+    const token = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+    if (!token) return null;
     const user = getStorageItem<User | null>(STORAGE_KEYS.CURRENT_USER, null);
-    if (!user) {
-      // Default to Admin user so system is immediately testable if not logged in
-      const defaultUser = initialUsers[0];
-      setStorageItem(STORAGE_KEYS.CURRENT_USER, defaultUser);
-      setStorageItem(STORAGE_KEYS.AUTH_TOKEN, 'demo-token-123456');
-      return defaultUser;
-    }
     return user;
   },
 
@@ -96,12 +92,15 @@ export const authService = {
     await new Promise((res) => setTimeout(res, 200));
     removeStorageItem(STORAGE_KEYS.CURRENT_USER);
     removeStorageItem(STORAGE_KEYS.AUTH_TOKEN);
+    // SCRUM-199: Also clear session expiry timer on logout
+    localStorage.removeItem('kv_session_expires_at');
   },
 
   switchRole: (role: UserRole): User => {
     const users = authService.initUsers();
     const targetUser = users.find((u) => u.role === role) || users[0];
     setStorageItem(STORAGE_KEYS.CURRENT_USER, targetUser);
+    setStorageItem(STORAGE_KEYS.AUTH_TOKEN, `token-switch-${Date.now()}`);
     return targetUser;
   },
 
