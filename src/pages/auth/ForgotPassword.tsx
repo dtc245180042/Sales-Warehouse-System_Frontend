@@ -60,9 +60,14 @@ export const ForgotPassword: React.FC = () => {
           <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
             Nếu email <span className="font-semibold text-slate-900 dark:text-slate-200">{sentEmail}</span> tồn tại trong hệ thống, hướng dẫn đặt lại mật khẩu đã được gửi đến hộp thư. Liên kết có hiệu lực tối đa <strong className="text-indigo-600 dark:text-indigo-400 font-semibold">30 phút</strong> và chỉ sử dụng được <strong className="text-indigo-600 dark:text-indigo-400 font-semibold">một lần duy nhất</strong> vì mục đích an toàn.
           </p>
-          <div className="pt-4">
-            <Link to="/login">
+          <div className="pt-4 space-y-2">
+            <Link to={`/reset-password?token=reset_token_${Date.now()}`}>
               <Button variant="primary" className="w-full">
+                Mở liên kết đặt lại mật khẩu (Thử nghiệm)
+              </Button>
+            </Link>
+            <Link to="/login">
+              <Button variant="secondary" className="w-full">
                 Quay lại Đăng nhập
               </Button>
             </Link>

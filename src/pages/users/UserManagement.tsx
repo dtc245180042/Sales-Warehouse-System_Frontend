@@ -15,6 +15,7 @@ import {
   AlertTriangle,
   Warehouse as WarehouseIcon,
   CheckCircle2,
+  Camera,
 } from 'lucide-react';
 import { PageContainer } from '../../components/layout/PageContainer';
 import { DataTable, Column } from '../../components/common/DataTable';
@@ -34,11 +35,22 @@ const WAREHOUSE_OPTIONS = [
   'Kho Cần Thơ',
 ];
 
+const TERRITORY_OPTIONS = [
+  'Địa bàn Miền Bắc (Hà Nội, Hải Phòng, Quảng Ninh...)',
+  'Địa bàn Miền Trung (Đà Nẵng, Huế, Khánh Hòa...)',
+  'Địa bàn Miền Nam (TP. HCM, Bình Dương, Đồng Nai...)',
+  'Địa bàn Tây Nguyên (Đắk Lắk, Gia Lai, Lâm Đồng...)',
+  'Địa bàn Tây Nam Bộ (Cần Thơ, An Giang, Kiên Giang...)',
+];
+
 const AVAILABLE_ROLES: { role: UserRole; label: string; desc: string }[] = [
-  { role: 'Admin', label: 'Admin (Quản trị tối cao)', desc: 'Toàn quyền cấu hình, tài khoản & báo cáo' },
-  { role: 'Manager', label: 'Manager (Quản lý kho)', desc: 'Quản lý kho hàng, nhập xuất, xem giá vốn' },
-  { role: 'Staff', label: 'Staff (Nhân viên POS)', desc: 'Tạo đơn bán hàng, kiểm tra tồn kho' },
-  { role: 'User', label: 'User (Người dùng hệ thống)', desc: 'Xem danh mục, lịch sử, đổi mật khẩu' },
+  { role: 'Admin', label: '1. Quản trị hệ thống (System Admin)', desc: 'Toàn quyền cấu hình, tài khoản, phân quyền & bảo mật' },
+  { role: 'SalesManager', label: '2. Quản lý kinh doanh (Sales Manager)', desc: 'Quản lý địa bàn, duyệt đơn, xem giá vốn & biên lợi nhuận' },
+  { role: 'SalesStaff', label: '3. Nhân viên kinh doanh (Sales Staff / Rep)', desc: 'Chăm sóc đại lý, tạo đơn thị trường, không xem giá vốn' },
+  { role: 'WarehouseManager', label: '4. Quản lý kho (Warehouse Manager)', desc: 'Toàn quyền quản lý nhập/xuất/tồn kho được gán' },
+  { role: 'WarehouseStaff', label: '5. Thủ kho (Warehouse Staff)', desc: 'Thao tác nhập/xuất kho phụ trách, không xem giá vốn' },
+  { role: 'Accountant', label: '6. Kế toán (Accountant)', desc: 'Quản lý công nợ, hóa đơn chứng từ, không sửa tồn kho' },
+  { role: 'Director', label: '7. Ban giám đốc (Director / Executive)', desc: 'Xem báo cáo tổng thể, chiến lược toàn hệ thống' },
 ];
 
 export const UserManagement: React.FC = () => {
@@ -47,6 +59,7 @@ export const UserManagement: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
   // Add / Edit Modal state
@@ -57,9 +70,10 @@ export const UserManagement: React.FC = () => {
     email: '',
     phone: '',
     department: '',
-    role: 'Staff' as UserRole,
-    roles: ['Staff'] as UserRole[],
+    role: 'SalesStaff' as UserRole,
+    roles: ['SalesStaff'] as UserRole[],
     warehouse: 'Kho Tổng TP. HCM',
+    territory: 'Địa bàn Miền Nam (TP. HCM, Bình Dương, Đồng Nai...)',
     status: 'active' as UserStatus,
     avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
   });
@@ -80,7 +94,7 @@ export const UserManagement: React.FC = () => {
     loadUsers();
   }, []);
 
-  // SCRUM-205: Search by name, username/email, phone, department
+  // SCRUM-205: Search by name, username/email, phone, department & Filter by Role & Status
   const filteredUsers = useMemo(() => {
     return users.filter((u) => {
       const q = search.toLowerCase().trim();
@@ -96,9 +110,13 @@ export const UserManagement: React.FC = () => {
         u.role === roleFilter ||
         (u.roles && u.roles.includes(roleFilter as UserRole));
 
-      return matchSearch && matchRole;
+      const matchStatus =
+        statusFilter === 'all' ||
+        u.status === statusFilter;
+
+      return matchSearch && matchRole && matchStatus;
     });
-  }, [users, search, roleFilter]);
+  }, [users, search, roleFilter, statusFilter]);
 
   const handleOpenCreate = () => {
     setEditingUser(null);
@@ -106,10 +124,11 @@ export const UserManagement: React.FC = () => {
       name: '',
       email: '',
       phone: '',
-      department: 'Bán Hàng & POS',
-      role: 'Staff',
-      roles: ['Staff'],
+      department: 'Phòng Kinh Doanh',
+      role: 'SalesStaff',
+      roles: ['SalesStaff'],
       warehouse: 'Kho Tổng TP. HCM',
+      territory: 'Địa bàn Miền Nam (TP. HCM, Bình Dương, Đồng Nai...)',
       status: 'active',
       avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
     });
@@ -126,7 +145,8 @@ export const UserManagement: React.FC = () => {
       department: u.department || '',
       role: u.role,
       roles: assignedRoles,
-      warehouse: u.warehouse || (assignedRoles.some(r => r === 'Manager' || r === 'Staff') ? 'Kho Tổng TP. HCM' : ''),
+      warehouse: u.warehouse || 'Kho Tổng TP. HCM',
+      territory: u.territory || 'Địa bàn Miền Nam (TP. HCM, Bình Dương, Đồng Nai...)',
       status: u.status,
       avatar: u.avatar,
     });
@@ -151,13 +171,7 @@ export const UserManagement: React.FC = () => {
       updatedRoles = [...formData.roles, targetRole];
     }
 
-    const primaryRole = updatedRoles.includes('Admin')
-      ? 'Admin'
-      : updatedRoles.includes('Manager')
-      ? 'Manager'
-      : updatedRoles.includes('Staff')
-      ? 'Staff'
-      : 'User';
+    const primaryRole = updatedRoles[0] || 'SalesStaff';
 
     setFormData({
       ...formData,
@@ -174,9 +188,20 @@ export const UserManagement: React.FC = () => {
     }
 
     // SCRUM-206: Warehouse role must be bound to at least one warehouse
-    const hasWarehouseRole = formData.roles.includes('Manager') || formData.roles.includes('Staff');
+    const hasWarehouseRole = formData.roles.some((r) =>
+      ['WarehouseManager', 'WarehouseStaff', 'Manager', 'Staff'].includes(r)
+    );
     if (hasWarehouseRole && !formData.warehouse) {
-      showToast('Người dùng thuộc vai trò quản lý kho / nhân viên bán hàng phải gắn với ít nhất một kho cụ thể.', 'warning', 'Ràng buộc kho');
+      showToast('Người dùng thuộc vai trò kho phải gắn với ít nhất một kho cụ thể.', 'warning', 'Ràng buộc kho');
+      return;
+    }
+
+    // SCRUM-206: Sales role must be bound to a territory
+    const hasSalesRole = formData.roles.some((r) =>
+      ['SalesManager', 'SalesStaff'].includes(r)
+    );
+    if (hasSalesRole && !formData.territory) {
+      showToast('Người dùng thuộc vai trò kinh doanh phải gắn với ít nhất một địa bàn cụ thể.', 'warning', 'Ràng buộc địa bàn');
       return;
     }
 
@@ -190,6 +215,7 @@ export const UserManagement: React.FC = () => {
           role: formData.role,
           roles: formData.roles,
           warehouse: formData.warehouse,
+          territory: formData.territory,
           status: formData.status,
         });
         showToast('Cập nhật tài khoản người dùng thành công!', 'success');
@@ -204,10 +230,12 @@ export const UserManagement: React.FC = () => {
           role: formData.role,
           roles: formData.roles,
           warehouse: formData.warehouse,
+          territory: formData.territory,
           status: formData.status,
           avatar: formData.avatar,
           password: tempPassword,
-          assignedDealersCount: 0,
+          assignedDealersCount: hasSalesRole ? 3 : 0,
+          assignedDealers: hasSalesRole ? ['Đại lý Tân Phú', 'Đại lý Bình Thạnh', 'Đại lý Thủ Đức'] : [],
         });
         showToast(
           `Đã tạo tài khoản thành công! Email kích hoạt kèm mật khẩu tạm (${tempPassword}) đã được gửi tới ${formData.email}`,
@@ -326,8 +354,14 @@ export const UserManagement: React.FC = () => {
       className: 'min-w-[180px]',
       render: (u) => {
         const displayRoles = u.roles && u.roles.length > 0 ? u.roles : [u.role];
-        const roleConfig: Record<UserRole, { label: string; variant: 'primary' | 'info' | 'neutral' | 'success' }> = {
+        const roleConfig: Record<string, { label: string; variant: 'primary' | 'info' | 'neutral' | 'success' | 'warning' | 'danger' }> = {
           Admin: { label: 'Admin', variant: 'primary' },
+          SalesManager: { label: 'QL Kinh Doanh', variant: 'warning' },
+          SalesStaff: { label: 'Kinh Doanh', variant: 'info' },
+          WarehouseManager: { label: 'QL Kho', variant: 'warning' },
+          WarehouseStaff: { label: 'Thủ Kho', variant: 'neutral' },
+          Accountant: { label: 'Kế Toán', variant: 'success' },
+          Director: { label: 'Ban Giám Đốc', variant: 'danger' },
           Manager: { label: 'Manager', variant: 'info' },
           Staff: { label: 'Staff', variant: 'neutral' },
           User: { label: 'User', variant: 'success' },
@@ -351,15 +385,18 @@ export const UserManagement: React.FC = () => {
         <div className="text-xs space-y-0.5">
           <div className="font-medium text-slate-800 dark:text-slate-200 flex items-center gap-1">
             <WarehouseIcon className="w-3.5 h-3.5 text-slate-400" />
-            <span>{u.warehouse || 'Chưa gắn kho'}</span>
+            <span>{u.warehouse || 'Toàn hệ thống'}</span>
           </div>
+          {u.territory && (
+            <div className="text-[11px] text-indigo-600 dark:text-indigo-400 font-medium">
+              {u.territory}
+            </div>
+          )}
           {u.assignedDealersCount ? (
-            <span className="text-[11px] text-amber-600 dark:text-amber-400 font-medium">
+            <span className="text-[11px] text-amber-600 dark:text-amber-400 font-medium block">
               Phụ trách {u.assignedDealersCount} đại lý
             </span>
-          ) : (
-            <span className="text-[11px] text-slate-400">{u.department || 'Văn phòng'}</span>
-          )}
+          ) : null}
         </div>
       ),
     },
@@ -475,17 +512,35 @@ export const UserManagement: React.FC = () => {
               />
             </div>
 
-            <select
-              value={roleFilter}
-              onChange={(e) => setRoleFilter(e.target.value)}
-              className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs sm:text-sm text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            >
-              <option value="all">Tất cả vai trò</option>
-              <option value="Admin">Admin</option>
-              <option value="Manager">Manager</option>
-              <option value="Staff">Staff</option>
-              <option value="User">User (Người dùng)</option>
-            </select>
+            <div className="flex items-center gap-2">
+              {/* Filter by Role */}
+              <select
+                value={roleFilter}
+                onChange={(e) => setRoleFilter(e.target.value)}
+                className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs sm:text-sm text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                <option value="all">Tất cả vai trò</option>
+                <option value="Admin">Admin (Quản trị)</option>
+                <option value="SalesManager">QL Kinh Doanh</option>
+                <option value="SalesStaff">Kinh Doanh / Bán Hàng</option>
+                <option value="WarehouseManager">QL Kho Vận</option>
+                <option value="WarehouseStaff">Thủ Kho</option>
+                <option value="Accountant">Kế Toán</option>
+                <option value="Director">Ban Giám Đốc</option>
+              </select>
+
+              {/* Filter by Status (SCRUM-205) */}
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs sm:text-sm text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                <option value="all">Tất cả trạng thái</option>
+                <option value="active">Đang hoạt động</option>
+                <option value="locked">Đã bị khóa</option>
+                <option value="inactive">Tạm ngưng</option>
+              </select>
+            </div>
           </div>
         }
       />
@@ -554,6 +609,26 @@ export const UserManagement: React.FC = () => {
             </div>
           </div>
 
+          {/* Ảnh đại diện: Trạng thái chờ */}
+          <div className="p-3.5 rounded-2xl bg-slate-50/80 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-slate-400">
+                <Camera className="w-5 h-5" />
+              </div>
+              <div>
+                <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 block">
+                  Ảnh đại diện nhân sự
+                </span>
+                <span className="text-[11px] text-slate-400 block">
+                  Hệ thống tự động dùng ảnh mặc định (Tính năng tải ảnh đang chờ cập nhật)
+                </span>
+              </div>
+            </div>
+            <span className="text-[11px] px-2.5 py-1 rounded-full bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800 font-medium">
+              Trạng thái chờ
+            </span>
+          </div>
+
           {/* SCRUM-206: Multi-role Assignment */}
           <div>
             <div className="flex items-center justify-between mb-2">
@@ -604,12 +679,12 @@ export const UserManagement: React.FC = () => {
             </div>
           </div>
 
-          {/* SCRUM-206: Warehouse Binding (Required for Manager & Staff) */}
-          {(formData.roles.includes('Manager') || formData.roles.includes('Staff')) && (
+          {/* SCRUM-206: Warehouse Binding (Required for Warehouse roles) */}
+          {formData.roles.some((r) => ['WarehouseManager', 'WarehouseStaff', 'Manager', 'Staff'].includes(r)) && (
             <div className="p-3.5 rounded-2xl bg-indigo-50/60 dark:bg-indigo-950/30 border border-indigo-200/60 dark:border-indigo-800/40">
               <label className="block text-xs font-bold text-indigo-900 dark:text-indigo-200 mb-1.5 flex items-center gap-1.5">
                 <WarehouseIcon className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-                <span>Gán kho hoạt động (Bắt buộc với vai trò Quản lý / Nhân viên quầy) *</span>
+                <span>Gán kho hoạt động (Bắt buộc với vai trò Quản lý kho / Thủ kho) *</span>
               </label>
               <select
                 value={formData.warehouse}
@@ -625,7 +700,32 @@ export const UserManagement: React.FC = () => {
                 ))}
               </select>
               <p className="text-[11px] text-indigo-600 dark:text-indigo-400 mt-1">
-                Nhân viên sẽ chỉ được tạo đơn bán hoặc quản lý tồn kho tại kho này.
+                Nhân viên kho chỉ được thao tác xuất/nhập tại kho được phân công.
+              </p>
+            </div>
+          )}
+
+          {/* SCRUM-206: Territory Binding (Required for Sales roles) */}
+          {formData.roles.some((r) => ['SalesManager', 'SalesStaff'].includes(r)) && (
+            <div className="p-3.5 rounded-2xl bg-amber-50/60 dark:bg-amber-950/30 border border-amber-200/60 dark:border-amber-800/40">
+              <label className="block text-xs font-bold text-amber-900 dark:text-amber-200 mb-1.5 flex items-center gap-1.5">
+                <span>Gán địa bàn hoạt động (Bắt buộc với vai trò Quản lý / Nhân viên kinh doanh) *</span>
+              </label>
+              <select
+                value={formData.territory}
+                onChange={(e) => setFormData({ ...formData, territory: e.target.value })}
+                className="w-full px-3 py-2 rounded-xl border border-amber-200 dark:border-amber-800 bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-amber-500"
+                required
+              >
+                <option value="">-- Vui lòng chọn địa bàn phụ trách --</option>
+                {TERRITORY_OPTIONS.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+              <p className="text-[11px] text-amber-700 dark:text-amber-400 mt-1">
+                Nhân viên kinh doanh chỉ phụ trách chăm sóc các đại lý thuộc địa bàn này.
               </p>
             </div>
           )}
@@ -682,7 +782,7 @@ export const UserManagement: React.FC = () => {
 
             {/* Handover Warning if dealers assigned */}
             {lockingUser.assignedDealersCount && lockingUser.assignedDealersCount > 0 ? (
-              <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 space-y-2">
+              <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 space-y-2.5">
                 <div className="flex items-center gap-2 text-amber-900 dark:text-amber-200 font-bold text-xs sm:text-sm">
                   <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0" />
                   <span>CẢNH BÁO BÀN GIAO ĐẠI LÝ PHỤ TRÁCH</span>
@@ -690,6 +790,23 @@ export const UserManagement: React.FC = () => {
                 <p className="text-xs text-amber-800 dark:text-amber-300 leading-relaxed">
                   Nhân viên này hiện đang phụ trách <strong>{lockingUser.assignedDealersCount} đại lý/khách hàng</strong>. Bạn bắt buộc phải chỉ định nhân viên tiếp quản bàn giao để không làm gián đoạn việc cung ứng hàng hóa!
                 </p>
+
+                {/* Specific assigned dealers list */}
+                {lockingUser.assignedDealers && lockingUser.assignedDealers.length > 0 && (
+                  <div className="p-2.5 bg-amber-100/70 dark:bg-amber-900/40 rounded-xl space-y-1">
+                    <span className="text-[11px] font-bold text-amber-900 dark:text-amber-200 block">
+                      Danh sách các đại lý cần bàn giao ngay:
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {lockingUser.assignedDealers.map((d) => (
+                        <span key={d} className="px-2 py-0.5 bg-white dark:bg-slate-800 border border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-100 text-[11px] rounded-lg font-medium">
+                          {d}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <div>
                   <label className="block text-xs font-semibold text-amber-900 dark:text-amber-200 mb-1">
                     Chỉ định nhân sự tiếp quản bàn giao *

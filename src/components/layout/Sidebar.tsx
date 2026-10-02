@@ -2,28 +2,15 @@ import React, { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
-  Boxes,
-  Package,
-  Layers,
-  ArrowDownLeft,
-  ArrowUpRight,
-  History,
-  ShoppingCart,
-  Receipt,
-  Users2,
-  Building2,
-  BarChart3,
-  TrendingUp,
-  FileSpreadsheet,
   ShieldCheck,
   Settings,
   ChevronDown,
-  Warehouse,
   X,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { UserRole } from '../../types/User';
 import { Logo } from '../common/Logo';
+import { getRoleDisplayName } from '../../utils/roleUtils';
 
 interface SidebarProps {
   isMobileOpen: boolean;
@@ -52,11 +39,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const { role } = useAuth();
   const location = useLocation();
-  const [openSubmenus, setOpenSubmenus] = useState<Record<string, boolean>>({
-    inventory: true,
-    sales: true,
-    reports: false,
-  });
+  const [openSubmenus, setOpenSubmenus] = useState<Record<string, boolean>>({});
 
   const toggleSubmenu = (key: string) => {
     setOpenSubmenus((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -64,82 +47,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const menuSections: { heading?: string; items: MenuItem[] }[] = [
     {
+      heading: 'BẢNG ĐIỀU KHIỂN',
       items: [
         {
           title: 'Tổng quan Dashboard',
           path: '/dashboard',
           icon: <LayoutDashboard className="w-5 h-5" />,
-          allowedRoles: ['Admin', 'Manager', 'Staff', 'User'],
-        },
-      ],
-    },
-    {
-      heading: 'QUẢN LÝ HÀNG HÓA',
-      items: [
-        {
-          title: 'Sản phẩm',
-          path: '/products',
-          icon: <Boxes className="w-5 h-5" />,
-          allowedRoles: ['Admin', 'Manager', 'Staff', 'User'],
-        },
-        {
-          title: 'Kho vận',
-          icon: <Warehouse className="w-5 h-5" />,
-          allowedRoles: ['Admin', 'Manager'],
-          submenu: [
-            { title: 'Tồn kho tổng hợp', path: '/inventory', icon: <Package className="w-4 h-4" />, allowedRoles: ['Admin', 'Manager'] },
-            { title: 'Nhập kho', path: '/inventory/stock-in', icon: <ArrowDownLeft className="w-4 h-4" />, allowedRoles: ['Admin', 'Manager'] },
-            { title: 'Xuất kho', path: '/inventory/stock-out', icon: <ArrowUpRight className="w-4 h-4" />, allowedRoles: ['Admin', 'Manager'] },
-            { title: 'Lịch sử kho', path: '/inventory/history', icon: <History className="w-4 h-4" />, allowedRoles: ['Admin', 'Manager'] },
-          ],
-        },
-      ],
-    },
-    {
-      heading: 'BÁN HÀNG & POS',
-      items: [
-        {
-          title: 'Điểm bán hàng (POS)',
-          path: '/sales/pos',
-          icon: <ShoppingCart className="w-5 h-5" />,
-          allowedRoles: ['Admin', 'Manager', 'Staff', 'User'],
-        },
-        {
-          title: 'Quản lý đơn hàng',
-          path: '/orders',
-          icon: <Receipt className="w-5 h-5" />,
-          allowedRoles: ['Admin', 'Manager', 'Staff', 'User'],
-        },
-      ],
-    },
-    {
-      heading: 'ĐỐI TÁC',
-      items: [
-        {
-          title: 'Khách hàng',
-          path: '/customers',
-          icon: <Users2 className="w-5 h-5" />,
-          allowedRoles: ['Admin', 'Manager', 'Staff', 'User'],
-        },
-        {
-          title: 'Nhà cung cấp',
-          path: '/suppliers',
-          icon: <Building2 className="w-5 h-5" />,
-          allowedRoles: ['Admin', 'Manager'],
-        },
-      ],
-    },
-    {
-      heading: 'BÁO CÁO & THỐNG KÊ',
-      items: [
-        {
-          title: 'Báo cáo',
-          icon: <BarChart3 className="w-5 h-5" />,
-          allowedRoles: ['Admin', 'Manager'],
-          submenu: [
-            { title: 'Báo cáo doanh thu', path: '/reports/revenue', icon: <TrendingUp className="w-4 h-4" />, allowedRoles: ['Admin', 'Manager'] },
-            { title: 'Báo cáo bán hàng', path: '/reports/sales', icon: <FileSpreadsheet className="w-4 h-4" />, allowedRoles: ['Admin', 'Manager'] },
-            { title: 'Báo cáo tồn kho', path: '/reports/inventory', icon: <Layers className="w-4 h-4" />, allowedRoles: ['Admin', 'Manager'] },
+          allowedRoles: [
+            'Admin',
+            'SalesManager',
+            'SalesStaff',
+            'WarehouseManager',
+            'WarehouseStaff',
+            'Accountant',
+            'Director',
+            'Manager',
+            'Staff',
+            'User',
           ],
         },
       ],
@@ -154,10 +78,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
           allowedRoles: ['Admin'],
         },
         {
-          title: 'Cài đặt tài khoản',
+          title: 'Cài đặt & Bảo mật tài khoản',
           path: '/settings',
           icon: <Settings className="w-5 h-5" />,
-          allowedRoles: ['Admin', 'Manager', 'Staff', 'User'],
+          allowedRoles: [
+            'Admin',
+            'SalesManager',
+            'SalesStaff',
+            'WarehouseManager',
+            'WarehouseStaff',
+            'Accountant',
+            'Director',
+            'Manager',
+            'Staff',
+            'User',
+          ],
         },
       ],
     },
@@ -277,17 +212,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {!isCollapsed && (
         <div className="p-3 border-t border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/50">
           <div className="flex items-center justify-between text-xs">
-            <span className="text-slate-500 dark:text-slate-400">Quyền truy cập:</span>
+            <span className="text-slate-500 dark:text-slate-400">Vai trò:</span>
             <span
               className={`font-semibold px-2 py-0.5 rounded-full text-[11px] ${
                 role === 'Admin'
                   ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300'
-                  : role === 'Manager'
+                  : role === 'Director'
+                  ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300'
+                  : role === 'SalesManager' || role === 'SalesStaff'
                   ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300'
-                  : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300'
+                  : role === 'WarehouseManager' || role === 'WarehouseStaff'
+                  ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300'
+                  : role === 'Accountant'
+                  ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300'
+                  : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
               }`}
             >
-              {role}
+              {getRoleDisplayName(role)}
             </span>
           </div>
         </div>

@@ -7,6 +7,7 @@ import { Mail, Lock, Eye, EyeOff, LogIn, Warehouse, Shield, CheckCircle, AlertTr
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
 import { Button } from '../../components/common/Button';
+import { getHomePathForRole } from '../../utils/roleUtils';
 
 const loginSchema = z.object({
   email: z.string().min(1, 'Email không được để trống').email('Email không đúng định dạng'),
@@ -28,14 +29,13 @@ export const Login: React.FC = () => {
   const {
     register,
     handleSubmit,
-    setValue,
     formState: { errors },
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      email: 'admin@khovanpro.vn',
-      password: 'admin@1234',
-      rememberMe: true,
+      email: '',
+      password: '',
+      rememberMe: false,
     },
   });
 
@@ -44,7 +44,7 @@ export const Login: React.FC = () => {
     try {
       const user = await login(data.email, data.password, data.rememberMe);
       showToast(`Chào mừng ${user.name} đã quay trở lại hệ thống!`, 'success', 'Đăng nhập thành công');
-      const targetPath = user.role === 'User' ? '/user/dashboard' : user.role === 'Staff' ? '/sales/pos' : '/dashboard';
+      const targetPath = getHomePathForRole(user.role);
       navigate(targetPath);
     } catch (error: any) {
       showToast(error.message || 'Email hoặc mật khẩu không chính xác', 'error', 'Đăng nhập thất bại');

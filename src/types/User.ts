@@ -1,4 +1,13 @@
-export type UserRole = 'Admin' | 'Manager' | 'Staff' | 'User';
+export type BusinessRole = 
+  | 'Admin'             // Quản trị hệ thống
+  | 'SalesManager'      // Quản lý kinh doanh (xem giá vốn, biên lợi nhuận)
+  | 'SalesStaff'        // Nhân viên kinh doanh (gắn địa bàn)
+  | 'WarehouseManager'  // Quản lý kho (gắn kho)
+  | 'WarehouseStaff'    // Thủ kho (gắn kho, không xem giá vốn)
+  | 'Accountant'        // Kế toán
+  | 'Director';         // Ban giám đốc
+
+export type UserRole = BusinessRole | 'Manager' | 'Staff' | 'User';
 
 export type UserStatus = 'active' | 'inactive' | 'locked';
 
@@ -16,6 +25,7 @@ export interface User {
   warehouse?: string;
   territory?: string;
   assignedDealersCount?: number;
+  assignedDealers?: string[];
   lockReason?: string;
   lockedAt?: string;
   handoverTo?: string;

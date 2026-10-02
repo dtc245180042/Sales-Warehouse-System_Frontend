@@ -120,7 +120,8 @@ export const ProductList: React.FC = () => {
     showToast('Đã xuất file CSV thành công!', 'success');
   };
 
-  const isManagerOrAdmin = role === 'Admin' || role === 'Manager';
+  // SCRUM-202: Giá vốn và biên lợi nhuận chỉ lộ ra với vai trò Quản lý kinh doanh (và Admin/Ban giám đốc)
+  const canViewCostPrice = role === 'Admin' || role === 'SalesManager' || role === 'Director';
 
   const columns: Column<Product>[] = useMemo(() => {
     const rawCols: Column<Product>[] = [
@@ -265,12 +266,12 @@ export const ProductList: React.FC = () => {
     },
   ];
 
-  // SCRUM-202: Giá vốn và biên lợi nhuận chỉ hiển thị với vai trò Quản lý (Admin / Manager)
-  if (!isManagerOrAdmin) {
+  // SCRUM-202: Giá vốn và biên lợi nhuận chỉ hiển thị với vai trò Quản lý kinh doanh (Admin / SalesManager / Director)
+  if (!canViewCostPrice) {
     return rawCols.filter((col) => col.key !== 'costPrice');
   }
   return rawCols;
-}, [isManagerOrAdmin]);
+}, [canViewCostPrice]);
 
   return (
     <PageContainer

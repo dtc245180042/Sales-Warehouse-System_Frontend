@@ -2,6 +2,7 @@ import React from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { ShieldAlert, FileQuestion, ArrowLeft, Home, ShoppingBag, LogOut } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { getHomePathForRole, getHomeTitleForRole } from '../../utils/roleUtils';
 
 interface ErrorPageProps {
   code?: '403' | '404' | '500';
@@ -21,17 +22,8 @@ export const ErrorPage: React.FC<ErrorPageProps> = ({
   const is403 = code === '403';
 
   // Determine home path based on user role
-  const getHomePath = () => {
-    if (role === 'User') return '/user/dashboard';
-    if (role === 'Staff') return '/sales/pos';
-    return '/dashboard';
-  };
-
-  const getHomeTitle = () => {
-    if (role === 'User') return 'Về Tổng quan Bán hàng';
-    if (role === 'Staff') return 'Về Màn hình POS';
-    return 'Về Bảng điều khiển Quản trị';
-  };
+  const getHomePath = () => getHomePathForRole(role);
+  const getHomeTitle = () => getHomeTitleForRole(role);
 
   const defaultTitle = is403
     ? 'Không có quyền truy cập'

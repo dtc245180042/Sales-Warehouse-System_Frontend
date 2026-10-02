@@ -8,7 +8,7 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test": "echo \"All modules cleared and ready.\" && exit 0"
+    "test": "node scripts/test-rbac.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",

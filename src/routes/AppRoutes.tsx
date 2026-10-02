@@ -2,74 +2,39 @@ import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthLayout } from '../layouts/AuthLayout';
 import { DashboardLayout } from '../layouts/DashboardLayout';
-import { UserLayout } from '../layouts/UserLayout';
 import { ProtectedRoute } from './ProtectedRoute';
 import { useAuth } from '../contexts/AuthContext';
+import { UserRole } from '../types/User';
+import { getHomePathForRole } from '../utils/roleUtils';
 
-// Auth pages
+// Auth pages (Sprint 1: SCRUM-198, SCRUM-200)
 import { Login } from '../pages/auth/Login';
 import { ForgotPassword } from '../pages/auth/ForgotPassword';
+import { ResetPassword } from '../pages/auth/ResetPassword';
 import { ErrorPage } from '../pages/error/ErrorPage';
 
-// User / Sales Staff Pages
-import { DashboardPage as UserDashboard } from '../pages/user/Dashboard';
-import { ProductsPage as UserProducts } from '../pages/user/Products';
-import { ProductDetailPage as UserProductDetail } from '../pages/user/ProductDetail';
-import { CartPage as UserCart } from '../pages/user/Cart';
-import { CreateOrderPage as UserCreateOrder } from '../pages/user/CreateOrder';
-import { OrdersPage as UserOrders } from '../pages/user/Orders';
-import { OrderDetailPage as UserOrderDetail } from '../pages/user/OrderDetail';
-import { NotificationsPage as UserNotifications } from '../pages/user/Notifications';
-import { ProfilePage as UserProfile } from '../pages/user/Profile';
-import { ChangePasswordPage as UserChangePassword } from '../pages/user/ChangePassword';
-
-// Admin / Management Dashboard
+// Core Dashboard & Management Pages (Sprint 1: SCRUM-198, SCRUM-201, SCRUM-202, SCRUM-205, SCRUM-206, SCRUM-207)
 import { Dashboard } from '../pages/dashboard/Dashboard';
-
-// Products (Management)
-import { ProductList } from '../pages/products/ProductList';
-import { ProductCreate } from '../pages/products/ProductCreate';
-import { ProductEdit } from '../pages/products/ProductEdit';
-import { ProductDetail } from '../pages/products/ProductDetail';
-
-// Inventory (Management)
-import { InventoryOverview } from '../pages/inventory/InventoryOverview';
-import { StockIn } from '../pages/inventory/StockIn';
-import { StockOut } from '../pages/inventory/StockOut';
-import { InventoryHistory } from '../pages/inventory/InventoryHistory';
-
-// Sales & POS (Management)
-import { POS } from '../pages/sales/POS';
-import { Orders } from '../pages/sales/Orders';
-import { OrderDetail } from '../pages/sales/OrderDetail';
-
-// Customers (Management)
-import { CustomerList } from '../pages/customers/CustomerList';
-import { CustomerDetail } from '../pages/customers/CustomerDetail';
-
-// Suppliers (Management)
-import { SupplierList } from '../pages/suppliers/SupplierList';
-import { SupplierDetail } from '../pages/suppliers/SupplierDetail';
-
-// Reports (Management)
-import { RevenueReport } from '../pages/reports/RevenueReport';
-import { SalesReport } from '../pages/reports/SalesReport';
-import { InventoryReport } from '../pages/reports/InventoryReport';
-
-// Users & Settings (Management)
 import { UserManagement } from '../pages/users/UserManagement';
 import { Settings } from '../pages/settings/Settings';
 
-// Smart root redirect based on Role
+// All 7 business roles allowed in Sprint 1 backoffice
+const ALL_BACKOFFICE_ROLES: UserRole[] = [
+  'Admin',
+  'SalesManager',
+  'SalesStaff',
+  'WarehouseManager',
+  'WarehouseStaff',
+  'Accountant',
+  'Director',
+  'Manager',
+  'Staff',
+];
+
+// Smart root redirect based on Role (SCRUM-198)
 const RootRedirect: React.FC = () => {
   const { role } = useAuth();
-  if (role === 'User') {
-    return <Navigate to="/user/dashboard" replace />;
-  }
-  if (role === 'Staff') {
-    return <Navigate to="/sales/pos" replace />;
-  }
-  return <Navigate to="/dashboard" replace />;
+  return <Navigate to={getHomePathForRole(role)} replace />;
 };
 
 export const AppRoutes: React.FC = () => {
@@ -79,6 +44,7 @@ export const AppRoutes: React.FC = () => {
       <Route element={<AuthLayout />}>
         <Route path="/login" element={<Login />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
       </Route>
 
       {/* Root redirect */}
@@ -91,225 +57,37 @@ export const AppRoutes: React.FC = () => {
         }
       />
 
-      {/* ================================================================ */}
-      {/* ROLE USER / NHÂN VIÊN BÁN HÀNG ROUTES (Portal dành riêng cho User) */}
-      {/* ================================================================ */}
-      <Route
-        path="/user"
-        element={
-          <ProtectedRoute allowedRoles={['User', 'Admin', 'Staff', 'Manager']}>
-            <UserLayout />
-          </ProtectedRoute>
-        }
-      >
-        <Route index element={<Navigate to="/user/dashboard" replace />} />
-        <Route path="dashboard" element={<UserDashboard />} />
-        <Route path="products" element={<UserProducts />} />
-        <Route path="products/:id" element={<UserProductDetail />} />
-        <Route path="cart" element={<UserCart />} />
-        <Route path="orders/create" element={<UserCreateOrder />} />
-        <Route path="orders" element={<UserOrders />} />
-        <Route path="orders/:id" element={<UserOrderDetail />} />
-        <Route path="notifications" element={<UserNotifications />} />
-        <Route path="profile" element={<UserProfile />} />
-        <Route path="change-password" element={<UserChangePassword />} />
-      </Route>
-
-      {/* Block User from Admin / Manager prefixes */}
+      {/* Redirect /admin to /users for Sprint 1 */}
       <Route
         path="/admin/*"
         element={
           <ProtectedRoute allowedRoles={['Admin']}>
-            <Navigate to="/dashboard" replace />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/manager/*"
-        element={
-          <ProtectedRoute allowedRoles={['Admin', 'Manager']}>
-            <Navigate to="/dashboard" replace />
+            <Navigate to="/users" replace />
           </ProtectedRoute>
         }
       />
 
       {/* ================================================================ */}
-      {/* MANAGEMENT & BACKOFFICE ROUTES (User role CANNOT access these)    */}
+      {/* SPRINT 1 BACKOFFICE ROUTES                                       */}
       {/* ================================================================ */}
       <Route
         element={
-          <ProtectedRoute allowedRoles={['Admin', 'Manager', 'Staff']}>
+          <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
             <DashboardLayout />
           </ProtectedRoute>
         }
       >
-        {/* Dashboard */}
+        {/* Tổng quan Dashboard - Phân quyền theo vai trò (SCRUM-198, SCRUM-202) */}
         <Route
           path="/dashboard"
           element={
-            <ProtectedRoute allowedRoles={['Admin', 'Manager', 'Staff']}>
+            <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
               <Dashboard />
             </ProtectedRoute>
           }
         />
 
-        {/* Products */}
-        <Route
-          path="/products"
-          element={
-            <ProtectedRoute allowedRoles={['Admin', 'Manager', 'Staff']}>
-              <ProductList />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/products/create"
-          element={
-            <ProtectedRoute allowedRoles={['Admin', 'Manager']}>
-              <ProductCreate />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/products/:id"
-          element={
-            <ProtectedRoute allowedRoles={['Admin', 'Manager', 'Staff']}>
-              <ProductDetail />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/products/:id/edit"
-          element={
-            <ProtectedRoute allowedRoles={['Admin', 'Manager']}>
-              <ProductEdit />
-            </ProtectedRoute>
-          }
-        />
-
-        {/* Inventory */}
-        <Route
-          path="/inventory"
-          element={
-            <ProtectedRoute allowedRoles={['Admin', 'Manager']}>
-              <InventoryOverview />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/inventory/stock-in"
-          element={
-            <ProtectedRoute allowedRoles={['Admin', 'Manager']}>
-              <StockIn />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/inventory/stock-out"
-          element={
-            <ProtectedRoute allowedRoles={['Admin', 'Manager']}>
-              <StockOut />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/inventory/history"
-          element={
-            <ProtectedRoute allowedRoles={['Admin', 'Manager']}>
-              <InventoryHistory />
-            </ProtectedRoute>
-          }
-        />
-
-        {/* Sales & Orders */}
-        <Route
-          path="/sales/pos"
-          element={
-            <ProtectedRoute allowedRoles={['Admin', 'Manager', 'Staff']}>
-              <POS />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/orders"
-          element={
-            <ProtectedRoute allowedRoles={['Admin', 'Manager', 'Staff']}>
-              <Orders />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/orders/:id"
-          element={
-            <ProtectedRoute allowedRoles={['Admin', 'Manager', 'Staff']}>
-              <OrderDetail />
-            </ProtectedRoute>
-          }
-        />
-
-        {/* Customers */}
-        <Route
-          path="/customers"
-          element={
-            <ProtectedRoute allowedRoles={['Admin', 'Manager', 'Staff']}>
-              <CustomerList />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/customers/:id"
-          element={
-            <ProtectedRoute allowedRoles={['Admin', 'Manager', 'Staff']}>
-              <CustomerDetail />
-            </ProtectedRoute>
-          }
-        />
-
-        {/* Suppliers */}
-        <Route
-          path="/suppliers"
-          element={
-            <ProtectedRoute allowedRoles={['Admin', 'Manager']}>
-              <SupplierList />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/suppliers/:id"
-          element={
-            <ProtectedRoute allowedRoles={['Admin', 'Manager']}>
-              <SupplierDetail />
-            </ProtectedRoute>
-          }
-        />
-
-        {/* Reports */}
-        <Route
-          path="/reports/revenue"
-          element={
-            <ProtectedRoute allowedRoles={['Admin', 'Manager']}>
-              <RevenueReport />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/reports/sales"
-          element={
-            <ProtectedRoute allowedRoles={['Admin', 'Manager']}>
-              <SalesReport />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/reports/inventory"
-          element={
-            <ProtectedRoute allowedRoles={['Admin', 'Manager']}>
-              <InventoryReport />
-            </ProtectedRoute>
-          }
-        />
-
-        {/* Users & Settings */}
+        {/* Quản lý Người dùng & Phân quyền - Chỉ Admin (SCRUM-205, SCRUM-206, SCRUM-207) */}
         <Route
           path="/users"
           element={
@@ -318,10 +96,12 @@ export const AppRoutes: React.FC = () => {
             </ProtectedRoute>
           }
         />
+
+        {/* Cài đặt & Bảo mật tài khoản / Đổi mật khẩu - Mọi vai trò (SCRUM-201) */}
         <Route
           path="/settings"
           element={
-            <ProtectedRoute allowedRoles={['Admin', 'Manager', 'Staff']}>
+            <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
               <Settings />
             </ProtectedRoute>
           }
