@@ -1,4 +1,4 @@
-export type UserRole = 'Admin' | 'Manager' | 'Staff';
+export type UserRole = 'Admin' | 'Manager' | 'Staff' | 'User';
 
 export type UserStatus = 'active' | 'inactive' | 'locked';
 
@@ -8,10 +8,17 @@ export interface User {
   email: string;
   password?: string;
   role: UserRole;
+  roles?: UserRole[];
   status: UserStatus;
   avatar: string;
   phone?: string;
   department?: string;
+  warehouse?: string;
+  territory?: string;
+  assignedDealersCount?: number;
+  lockReason?: string;
+  lockedAt?: string;
+  handoverTo?: string;
   lastLogin: string;
   createdAt: string;
 }

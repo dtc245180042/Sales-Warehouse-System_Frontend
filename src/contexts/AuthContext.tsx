@@ -9,6 +9,7 @@ interface AuthContextType {
   isLoading: boolean;
   login: (email: string, pass: string, remember?: boolean) => Promise<User>;
   logout: () => Promise<void>;
+  changePassword: (currentPass: string, newPass: string, revokeOthers?: boolean) => Promise<void>;
   switchRole: (role: UserRole) => void;
   canAccess: (allowedRoles: UserRole[]) => boolean;
 }
@@ -19,11 +20,53 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
+  const SESSION_TIMEOUT_MS = 30 * 60 * 1000; // 30 mins
+
+  const renewSession = () => {
+    localStorage.setItem('kv_session_expires_at', String(Date.now() + SESSION_TIMEOUT_MS));
+  };
+
   useEffect(() => {
     // Initialize currentUser from localStorage or initial user
     const currentUser = authService.getCurrentUser();
     setUser(currentUser);
+    if (currentUser) {
+      renewSession();
+    }
     setIsLoading(false);
+
+    // Event listeners to automatically renew session on activity (SCRUM-199)
+    const handleActivity = () => {
+      if (localStorage.getItem('kv_current_user')) {
+        renewSession();
+      }
+    };
+
+    window.addEventListener('mousedown', handleActivity);
+    window.addEventListener('keydown', handleActivity);
+    window.addEventListener('scroll', handleActivity);
+    window.addEventListener('touchstart', handleActivity);
+
+    // Check expiration every 10 seconds
+    const interval = setInterval(() => {
+      const activeUser = localStorage.getItem('kv_current_user');
+      const expiresAt = Number(localStorage.getItem('kv_session_expires_at') || '0');
+
+      if (activeUser && expiresAt && Date.now() > expiresAt) {
+        // Session expired
+        authService.logout();
+        setUser(null);
+        window.location.href = '/login?expired=1';
+      }
+    }, 10000);
+
+    return () => {
+      window.removeEventListener('mousedown', handleActivity);
+      window.removeEventListener('keydown', handleActivity);
+      window.removeEventListener('scroll', handleActivity);
+      window.removeEventListener('touchstart', handleActivity);
+      clearInterval(interval);
+    };
   }, []);
 
   const login = async (email: string, pass: string, remember: boolean = true): Promise<User> => {
@@ -31,6 +74,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const loggedUser = await authService.login(email, pass, remember);
       setUser(loggedUser);
+      renewSession();
       return loggedUser;
     } finally {
       setIsLoading(false);
@@ -40,11 +84,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = async (): Promise<void> => {
     setIsLoading(true);
     try {
+      localStorage.removeItem('kv_session_expires_at');
       await authService.logout();
       setUser(null);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const changePassword = async (currentPass: string, newPass: string, revokeOthers: boolean = true): Promise<void> => {
+    await authService.changePassword(currentPass, newPass, revokeOthers);
+    const updatedUser = authService.getCurrentUser();
+    setUser(updatedUser);
   };
 
   const switchRole = (newRole: UserRole) => {
@@ -69,6 +120,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isLoading,
         login,
         logout,
+        changePassword,
         switchRole,
         canAccess,
       }}

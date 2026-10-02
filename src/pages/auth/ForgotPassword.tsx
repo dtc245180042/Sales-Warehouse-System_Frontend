@@ -58,7 +58,7 @@ export const ForgotPassword: React.FC = () => {
           </div>
           <h3 className="text-lg font-bold text-slate-900 dark:text-white">Email đã được gửi!</h3>
           <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
-            Chúng tôi đã gửi hướng dẫn đặt lại mật khẩu đến <span className="font-semibold text-slate-900 dark:text-slate-200">{sentEmail}</span>. Vui lòng kiểm tra hộp thư đến hoặc thư rác.
+            Nếu email <span className="font-semibold text-slate-900 dark:text-slate-200">{sentEmail}</span> tồn tại trong hệ thống, hướng dẫn đặt lại mật khẩu đã được gửi đến hộp thư. Liên kết có hiệu lực tối đa <strong className="text-indigo-600 dark:text-indigo-400 font-semibold">30 phút</strong> và chỉ sử dụng được <strong className="text-indigo-600 dark:text-indigo-400 font-semibold">một lần duy nhất</strong> vì mục đích an toàn.
           </p>
           <div className="pt-4">
             <Link to="/login">

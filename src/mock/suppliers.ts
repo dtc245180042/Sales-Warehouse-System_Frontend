@@ -8,7 +8,7 @@ export const initialSuppliers: Supplier[] = [
     contactPerson: 'Trịnh Hoài Nam',
     phone: '02838221199',
     email: 'b2b@apple-dist.vn',
-    address: 'Tầng 18, Bitexco Financial Tower, Quận 1, TP. HCM',
+    address: '',
     totalImports: 48,
     totalSpent: 1250000000,
     createdAt: '2025-01-05',

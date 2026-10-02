@@ -10,6 +10,7 @@ import {
   CheckCircle2,
   Sun,
   Moon,
+  Info,
 } from 'lucide-react';
 import { PageContainer } from '../../components/layout/PageContainer';
 import { Button } from '../../components/common/Button';
@@ -19,14 +20,14 @@ import { useToast } from '../../contexts/ToastContext';
 import { getStorageItem, setStorageItem } from '../../services/storage';
 
 export const Settings: React.FC = () => {
-  const { user } = useAuth();
+  const { user, role } = useAuth();
   const { theme, setTheme } = useTheme();
   const { showToast } = useToast();
 
   const [activeTab, setActiveTab] = useState<'profile' | 'store' | 'tax' | 'notif' | 'appearance' | 'security'>('profile');
 
   // Store settings local state
-  const [storeName, setStoreName] = useState(() => getStorageItem('kv_store_name', 'Hệ Thống KhoVận Pro Showroom'));
+  const [storeName, setStoreName] = useState(() => getStorageItem('kv_store_name', 'Sales Warehouse System Showroom'));
   const [storeAddress, setStoreAddress] = useState(() => getStorageItem('kv_store_address', '128 Đường Lê Lợi, Phường Bến Nghé, Quận 1, TP. HCM'));
   const [storePhone, setStorePhone] = useState(() => getStorageItem('kv_store_phone', '1900 6868'));
   const [storeTaxId, setStoreTaxId] = useState(() => getStorageItem('kv_store_tax', '0314859620'));
@@ -53,15 +54,47 @@ export const Settings: React.FC = () => {
     showToast('Đã cập nhật thông tin cửa hàng thành công!', 'success');
   };
 
-  const handleSaveSecurity = (e: React.FormEvent) => {
+  const { changePassword } = useAuth();
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [revokeOthers, setRevokeOthers] = useState(true);
+  const [isChangingPass, setIsChangingPass] = useState(false);
+
+  const handleSaveSecurity = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newPassword || newPassword.length < 6) {
-      showToast('Mật khẩu mới phải có tối thiểu 6 ký tự', 'warning');
+    if (!oldPassword) {
+      showToast('Vui lòng nhập mật khẩu hiện tại.', 'warning');
       return;
     }
-    setOldPassword('');
-    setNewPassword('');
-    showToast('Đã đổi mật khẩu tài khoản thành công!', 'success');
+    if (newPassword.length < 8) {
+      showToast('Mật khẩu mới phải có tối thiểu 8 ký tự.', 'warning');
+      return;
+    }
+    if (!/[a-zA-Z]/.test(newPassword) || !/[0-9]/.test(newPassword)) {
+      showToast('Mật khẩu mới phải chứa cả chữ cái và chữ số.', 'warning');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      showToast('Mật khẩu xác nhận không khớp.', 'warning');
+      return;
+    }
+
+    setIsChangingPass(true);
+    try {
+      await changePassword(oldPassword, newPassword, revokeOthers);
+      setOldPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      showToast(
+        revokeOthers
+          ? 'Đã đổi mật khẩu thành công! Đã thu hồi các phiên đăng nhập khác.'
+          : 'Đã cập nhật mật khẩu thành công!',
+        'success'
+      );
+    } catch (err: any) {
+      showToast(err.message || 'Đổi mật khẩu thất bại.', 'error');
+    } finally {
+      setIsChangingPass(false);
+    }
   };
 
   const tabs = [
@@ -184,9 +217,24 @@ export const Settings: React.FC = () => {
 
           {activeTab === 'store' && (
             <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-card">
-              <h3 className="text-base font-bold text-slate-900 dark:text-white mb-4">
-                Thông Tin Thương Hiệu & Cửa Hàng
-              </h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                  Thông Tin Thương Hiệu & Cửa Hàng
+                </h3>
+                {role !== 'Admin' && role !== 'Manager' && (
+                  <span className="text-xs px-2.5 py-1 rounded-full bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 font-semibold border border-amber-200 dark:border-amber-800">
+                    Chế độ xem thông tin
+                  </span>
+                )}
+              </div>
+
+              {role !== 'Admin' && role !== 'Manager' && (
+                <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 flex items-center gap-2.5 mb-5 text-xs text-slate-600 dark:text-slate-300">
+                  <Info className="w-4 h-4 text-indigo-500 shrink-0" />
+                  <span>Tài khoản của bạn có quyền xem thông tin cửa hàng. Chỉ tài khoản <strong>Admin</strong> hoặc <strong>Manager</strong> mới có quyền cập nhật các thông tin này.</span>
+                </div>
+              )}
+
               <form onSubmit={handleSaveStore} className="space-y-4">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
@@ -196,7 +244,8 @@ export const Settings: React.FC = () => {
                     type="text"
                     value={storeName}
                     onChange={(e) => setStoreName(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm focus:ring-2 focus:ring-indigo-500"
+                    disabled={role !== 'Admin' && role !== 'Manager'}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm focus:ring-2 focus:ring-indigo-500 disabled:bg-slate-100 dark:disabled:bg-slate-800/80 disabled:cursor-not-allowed disabled:text-slate-500"
                   />
                 </div>
 
@@ -208,7 +257,8 @@ export const Settings: React.FC = () => {
                     type="text"
                     value={storeAddress}
                     onChange={(e) => setStoreAddress(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm focus:ring-2 focus:ring-indigo-500"
+                    disabled={role !== 'Admin' && role !== 'Manager'}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm focus:ring-2 focus:ring-indigo-500 disabled:bg-slate-100 dark:disabled:bg-slate-800/80 disabled:cursor-not-allowed disabled:text-slate-500"
                   />
                 </div>
 
@@ -221,7 +271,8 @@ export const Settings: React.FC = () => {
                       type="text"
                       value={storePhone}
                       onChange={(e) => setStorePhone(e.target.value)}
-                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm focus:ring-2 focus:ring-indigo-500"
+                      disabled={role !== 'Admin' && role !== 'Manager'}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm focus:ring-2 focus:ring-indigo-500 disabled:bg-slate-100 dark:disabled:bg-slate-800/80 disabled:cursor-not-allowed disabled:text-slate-500"
                     />
                   </div>
                   <div>
@@ -232,16 +283,19 @@ export const Settings: React.FC = () => {
                       type="text"
                       value={storeTaxId}
                       onChange={(e) => setStoreTaxId(e.target.value)}
-                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm focus:ring-2 focus:ring-indigo-500 font-mono"
+                      disabled={role !== 'Admin' && role !== 'Manager'}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm focus:ring-2 focus:ring-indigo-500 font-mono disabled:bg-slate-100 dark:disabled:bg-slate-800/80 disabled:cursor-not-allowed disabled:text-slate-500"
                     />
                   </div>
                 </div>
 
-                <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
-                  <Button variant="primary" type="submit" leftIcon={<Save className="w-4 h-4" />}>
-                    Lưu thông tin cửa hàng
-                  </Button>
-                </div>
+                {(role === 'Admin' || role === 'Manager') && (
+                  <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
+                    <Button variant="primary" type="submit" leftIcon={<Save className="w-4 h-4" />}>
+                      Lưu thông tin cửa hàng
+                    </Button>
+                  </div>
+                )}
               </form>
             </div>
           )}
@@ -355,35 +409,64 @@ export const Settings: React.FC = () => {
               <form onSubmit={handleSaveSecurity} className="space-y-4 max-w-md">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    Mật khẩu hiện tại
+                    Mật khẩu hiện tại <span className="text-rose-500">*</span>
                   </label>
                   <input
                     type="password"
                     value={oldPassword}
                     onChange={(e) => setOldPassword(e.target.value)}
-                    placeholder="••••••••"
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm focus:ring-2 focus:ring-indigo-500"
+                    placeholder="Nhập mật khẩu hiện tại (hoặc mật khẩu tạm)"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500"
                     required
                   />
                 </div>
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    Mật khẩu mới
+                    Mật khẩu mới <span className="text-rose-500">*</span>
                   </label>
                   <input
                     type="password"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="Tối thiểu 6 ký tự"
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm focus:ring-2 focus:ring-indigo-500"
+                    placeholder="Tối thiểu 8 ký tự (chứa chữ và số)"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500"
+                    required
+                  />
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                    Yêu cầu: Tối thiểu 8 ký tự, bao gồm cả chữ cái (a-z, A-Z) và chữ số (0-9).
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Xác nhận mật khẩu mới <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="Nhập lại mật khẩu mới"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500"
                     required
                   />
                 </div>
 
                 <div className="pt-2">
-                  <Button variant="primary" type="submit">
-                    Cập nhật mật khẩu
+                  <label className="flex items-center gap-2 cursor-pointer text-xs text-slate-700 dark:text-slate-300 font-medium">
+                    <input
+                      type="checkbox"
+                      checked={revokeOthers}
+                      onChange={(e) => setRevokeOthers(e.target.checked)}
+                      className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300 dark:border-slate-700"
+                    />
+                    <span>Thu hồi tất cả các phiên đăng nhập khác sau khi đổi mật khẩu</span>
+                  </label>
+                </div>
+
+                <div className="pt-3">
+                  <Button variant="primary" type="submit" isLoading={isChangingPass}>
+                    Cập nhật mật khẩu & Thu hồi phiên
                   </Button>
                 </div>
               </form>

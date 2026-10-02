@@ -7,3 +7,6 @@ Mật khẩu: manager@1234
 Staff:
 Email: staff@khovanpro.vn
 Mật khẩu: staff@1234
+User:
+Email: user@khovanpro.vn
+Mật khẩu: user@1234

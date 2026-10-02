@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Link, useNavigate } from 'react-router-dom';
-import { Mail, Lock, Eye, EyeOff, LogIn, Warehouse, Shield, CheckCircle } from 'lucide-react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Mail, Lock, Eye, EyeOff, LogIn, Warehouse, Shield, CheckCircle, AlertTriangle } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
 import { Button } from '../../components/common/Button';
@@ -20,8 +20,10 @@ export const Login: React.FC = () => {
   const { login } = useAuth();
   const { showToast } = useToast();
   const navigate = useNavigate();
+  const location = useLocation();
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const isExpired = new URLSearchParams(location.search).get('expired') === '1';
 
   const {
     register,
@@ -42,7 +44,7 @@ export const Login: React.FC = () => {
     try {
       const user = await login(data.email, data.password, data.rememberMe);
       showToast(`Chào mừng ${user.name} đã quay trở lại hệ thống!`, 'success', 'Đăng nhập thành công');
-      const targetPath = user.role === 'Staff' ? '/sales/pos' : '/dashboard';
+      const targetPath = user.role === 'User' ? '/user/dashboard' : user.role === 'Staff' ? '/sales/pos' : '/dashboard';
       navigate(targetPath);
     } catch (error: any) {
       showToast(error.message || 'Email hoặc mật khẩu không chính xác', 'error', 'Đăng nhập thất bại');
@@ -53,14 +55,6 @@ export const Login: React.FC = () => {
 
   return (
     <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-soft p-8 sm:p-10 transition-all">
-      {/* Brand icon for mobile */}
-      <div className="lg:hidden flex items-center gap-3 mb-6">
-        <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-md">
-          <Warehouse className="w-5 h-5" />
-        </div>
-        <span className="text-xl font-bold text-slate-900 dark:text-white">KhoVận Pro</span>
-      </div>
-
       <div className="mb-8">
         <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
           Đăng nhập
@@ -69,6 +63,16 @@ export const Login: React.FC = () => {
           Đăng nhập để quản lý kho và bán hàng
         </p>
       </div>
+
+      {isExpired && (
+        <div className="mb-6 p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 flex items-start gap-3 text-amber-800 dark:text-amber-200">
+          <AlertTriangle className="w-5 h-5 shrink-0 text-amber-500 mt-0.5" />
+          <div className="text-xs sm:text-sm">
+            <span className="font-semibold block mb-0.5">Phiên làm việc đã hết hạn</span>
+            Phiên đăng nhập đã tự động kết thúc do không có tương tác để bảo đảm an toàn. Vui lòng đăng nhập lại.
+          </div>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
         {/* Email field */}

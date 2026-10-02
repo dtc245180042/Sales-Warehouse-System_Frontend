@@ -13,12 +13,14 @@ import {
   Shield,
   CheckCircle2,
   AlertTriangle,
+  KeyRound,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useToast } from '../../contexts/ToastContext';
 import { Breadcrumb } from './Breadcrumb';
 import { ConfirmDialog } from '../common/ConfirmDialog';
+import { ChangePasswordModal } from '../common/ChangePasswordModal';
 import { UserRole } from '../../types/User';
 
 interface HeaderProps {
@@ -39,8 +41,9 @@ export const Header: React.FC<HeaderProps> = ({
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
+  const [isChangePassModalOpen, setIsChangePassModalOpen] = useState(false);
   const [notifications, setNotifications] = useState([
-    { id: '1', title: 'Cảnh báo tồn kho', msg: 'Pin Sạc Dự Phòng Anker 737 đã hết hàng', time: '10 phút trước', unread: true },
+    { id: '1', title: 'Cảnh báo tồn kho', msg: 'Bàn Phím Cơ Keychron K2 Pro đã hết hàng', time: '10 phút trước', unread: true },
     { id: '2', title: 'Đơn hàng mới', msg: 'Đơn hàng DH-2026-001 trị giá 32.180.000₫ vừa tạo', time: '25 phút trước', unread: true },
     { id: '3', title: 'Nhập kho thành công', msg: 'Phiếu PNK-2026-001 (50 sp) đã hoàn tất', time: '1 giờ trước', unread: false },
   ]);
@@ -98,7 +101,7 @@ export const Header: React.FC<HeaderProps> = ({
           <div className="hidden md:flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-300">
             <Shield className="w-3.5 h-3.5 ml-1.5 text-indigo-500" />
             <span className="text-[11px] text-slate-400 mr-1">Role:</span>
-            {(['Admin', 'Manager', 'Staff'] as UserRole[]).map((r) => (
+            {(['Admin', 'Manager', 'Staff', 'User'] as UserRole[]).map((r) => (
               <button
                 key={r}
                 onClick={() => switchRole(r)}
@@ -205,8 +208,8 @@ export const Header: React.FC<HeaderProps> = ({
                 <div className="text-xs font-bold text-slate-800 dark:text-slate-200 max-w-[120px] truncate">
                   {user?.name || 'Người dùng'}
                 </div>
-                <div className="text-[10px] font-medium text-slate-400 capitalize">
-                  {role}
+                <div className="text-[10px] font-medium text-slate-400 truncate max-w-[150px]">
+                  {role} • {user?.warehouse || user?.department || 'Kho Tổng TP. HCM'}
                 </div>
               </div>
               <ChevronDown className="w-3.5 h-3.5 text-slate-400 hidden sm:block" />
@@ -223,6 +226,16 @@ export const Header: React.FC<HeaderProps> = ({
                   <button
                     onClick={() => {
                       setIsProfileOpen(false);
+                      setIsChangePassModalOpen(true);
+                    }}
+                    className="w-full flex items-center gap-2.5 px-4 py-2 text-xs text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 transition-colors font-semibold"
+                  >
+                    <KeyRound className="w-4 h-4 text-indigo-500" />
+                    <span>Đổi mật khẩu tài khoản</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setIsProfileOpen(false);
                       navigate('/settings');
                     }}
                     className="w-full flex items-center gap-2.5 px-4 py-2 text-xs text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
@@ -230,16 +243,18 @@ export const Header: React.FC<HeaderProps> = ({
                     <Settings className="w-4 h-4 text-slate-400" />
                     <span>Cài đặt tài khoản</span>
                   </button>
-                  <button
-                    onClick={() => {
-                      setIsProfileOpen(false);
-                      navigate('/users');
-                    }}
-                    className="w-full flex items-center gap-2.5 px-4 py-2 text-xs text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-                  >
-                    <UserIcon className="w-4 h-4 text-slate-400" />
-                    <span>Danh sách nhân viên</span>
-                  </button>
+                  {role === 'Admin' && (
+                    <button
+                      onClick={() => {
+                        setIsProfileOpen(false);
+                        navigate('/users');
+                      }}
+                      className="w-full flex items-center gap-2.5 px-4 py-2 text-xs text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                    >
+                      <UserIcon className="w-4 h-4 text-slate-400" />
+                      <span>Danh sách nhân viên</span>
+                    </button>
+                  )}
                 </div>
 
                 <div className="border-t border-slate-100 dark:border-slate-800 pt-1">
@@ -260,13 +275,19 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </header>
 
+      {/* Change Password Modal */}
+      <ChangePasswordModal
+        isOpen={isChangePassModalOpen}
+        onClose={() => setIsChangePassModalOpen(false)}
+      />
+
       {/* Confirm Logout Dialog */}
       <ConfirmDialog
         isOpen={isLogoutModalOpen}
         onClose={() => setIsLogoutModalOpen(false)}
         onConfirm={handleLogout}
         title="Đăng xuất tài khoản"
-        message="Bạn có chắc chắn muốn đăng xuất khỏi hệ thống KhoVận Pro không?"
+        message="Bạn có chắc chắn muốn đăng xuất khỏi hệ thống không?"
         confirmText="Đăng xuất"
         variant="danger"
       />

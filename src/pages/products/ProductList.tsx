@@ -24,10 +24,12 @@ import { productService } from '../../services/productService';
 import { Product } from '../../types/Product';
 import { productCategories } from '../../mock/products';
 import { useToast } from '../../contexts/ToastContext';
+import { useAuth } from '../../contexts/AuthContext';
 
 export const ProductList: React.FC = () => {
   const navigate = useNavigate();
   const { showToast } = useToast();
+  const { role } = useAuth();
 
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -118,7 +120,10 @@ export const ProductList: React.FC = () => {
     showToast('Đã xuất file CSV thành công!', 'success');
   };
 
-  const columns: Column<Product>[] = [
+  const isManagerOrAdmin = role === 'Admin' || role === 'Manager';
+
+  const columns: Column<Product>[] = useMemo(() => {
+    const rawCols: Column<Product>[] = [
     {
       key: 'sku',
       header: 'Mã SKU',
@@ -259,6 +264,13 @@ export const ProductList: React.FC = () => {
       ),
     },
   ];
+
+  // SCRUM-202: Giá vốn và biên lợi nhuận chỉ hiển thị với vai trò Quản lý (Admin / Manager)
+  if (!isManagerOrAdmin) {
+    return rawCols.filter((col) => col.key !== 'costPrice');
+  }
+  return rawCols;
+}, [isManagerOrAdmin]);
 
   return (
     <PageContainer

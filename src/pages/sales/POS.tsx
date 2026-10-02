@@ -562,8 +562,8 @@ export const POS: React.FC = () => {
           {/* Printable receipt container */}
           <div id="printable-receipt" className="p-4 bg-white text-slate-900 text-xs font-mono">
             <div className="text-center pb-3 border-b border-dashed border-slate-300">
-              <h2 className="text-base font-bold uppercase tracking-wider">KhoVận Pro POS</h2>
-              <p className="text-[11px] text-slate-500">Hệ Thống Kho & Bán Hàng Thông Minh</p>
+              <h2 className="text-base font-bold uppercase tracking-wider">Sales Warehouse System POS</h2>
+              <p className="text-[11px] text-slate-500">Hệ Thống Quản Lý Kho & Bán Hàng</p>
               <p className="text-[10px] text-slate-400 mt-1">Đ/c: 128 Lê Lợi, Bến Nghé, Q1, TP. HCM</p>
               <p className="text-[10px] text-slate-400">Hotline: 1900 6868</p>
             </div>

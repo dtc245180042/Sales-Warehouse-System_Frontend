@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { UserRole } from '../../types/User';
+import { Logo } from '../common/Logo';
 
 interface SidebarProps {
   isMobileOpen: boolean;
@@ -68,7 +69,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           title: 'Tổng quan Dashboard',
           path: '/dashboard',
           icon: <LayoutDashboard className="w-5 h-5" />,
-          allowedRoles: ['Admin', 'Manager'],
+          allowedRoles: ['Admin', 'Manager', 'Staff', 'User'],
         },
       ],
     },
@@ -79,7 +80,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           title: 'Sản phẩm',
           path: '/products',
           icon: <Boxes className="w-5 h-5" />,
-          allowedRoles: ['Admin', 'Manager'],
+          allowedRoles: ['Admin', 'Manager', 'Staff', 'User'],
         },
         {
           title: 'Kho vận',
@@ -101,13 +102,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
           title: 'Điểm bán hàng (POS)',
           path: '/sales/pos',
           icon: <ShoppingCart className="w-5 h-5" />,
-          allowedRoles: ['Admin', 'Manager', 'Staff'],
+          allowedRoles: ['Admin', 'Manager', 'Staff', 'User'],
         },
         {
           title: 'Quản lý đơn hàng',
           path: '/orders',
           icon: <Receipt className="w-5 h-5" />,
-          allowedRoles: ['Admin', 'Manager', 'Staff'],
+          allowedRoles: ['Admin', 'Manager', 'Staff', 'User'],
         },
       ],
     },
@@ -118,7 +119,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           title: 'Khách hàng',
           path: '/customers',
           icon: <Users2 className="w-5 h-5" />,
-          allowedRoles: ['Admin', 'Manager', 'Staff'],
+          allowedRoles: ['Admin', 'Manager', 'Staff', 'User'],
         },
         {
           title: 'Nhà cung cấp',
@@ -153,10 +154,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
           allowedRoles: ['Admin'],
         },
         {
-          title: 'Cài đặt hệ thống',
+          title: 'Cài đặt tài khoản',
           path: '/settings',
           icon: <Settings className="w-5 h-5" />,
-          allowedRoles: ['Admin', 'Manager'],
+          allowedRoles: ['Admin', 'Manager', 'Staff', 'User'],
         },
       ],
     },
@@ -166,20 +167,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     <div className="flex flex-col h-full bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 transition-all duration-300">
       {/* Brand Header */}
       <div className="h-16 flex items-center justify-between px-4 border-b border-slate-100 dark:border-slate-800 shrink-0">
-        <NavLink to="/dashboard" className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center text-white shadow-md shadow-indigo-500/20">
-            <Warehouse className="w-5 h-5" />
-          </div>
-          {!isCollapsed && (
-            <div>
-              <span className="font-extrabold text-base tracking-tight bg-gradient-to-r from-indigo-600 to-violet-600 bg-clip-text text-transparent">
-                KhoVận Pro
-              </span>
-              <span className="block text-[10px] uppercase font-bold text-slate-400 tracking-wider">
-                OMS Enterprise
-              </span>
-            </div>
-          )}
+        <NavLink to="/dashboard" className="flex items-center gap-2">
+          <Logo size="md" showText={!isCollapsed} />
         </NavLink>
         {isMobileOpen && (
           <button

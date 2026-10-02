@@ -61,6 +61,21 @@
 }
 
 /* Animations for popups, toasts and dropdowns */
+@keyframes toastSlideUp {
+  0% {
+    opacity: 0;
+    transform: translateY(20px) scale(0.96);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(-3px) scale(1.01);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 @keyframes toastSlideDown {
   0% {
     opacity: 0;
@@ -96,6 +111,10 @@
     opacity: 1;
     transform: translateX(0);
   }
+}
+
+.animate-toast-up {
+  animation: toastSlideUp 0.32s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 .animate-toast-down {
