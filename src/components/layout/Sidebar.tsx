@@ -6,6 +6,7 @@ import {
   Settings,
   ChevronDown,
   X,
+  Activity,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { UserRole } from '../../types/User';
@@ -75,6 +76,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
           title: 'Người dùng & Phân quyền',
           path: '/users',
           icon: <ShieldCheck className="w-5 h-5" />,
+          allowedRoles: ['Admin'],
+        },
+        {
+          title: 'Nhật ký hệ thống',
+          path: '/settings/logs',
+          icon: <Activity className="w-5 h-5" />,
           allowedRoles: ['Admin'],
         },
         {

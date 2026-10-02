@@ -152,8 +152,8 @@ assert(afterLogout.token === null && afterLogout.user === null, 'TC-199-04', 'Sa
 // ── SCRUM-200 ───────────────────────────────────────────
 suite('SCRUM-200: Dat lai mat khau qua email');
 
-function mockForgotPwd(_email) { return { msg: 'Neu email ton tai, huong dan da duoc gui.' }; }
-assert(mockForgotPwd('admin@khovanpro.vn').msg === mockForgotPwd('khong_ton_tai@test.vn').msg, 'TC-200-01+02', 'Email ton tai/khong ton tai → cung 1 thong bao (chong liet ke tai khoan)');
+function mockForgotPwd() { return { msg: 'Neu email ton tai, huong dan da duoc gui.' }; }
+assert(mockForgotPwd().msg === mockForgotPwd().msg, 'TC-200-01+02', 'Email ton tai/khong ton tai → cung 1 thong bao (chong liet ke tai khoan)');
 const resetToken = `reset_token_${Date.now()}`;
 usedResetTokens.push(resetToken);
 assert(usedResetTokens.includes(resetToken), 'TC-200-04a', 'Sau khi dung reset link → token duoc danh dau da su dung');
@@ -222,18 +222,18 @@ assert(whStaff.warehouse && whStaff.warehouse.length > 0, 'TC-203-05', 'Warehous
 // ── SCRUM-204 ───────────────────────────────────────────
 suite('SCRUM-204: Trang bao loi dung chung');
 
-function getErrorConfig(code, role, pathname) {
+function getErrorConfig(code, role) {
   const is403 = code === '403'; const is500 = code === '500';
   return {
     title: is403 ? '403-title' : is500 ? '500-title' : '404-title',
     homePath: role === 'Admin' ? '/users' : '/dashboard',
   };
 }
-assert(getErrorConfig('403','SalesStaff','/users').title === '403-title', 'TC-204-01', 'Loi 403 → title dung cho 403');
-assert(getErrorConfig('404','SalesStaff','/x').title    === '404-title', 'TC-204-02', 'Loi 404 → title dung cho 404');
-assert(getErrorConfig('500','Admin','/x').title         === '500-title', 'TC-204-06', 'Loi 500 → title dung cho 500 (SCRUM-204 mo rong)');
-assert(getErrorConfig('404','Admin','/x').homePath      === '/users',     'TC-204-04', 'Admin xem trang loi → nut Home tro ve /users');
-assert(getErrorConfig('404','SalesStaff','/x').homePath === '/dashboard', 'TC-204-05', 'SalesStaff xem trang loi → nut Home tro ve /dashboard');
+assert(getErrorConfig('403','SalesStaff').title === '403-title', 'TC-204-01', 'Loi 403 → title dung cho 403');
+assert(getErrorConfig('404','SalesStaff').title    === '404-title', 'TC-204-02', 'Loi 404 → title dung cho 404');
+assert(getErrorConfig('500','Admin').title         === '500-title', 'TC-204-06', 'Loi 500 → title dung cho 500 (SCRUM-204 mo rong)');
+assert(getErrorConfig('404','Admin').homePath      === '/users',     'TC-204-04', 'Admin xem trang loi → nut Home tro ve /users');
+assert(getErrorConfig('404','SalesStaff').homePath === '/dashboard', 'TC-204-05', 'SalesStaff xem trang loi → nut Home tro ve /dashboard');
 
 // ── SCRUM-205 ───────────────────────────────────────────
 suite('SCRUM-205: Tao, sua va tim kiem tai khoan nguoi dung');

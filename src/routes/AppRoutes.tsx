@@ -17,6 +17,7 @@ import { ErrorPage } from '../pages/error/ErrorPage';
 import { Dashboard } from '../pages/dashboard/Dashboard';
 import { UserManagement } from '../pages/users/UserManagement';
 import { Settings } from '../pages/settings/Settings';
+import { SystemLogs } from '../pages/settings/SystemLogs';
 
 // All 7 business roles allowed in Sprint 1 backoffice
 const ALL_BACKOFFICE_ROLES: UserRole[] = [
@@ -103,6 +104,16 @@ export const AppRoutes: React.FC = () => {
           element={
             <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
               <Settings />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Nhật ký hệ thống - SCRUM-212 / SCRUM-373 */}
+        <Route
+          path="/settings/logs"
+          element={
+            <ProtectedRoute allowedRoles={['Admin']}>
+              <SystemLogs />
             </ProtectedRoute>
           }
         />
