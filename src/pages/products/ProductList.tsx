@@ -173,6 +173,23 @@ export const ProductList: React.FC = () => {
       ),
     },
     {
+      key: 'unit',
+      header: 'ĐVT / Quy Cách',
+      sortable: true,
+      render: (p) => (
+        <div>
+          <span className="font-semibold text-slate-800 dark:text-slate-200 text-xs">
+            {p.unit}
+          </span>
+          {p.packagingSpecification && (
+            <div className="text-[11px] text-slate-400 mt-0.5">
+              {p.packagingSpecification}
+            </div>
+          )}
+        </div>
+      ),
+    },
+    {
       key: 'costPrice',
       header: 'Giá Nhập',
       sortable: true,

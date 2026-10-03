@@ -6,6 +6,7 @@ import {
   Settings,
   ChevronDown,
   X,
+  Package,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { UserRole } from '../../types/User';
@@ -53,6 +54,28 @@ export const Sidebar: React.FC<SidebarProps> = ({
           title: 'Tổng quan Dashboard',
           path: '/dashboard',
           icon: <LayoutDashboard className="w-5 h-5" />,
+          allowedRoles: [
+            'Admin',
+            'SalesManager',
+            'SalesStaff',
+            'WarehouseManager',
+            'WarehouseStaff',
+            'Accountant',
+            'Director',
+            'Manager',
+            'Staff',
+            'User',
+          ],
+        },
+      ],
+    },
+    {
+      heading: 'DANH MỤC & SẢN PHẨM',
+      items: [
+        {
+          title: 'Danh mục sản phẩm',
+          path: '/products',
+          icon: <Package className="w-5 h-5" />,
           allowedRoles: [
             'Admin',
             'SalesManager',

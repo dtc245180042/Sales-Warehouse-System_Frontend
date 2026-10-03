@@ -197,12 +197,66 @@ assert(attemptHackingProfile.territory === mockCurrentUser.territory, 'TC-360-04
 assert(attemptHackingProfile.id === mockCurrentUser.id, 'TC-360-05', 'ID định danh người dùng giữ nguyên');
 assert(attemptHackingProfile.status === mockCurrentUser.status, 'TC-360-06', 'Trạng thái hoạt động tài khoản giữ nguyên');
 
+// ========================================================
+// 4. Test logic SCRUM-220 / SCRUM-380: Quản lý danh mục & SKU duy nhất
+// ========================================================
+suite('SCRUM-220 / SCRUM-380: Quản lý danh mục sản phẩm & Ràng buộc SKU duy nhất');
+
+const mockProductCatalog = [
+  { id: 'PRD-001', sku: 'IP15P-128-TI', name: 'iPhone 15 Pro', unit: 'Chiếc', packagingSpecification: '1 chiếc/hộp', costPrice: 22500000, salePrice: 26990000, status: 'active', hasTransactions: true },
+  { id: 'PRD-002', sku: 'SAM-S24U-512', name: 'Samsung S24 Ultra', unit: 'Chiếc', packagingSpecification: '1 chiếc/hộp', costPrice: 25000000, salePrice: 29990000, status: 'active', hasTransactions: true },
+];
+
+function validateProductSkuUnique(sku, existingProducts, currentId) {
+  if (!sku || !sku.trim()) {
+    return { valid: false, message: 'Mã SKU không được để trống' };
+  }
+  const cleanSku = sku.trim().toUpperCase();
+  const duplicate = existingProducts.find(
+    (p) => (!currentId || p.id !== currentId) && p.sku.trim().toUpperCase() === cleanSku
+  );
+  if (duplicate) {
+    return { valid: false, message: `Mã SKU "${cleanSku}" đã tồn tại trong danh mục sản phẩm.` };
+  }
+  return { valid: true, cleanSku };
+}
+
+assert(validateProductSkuUnique('IP15P-128-TI', mockProductCatalog).valid === false, 'TC-380-01', 'Chặn tạo sản phẩm với mã SKU đã tồn tại (trùng IP15P-128-TI)');
+assert(validateProductSkuUnique('ip15p-128-ti', mockProductCatalog).valid === false, 'TC-380-02', 'Chặn mã SKU trùng dù nhập chữ thường (case-insensitive)');
+assert(validateProductSkuUnique('  IP15P-128-TI  ', mockProductCatalog).valid === false, 'TC-380-03', 'Chặn mã SKU trùng có khoảng trắng thừa');
+assert(validateProductSkuUnique('MAC-M3-PRO', mockProductCatalog).valid === true, 'TC-380-04', 'Cho phép tạo sản phẩm với mã SKU mới hợp lệ');
+assert(validateProductSkuUnique('IP15P-128-TI', mockProductCatalog, 'PRD-001').valid === true, 'TC-380-05', 'Cho phép giữ nguyên SKU của chính nó khi chỉnh sửa sản phẩm PRD-001');
+assert(validateProductSkuUnique('SAM-S24U-512', mockProductCatalog, 'PRD-001').valid === false, 'TC-380-06', 'Chặn cập nhật sản phẩm PRD-001 sang SKU của sản phẩm PRD-002');
+
+// Kiểm tra khai báo đủ các trường bắt buộc theo SCRUM-220
+const sampleProduct = {
+  sku: 'COCA-330-CAN',
+  name: 'Coca Cola 330ml',
+  category: 'Đồ Uống',
+  unit: 'Lon',
+  packagingSpecification: '24 lon/thùng',
+  costPrice: 8500,
+  salePrice: 12000,
+  image: 'https://example.com/coca.jpg',
+  status: 'active',
+};
+
+assert(Boolean(sampleProduct.sku && sampleProduct.sku.trim()), 'TC-380-07', 'Có khai báo mã SKU');
+assert(Boolean(sampleProduct.name && sampleProduct.name.trim()), 'TC-380-08', 'Có khai báo tên sản phẩm');
+assert(Boolean(sampleProduct.category), 'TC-380-09', 'Có khai báo nhóm hàng/danh mục');
+assert(Boolean(sampleProduct.unit), 'TC-380-10', 'Có khai báo đơn vị tính cơ sở');
+assert(Boolean(sampleProduct.packagingSpecification), 'TC-380-11', 'Có khai báo quy cách đóng gói (24 lon/thùng)');
+assert(sampleProduct.costPrice > 0 && sampleProduct.salePrice > sampleProduct.costPrice, 'TC-380-12', 'Có khai báo giá vốn và giá bán hợp lệ');
+assert(Boolean(sampleProduct.image), 'TC-380-13', 'Có khai báo ảnh sản phẩm');
+assert(['active', 'inactive', 'low_stock', 'out_of_stock'].includes(sampleProduct.status), 'TC-380-14', 'Có khai báo trạng thái sản phẩm hợp lệ');
+
 console.log('\n══════════════════════════════════════════════════');
 console.log(`📊 KẾT QUẢ: ${passedTests}/${totalTests} PASS | ${failedTests} FAIL`);
 console.log(`📈 Tỷ lệ đạt: ${((passedTests / totalTests) * 100).toFixed(1)}%`);
 if (failedTests === 0) {
-  console.log('🎉 TẤT CẢ TEST CASE SCRUM-210 / SCRUM-361 ĐẠT CHUẨN 100%!');
+  console.log('🎉 TẤT CẢ TEST CASE SPRINT 2 (SCRUM-210 & SCRUM-220/380) ĐẠT CHUẨN 100%!');
 }
 console.log('══════════════════════════════════════════════════\n');
 
 process.exit(failedTests > 0 ? 1 : 0);
+

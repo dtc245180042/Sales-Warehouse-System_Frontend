@@ -132,9 +132,14 @@ export const ProductDetail: React.FC = () => {
                 {product.category}
               </span>
             </div>
-            <p className="text-xs text-slate-400">
-              Đơn vị: <span className="font-semibold text-slate-700 dark:text-slate-200">{product.unit}</span>
-            </p>
+            <div className="space-y-1 text-xs text-slate-400 mt-2">
+              <p>
+                Đơn vị tính cơ sở: <span className="font-semibold text-slate-700 dark:text-slate-200">{product.unit}</span>
+              </p>
+              <p>
+                Quy cách đóng gói: <span className="font-semibold text-slate-700 dark:text-slate-200">{product.packagingSpecification || '1 chiếc/hộp'}</span>
+              </p>
+            </div>
           </div>
 
           {/* Supplier details card */}
