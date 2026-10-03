@@ -17,6 +17,13 @@ import { ErrorPage } from '../pages/error/ErrorPage';
 import { Dashboard } from '../pages/dashboard/Dashboard';
 import { UserManagement } from '../pages/users/UserManagement';
 import { Settings } from '../pages/settings/Settings';
+import { Profile } from '../pages/profile/Profile';
+
+// Product Catalog Pages (Sprint 2: SCRUM-220, SCRUM-380, SCRUM-381)
+import { ProductList } from '../pages/products/ProductList';
+import { ProductCreate } from '../pages/products/ProductCreate';
+import { ProductEdit } from '../pages/products/ProductEdit';
+import { ProductDetail } from '../pages/products/ProductDetail';
 
 // All 7 business roles allowed in Sprint 1 backoffice
 const ALL_BACKOFFICE_ROLES: UserRole[] = [
@@ -103,6 +110,50 @@ export const AppRoutes: React.FC = () => {
           element={
             <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
               <Settings />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Hồ sơ cá nhân - Xem và cập nhật họ tên, SĐT Việt Nam - Mọi vai trò (SCRUM-210, SCRUM-361) */}
+        <Route
+          path="/profile"
+          element={
+            <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
+              <Profile />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Quản lý danh mục sản phẩm (Sprint 2: SCRUM-220, SCRUM-380, SCRUM-381) */}
+        <Route
+          path="/products"
+          element={
+            <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
+              <ProductList />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/products/create"
+          element={
+            <ProtectedRoute allowedRoles={['Admin', 'SalesManager', 'Director']}>
+              <ProductCreate />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/products/:id/edit"
+          element={
+            <ProtectedRoute allowedRoles={['Admin', 'SalesManager', 'Director']}>
+              <ProductEdit />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/products/:id"
+          element={
+            <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
+              <ProductDetail />
             </ProtectedRoute>
           }
         />

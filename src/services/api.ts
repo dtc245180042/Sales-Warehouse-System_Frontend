@@ -11,10 +11,11 @@ import {
   CartItem,
   OrderItemRecord,
 } from '../data/mockData';
+import { validateVNPhoneNumber } from '../utils/phoneUtils';
 
 // Create base Axios instance (ready for real backend URL)
 export const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'https://api.salepro-warehouse.vn/v1',
+  baseURL: (import.meta as unknown as { env: Record<string, string> }).env?.VITE_API_URL || 'https://api.salepro-warehouse.vn/v1',
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
@@ -332,10 +333,10 @@ export const api = {
 
       // Update user today's stats
       const profile = getStored<UserProfileData>(STORAGE_KEYS.PROFILE, initialUserProfile);
-      profile.todayOrdersCount += 1;
-      profile.monthlyOrdersCount += 1;
-      profile.personalRevenue += newOrder.total;
-      profile.productsSoldCount += data.items.reduce((acc, it) => acc + it.quantity, 0);
+      profile.todayOrdersCount = (profile.todayOrdersCount ?? 0) + 1;
+      profile.monthlyOrdersCount = (profile.monthlyOrdersCount ?? 0) + 1;
+      profile.personalRevenue = (profile.personalRevenue ?? 0) + newOrder.total;
+      profile.productsSoldCount = (profile.productsSoldCount ?? 0) + data.items.reduce((acc, it) => acc + it.quantity, 0);
       setStored(STORAGE_KEYS.PROFILE, profile);
 
       return newOrder;
@@ -380,12 +381,20 @@ export const api = {
 
     updateProfile: async (data: { name: string; email: string; phone: string; avatar?: string }): Promise<UserProfileData> => {
       await delay(300);
+      const trimmedName = data.name ? data.name.trim() : '';
+      if (!trimmedName || trimmedName.length < 2) {
+        throw new Error('Họ và tên không được để trống (tối thiểu 2 ký tự).');
+      }
+      const phoneVal = validateVNPhoneNumber(data.phone);
+      if (!phoneVal.valid) {
+        throw new Error(phoneVal.message || 'Số điện thoại không hợp lệ.');
+      }
+
       const current = getStored<UserProfileData>(STORAGE_KEYS.PROFILE, initialUserProfile);
       const updated: UserProfileData = {
         ...current,
-        name: data.name.trim() || current.name,
-        email: data.email.trim() || current.email,
-        phone: data.phone.trim() || current.phone,
+        name: trimmedName,
+        phone: phoneVal.normalized || data.phone.trim(),
         avatar: data.avatar || current.avatar,
       };
       setStored(STORAGE_KEYS.PROFILE, updated);

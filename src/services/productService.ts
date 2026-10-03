@@ -14,20 +14,36 @@ export const productService = {
     if (synced.length !== products.length) {
       setStorageItem(STORAGE_KEY, synced);
     }
-    return synced;
+    const mapped = synced.map((p, idx) => ({
+      ...p,
+      packagingSpecification: p.packagingSpecification || '1 chiếc/hộp',
+      hasTransactions: p.hasTransactions !== undefined ? p.hasTransactions : idx < 4,
+    }));
+    return mapped;
   },
 
   getById: async (id: string): Promise<Product | undefined> => {
     await new Promise((r) => setTimeout(r, 150));
-    const products = getStorageItem<Product[]>(STORAGE_KEY, initialProducts);
+    const products = await productService.getAll();
     return products.find((p) => p.id === id);
   },
 
   create: async (data: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>): Promise<Product> => {
     await new Promise((r) => setTimeout(r, 300));
     const products = getStorageItem<Product[]>(STORAGE_KEY, initialProducts);
+
+    // SCRUM-220 & SCRUM-377: Mã SKU là duy nhất trong hệ thống
+    const cleanSku = data.sku.trim().toUpperCase();
+    const existingSku = products.find((p) => p.sku.trim().toUpperCase() === cleanSku);
+    if (existingSku) {
+      throw new Error(`Mã SKU "${cleanSku}" đã tồn tại trong danh mục sản phẩm.`);
+    }
+
     const newProduct: Product = {
       ...data,
+      sku: cleanSku,
+      packagingSpecification: data.packagingSpecification || 'Mặc định',
+      hasTransactions: false,
       id: `PRD-${String(products.length + 1).padStart(3, '0')}`,
       createdAt: new Date().toISOString().split('T')[0],
       updatedAt: new Date().toISOString().split('T')[0],
@@ -43,6 +59,18 @@ export const productService = {
     const index = products.findIndex((p) => p.id === id);
     if (index === -1) throw new Error('Không tìm thấy sản phẩm');
 
+    // SCRUM-220 & SCRUM-377: Kiểm tra trùng mã SKU khi cập nhật
+    if (data.sku) {
+      const cleanSku = data.sku.trim().toUpperCase();
+      const existingSku = products.find(
+        (p) => p.id !== id && p.sku.trim().toUpperCase() === cleanSku
+      );
+      if (existingSku) {
+        throw new Error(`Mã SKU "${cleanSku}" đã được sử dụng bởi sản phẩm khác.`);
+      }
+      data.sku = cleanSku;
+    }
+
     const updatedProduct = {
       ...products[index],
       ...data,
@@ -55,7 +83,13 @@ export const productService = {
 
   delete: async (id: string): Promise<boolean> => {
     await new Promise((r) => setTimeout(r, 250));
-    const products = getStorageItem<Product[]>(STORAGE_KEY, initialProducts);
+    const products = await productService.getAll();
+    const target = products.find((p) => p.id === id);
+    if (target?.hasTransactions) {
+      throw new Error(
+        `Sản phẩm "${target.name}" (${target.sku}) đã phát sinh giao dịch, không thể xóa. Vui lòng chuyển sang ngừng kinh doanh.`
+      );
+    }
     const filtered = products.filter((p) => p.id !== id);
     setStorageItem(STORAGE_KEY, filtered);
     return true;
@@ -63,10 +97,20 @@ export const productService = {
 
   bulkDelete: async (ids: string[]): Promise<boolean> => {
     await new Promise((r) => setTimeout(r, 350));
-    const products = getStorageItem<Product[]>(STORAGE_KEY, initialProducts);
+    const products = await productService.getAll();
+    const hasTx = products.filter((p) => ids.includes(p.id) && p.hasTransactions);
+    if (hasTx.length > 0) {
+      throw new Error(
+        `Có ${hasTx.length} sản phẩm đã phát sinh giao dịch, không thể xóa. Vui lòng chuyển sang ngừng kinh doanh.`
+      );
+    }
     const filtered = products.filter((p) => !ids.includes(p.id));
     setStorageItem(STORAGE_KEY, filtered);
     return true;
+  },
+
+  deactivateProduct: async (id: string): Promise<Product> => {
+    return productService.update(id, { status: 'inactive' });
   },
 
   updateStock: async (id: string, delta: number): Promise<Product> => {

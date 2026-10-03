@@ -43,6 +43,10 @@ export const ProductList: React.FC = () => {
   const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
+  // SCRUM-220 & SCRUM-381: Chặn xóa sản phẩm đã có giao dịch và cho phép chuyển sang ngừng kinh doanh
+  const [blockedProduct, setBlockedProduct] = useState<Product | null>(null);
+  const [bulkBlockedProducts, setBulkBlockedProducts] = useState<Product[]>([]);
+
   const loadProducts = async () => {
     setLoading(true);
     try {
@@ -71,6 +75,14 @@ export const ProductList: React.FC = () => {
   }, [products, search, selectedCategory, selectedStatus]);
 
   // Actions
+  const handleRequestDelete = (product: Product) => {
+    if (product.hasTransactions) {
+      setBlockedProduct(product);
+    } else {
+      setDeleteId(product.id);
+    }
+  };
+
   const handleDeleteSingle = async () => {
     if (!deleteId) return;
     try {
@@ -78,8 +90,50 @@ export const ProductList: React.FC = () => {
       showToast('Đã xóa sản phẩm thành công', 'success');
       setDeleteId(null);
       loadProducts();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Có lỗi xảy ra khi xóa sản phẩm';
+      showToast(msg, 'error');
+    }
+  };
+
+  const handleDeactivateSingle = async () => {
+    if (!blockedProduct) return;
+    try {
+      await productService.deactivateProduct(blockedProduct.id);
+      showToast(
+        `Đã chuyển sản phẩm "${blockedProduct.name}" sang trạng thái "Ngừng kinh doanh".`,
+        'success'
+      );
+      setBlockedProduct(null);
+      loadProducts();
     } catch {
-      showToast('Có lỗi xảy ra khi xóa sản phẩm', 'error');
+      showToast('Có lỗi xảy ra khi cập nhật trạng thái', 'error');
+    }
+  };
+
+  const handleRequestBulkDelete = () => {
+    const blocked = products.filter((p) => selectedIds.includes(p.id) && p.hasTransactions);
+    if (blocked.length > 0) {
+      setBulkBlockedProducts(blocked);
+    } else {
+      setIsBulkDeleteOpen(true);
+    }
+  };
+
+  const handleDeactivateBulkBlocked = async () => {
+    try {
+      for (const p of bulkBlockedProducts) {
+        await productService.deactivateProduct(p.id);
+      }
+      showToast(
+        `Đã chuyển ${bulkBlockedProducts.length} sản phẩm sang trạng thái "Ngừng kinh doanh".`,
+        'success'
+      );
+      setBulkBlockedProducts([]);
+      setSelectedIds([]);
+      loadProducts();
+    } catch {
+      showToast('Có lỗi xảy ra khi cập nhật trạng thái', 'error');
     }
   };
 
@@ -91,8 +145,9 @@ export const ProductList: React.FC = () => {
       setSelectedIds([]);
       setIsBulkDeleteOpen(false);
       loadProducts();
-    } catch {
-      showToast('Có lỗi xảy ra khi xóa nhiều sản phẩm', 'error');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Có lỗi xảy ra khi xóa nhiều sản phẩm';
+      showToast(msg, 'error');
     }
   };
 
@@ -170,6 +225,23 @@ export const ProductList: React.FC = () => {
         <span className="px-2 py-1 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-medium">
           {p.category}
         </span>
+      ),
+    },
+    {
+      key: 'unit',
+      header: 'ĐVT / Quy Cách',
+      sortable: true,
+      render: (p) => (
+        <div>
+          <span className="font-semibold text-slate-800 dark:text-slate-200 text-xs">
+            {p.unit}
+          </span>
+          {p.packagingSpecification && (
+            <div className="text-[11px] text-slate-400 mt-0.5">
+              {p.packagingSpecification}
+            </div>
+          )}
+        </div>
       ),
     },
     {
@@ -255,9 +327,9 @@ export const ProductList: React.FC = () => {
             <Edit className="w-4 h-4" />
           </Link>
           <button
-            onClick={() => setDeleteId(p.id)}
+            onClick={() => handleRequestDelete(p)}
             className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
-            title="Xóa sản phẩm"
+            title={p.hasTransactions ? 'Sản phẩm đã phát sinh giao dịch - Chỉ có thể ngừng kinh doanh' : 'Xóa sản phẩm'}
           >
             <Trash2 className="w-4 h-4" />
           </button>
@@ -314,7 +386,7 @@ export const ProductList: React.FC = () => {
           <Button
             variant="danger"
             size="sm"
-            onClick={() => setIsBulkDeleteOpen(true)}
+            onClick={handleRequestBulkDelete}
             leftIcon={<Trash2 className="w-3.5 h-3.5" />}
           >
             Xóa {selectedIds.length} mục đã chọn
@@ -385,6 +457,86 @@ export const ProductList: React.FC = () => {
         confirmText="Xóa tất cả"
         variant="danger"
       />
+
+      {/* SCRUM-220 & SCRUM-381: Cảnh báo không thể xóa sản phẩm đã có giao dịch */}
+      <Modal
+        isOpen={!!blockedProduct}
+        onClose={() => setBlockedProduct(null)}
+        title="Không Thể Xóa Sản Phẩm Đã Có Giao Dịch"
+        maxWidth="md"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setBlockedProduct(null)}>
+              Đóng
+            </Button>
+            <Button variant="primary" onClick={handleDeactivateSingle}>
+              Chuyển sang "Ngừng kinh doanh"
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 flex items-start gap-3">
+            <AlertTriangle className="w-6 h-6 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+            <div className="text-sm text-amber-900 dark:text-amber-200 space-y-1">
+              <p className="font-bold">
+                Quy định hệ thống: Sản phẩm đã phát sinh giao dịch thì KHÔNG ĐƯỢC XÓA!
+              </p>
+              <p className="text-xs text-amber-800 dark:text-amber-300">
+                Sản phẩm <strong>{blockedProduct?.name}</strong> (SKU: <strong>{blockedProduct?.sku}</strong>) đã được ghi nhận trong đơn hàng hoặc lịch sử nhập xuất kho. Để đảm bảo toàn vẹn dữ liệu sổ sách kế toán, bạn chỉ có thể chuyển sang trạng thái <strong>Ngừng kinh doanh</strong>.
+              </p>
+            </div>
+          </div>
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            Khi chuyển sang <em>Ngừng kinh doanh</em>, sản phẩm sẽ không còn xuất hiện trong danh sách bán hàng mới nhưng dữ liệu lịch sử cũ vẫn được lưu trữ nguyên vẹn.
+          </p>
+        </div>
+      </Modal>
+
+      {/* Cảnh báo xóa nhiều khi có sản phẩm đã có giao dịch */}
+      <Modal
+        isOpen={bulkBlockedProducts.length > 0}
+        onClose={() => setBulkBlockedProducts([])}
+        title={`Cảnh Báo: ${bulkBlockedProducts.length} Sản Phẩm Không Thể Xóa`}
+        maxWidth="md"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setBulkBlockedProducts([])}>
+              Hủy bỏ
+            </Button>
+            <Button variant="primary" onClick={handleDeactivateBulkBlocked}>
+              Chuyển {bulkBlockedProducts.length} sản phẩm sang "Ngừng kinh doanh"
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 flex items-start gap-3">
+            <AlertTriangle className="w-6 h-6 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+            <div className="text-sm text-amber-900 dark:text-amber-200 space-y-1">
+              <p className="font-bold">
+                Phát hiện {bulkBlockedProducts.length} sản phẩm đã có giao dịch
+              </p>
+              <p className="text-xs text-amber-800 dark:text-amber-300">
+                Các sản phẩm này không thể xóa bỏ hoàn toàn. Bạn có muốn chuyển tất cả chúng sang trạng thái <strong>Ngừng kinh doanh</strong>?
+              </p>
+            </div>
+          </div>
+
+          <div className="max-h-40 overflow-y-auto space-y-1.5 border border-slate-200 dark:border-slate-800 rounded-xl p-3 bg-slate-50 dark:bg-slate-900">
+            {bulkBlockedProducts.map((p) => (
+              <div key={p.id} className="flex items-center justify-between text-xs py-1 border-b border-slate-100 dark:border-slate-800/60 last:border-0">
+                <span className="font-medium text-slate-800 dark:text-slate-200 truncate max-w-[220px]">
+                  {p.name}
+                </span>
+                <span className="text-indigo-600 dark:text-indigo-400 font-mono font-semibold">
+                  {p.sku}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </Modal>
 
       {/* Import Modal */}
       <Modal

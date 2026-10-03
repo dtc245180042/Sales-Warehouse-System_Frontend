@@ -13,9 +13,11 @@ export interface Product {
   stock: number;
   minStock: number;
   unit: string;
+  packagingSpecification?: string; // Quy cách đóng gói (SCRUM-220)
   image: string;
   description: string;
   status: ProductStatus;
+  hasTransactions?: boolean; // Đã phát sinh giao dịch - không thể xóa (SCRUM-220/381)
   createdAt: string;
   updatedAt: string;
 }
