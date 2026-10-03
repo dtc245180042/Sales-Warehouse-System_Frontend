@@ -18,6 +18,9 @@ import { Dashboard } from '../pages/dashboard/Dashboard';
 import { UserManagement } from '../pages/users/UserManagement';
 import { Settings } from '../pages/settings/Settings';
 
+// Sprint 2 Pages
+import ActivityLogPage from '../pages/activitylog/ActivityLogPage';
+
 // All 7 business roles allowed in Sprint 1 backoffice
 const ALL_BACKOFFICE_ROLES: UserRole[] = [
   'Admin',
@@ -103,6 +106,16 @@ export const AppRoutes: React.FC = () => {
           element={
             <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
               <Settings />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Nhật ký thao tác - Chỉ Admin (Sprint 2) */}
+        <Route
+          path="/activity-log"
+          element={
+            <ProtectedRoute allowedRoles={['Admin']}>
+              <ActivityLogPage />
             </ProtectedRoute>
           }
         />

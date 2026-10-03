@@ -222,7 +222,7 @@ assert(whStaff.warehouse && whStaff.warehouse.length > 0, 'TC-203-05', 'Warehous
 // ── SCRUM-204 ───────────────────────────────────────────
 suite('SCRUM-204: Trang bao loi dung chung');
 
-function getErrorConfig(code, role, pathname) {
+function getErrorConfig(code, role, _pathname) {
   const is403 = code === '403'; const is500 = code === '500';
   return {
     title: is403 ? '403-title' : is500 ? '500-title' : '404-title',
