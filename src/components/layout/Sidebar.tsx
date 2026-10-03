@@ -6,6 +6,9 @@ import {
   Settings,
   ChevronDown,
   X,
+  Boxes,
+  Scale,
+  LayoutList,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { UserRole } from '../../types/User';
@@ -80,6 +83,54 @@ export const Sidebar: React.FC<SidebarProps> = ({
             'Manager',
             'Staff',
             'User',
+          ],
+        },
+      ],
+    },
+    {
+      heading: 'DANH MỤC SẢN PHẨM',
+      items: [
+        {
+          title: 'Sản phẩm',
+          icon: <Boxes className="w-5 h-5" />,
+          allowedRoles: [
+            'Admin',
+            'SalesManager',
+            'SalesStaff',
+            'WarehouseManager',
+            'WarehouseStaff',
+            'Director',
+            'Manager',
+            'Staff',
+          ],
+          submenu: [
+            {
+              title: 'Danh sách sản phẩm',
+              path: '/products',
+              icon: <LayoutList className="w-3.5 h-3.5" />,
+              allowedRoles: [
+                'Admin',
+                'SalesManager',
+                'SalesStaff',
+                'WarehouseManager',
+                'WarehouseStaff',
+                'Director',
+                'Manager',
+                'Staff',
+              ],
+            },
+            {
+              title: 'Đơn vị tính & Quy đổi',
+              path: '/products/units',
+              icon: <Scale className="w-3.5 h-3.5" />,
+              allowedRoles: [
+                'Admin',
+                'SalesManager',
+                'WarehouseManager',
+                'Director',
+                'Manager',
+              ],
+            },
           ],
         },
       ],
