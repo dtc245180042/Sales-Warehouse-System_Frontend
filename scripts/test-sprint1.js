@@ -1,4 +1,5 @@
 /* global process */
+/* eslint-disable no-unused-vars */
 /**
  * KIỂM THỬ TỰ ĐỘNG SPRINT 1 - OMS Pro
  * Bao gồm: SCRUM-198, 199, 200, 201, 202, 203, 204, 205, 206, 207
@@ -222,7 +223,7 @@ assert(whStaff.warehouse && whStaff.warehouse.length > 0, 'TC-203-05', 'Warehous
 // ── SCRUM-204 ───────────────────────────────────────────
 suite('SCRUM-204: Trang bao loi dung chung');
 
-function getErrorConfig(code, role, pathname) {
+function getErrorConfig(code, role, _pathname) {
   const is403 = code === '403'; const is500 = code === '500';
   return {
     title: is403 ? '403-title' : is500 ? '500-title' : '404-title',
