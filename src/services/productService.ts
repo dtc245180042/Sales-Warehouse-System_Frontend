@@ -7,14 +7,8 @@ const STORAGE_KEY = 'kv_products';
 export const productService = {
   getAll: async (): Promise<Product[]> => {
     await new Promise((r) => setTimeout(r, 200));
-    let products = getStorageItem<Product[]>(STORAGE_KEY, initialProducts);
-    // Sync: remove any products deleted from mock data (e.g. removed from initialProducts)
-    const validIds = new Set(initialProducts.map((p) => p.id));
-    const synced = products.filter((p) => validIds.has(p.id));
-    if (synced.length !== products.length) {
-      setStorageItem(STORAGE_KEY, synced);
-    }
-    return synced;
+    const products = getStorageItem<Product[]>(STORAGE_KEY, initialProducts);
+    return products;
   },
 
   getById: async (id: string): Promise<Product | undefined> => {

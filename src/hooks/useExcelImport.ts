@@ -1,6 +1,10 @@
 import { useState, useCallback } from 'react';
 import { ImportRow, ImportResult, ImportStep, ImportSummary, ImportReport, ImportReportRow } from '../types/ExcelImport';
 import { initialProducts } from '../mock/products';
+import { getStorageItem, setStorageItem } from '../services/storage';
+import { Product } from '../types/Product';
+
+const PRODUCTS_STORAGE_KEY = 'kv_products';
 
 // Required columns mapping (case-insensitive header matching)
 const COLUMN_ALIASES: Record<string, string> = {
@@ -285,6 +289,64 @@ export function useExcelImport() {
    */
   const buildReport = useCallback(
     (result: ImportResult, startedAt: string, finishedAt: string): ImportReport => {
+      // ── Persist valid rows to localStorage (simulate actual DB write) ──
+      const today = new Date().toISOString().split('T')[0];
+      const products = getStorageItem<Product[]>(PRODUCTS_STORAGE_KEY, initialProducts);
+      const productMap = new Map<string, Product>(products.map((p) => [p.sku.toLowerCase(), p]));
+
+      for (const row of result.rows) {
+        if (row.status !== 'new' && row.status !== 'update') continue;
+        const { sku, name, category, barcode, costPrice, salePrice, stock, minStock, unit, description, supplierName } = row.data;
+        const existing = productMap.get(sku.toLowerCase());
+
+        if (row.status === 'new' || !existing) {
+          // Create new product
+          const newProduct: Product = {
+            id: row.existingProductId ?? `PRD-IMP-${Date.now()}-${row.rowIndex}`,
+            sku,
+            barcode: barcode || '',
+            name,
+            category: category || 'Khác',
+            supplierId: '',
+            supplierName: supplierName || '',
+            costPrice: typeof costPrice === 'number' ? costPrice : 0,
+            salePrice: typeof salePrice === 'number' ? salePrice : 0,
+            stock: typeof stock === 'number' ? stock : 0,
+            minStock: typeof minStock === 'number' ? minStock : 0,
+            unit: unit || 'Chiếc',
+            image: '',
+            description: description || '',
+            status: 'active',
+            createdAt: today,
+            updatedAt: today,
+          };
+          productMap.set(sku.toLowerCase(), newProduct);
+        } else {
+          // Update existing product fields
+          const updated: Product = {
+            ...existing,
+            name: name || existing.name,
+            category: category || existing.category,
+            barcode: barcode || existing.barcode,
+            costPrice: typeof costPrice === 'number' ? costPrice : existing.costPrice,
+            salePrice: typeof salePrice === 'number' ? salePrice : existing.salePrice,
+            stock: typeof stock === 'number' ? stock : existing.stock,
+            minStock: typeof minStock === 'number' ? minStock : existing.minStock,
+            unit: unit || existing.unit,
+            description: description || existing.description,
+            supplierName: supplierName || existing.supplierName,
+            updatedAt: today,
+          };
+          productMap.set(sku.toLowerCase(), updated);
+        }
+      }
+
+      // Save back — filter only valid product IDs (exclude pure-new imports not in initialProducts)
+      // We merge: initialProducts ids + newly created
+      const mergedProducts = Array.from(productMap.values());
+      setStorageItem(PRODUCTS_STORAGE_KEY, mergedProducts);
+
+      // ── Build report rows ──
       const reportRows: ImportReportRow[] = result.rows.map((row) => {
         let outcome: ImportReportRow['outcome'];
         if (row.status === 'new') outcome = 'created';

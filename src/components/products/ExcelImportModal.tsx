@@ -21,6 +21,8 @@ import {
   FileText,
   TrendingUp,
   SkipForward,
+  BarChart3,
+  Table2,
 } from 'lucide-react';
 import { Modal } from '../common/Modal';
 import { Button } from '../common/Button';
@@ -110,6 +112,8 @@ const SummaryBadge: React.FC<SummaryBadgeProps> = ({ count, label, color, icon }
 };
 
 // ─────────────────────────────────────────────
+// Error detail panel (expanded under a row)
+// ─────────────────────────────────────────────
 
 interface RowDetailPanelProps {
   row: ImportRow;
@@ -141,6 +145,8 @@ const RowDetailPanel: React.FC<RowDetailPanelProps> = ({ row }) => {
   );
 };
 
+// ─────────────────────────────────────────────
+// Preview Row — List mode
 // ─────────────────────────────────────────────
 
 interface PreviewRowProps {
@@ -217,6 +223,164 @@ const PreviewRow: React.FC<PreviewRowProps> = ({ row }) => {
           <RowDetailPanel row={row} />
         </div>
       )}
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────
+// Preview Table — Table mode (SCRUM-405)
+// ─────────────────────────────────────────────
+
+interface PreviewTableProps {
+  rows: ImportRow[];
+}
+
+const STATUS_ROW_CLASSES: Record<ImportRow['status'], string> = {
+  new: 'bg-emerald-50/50 dark:bg-emerald-950/10 hover:bg-emerald-50 dark:hover:bg-emerald-950/20',
+  update: 'bg-indigo-50/50 dark:bg-indigo-950/10 hover:bg-indigo-50 dark:hover:bg-indigo-950/20',
+  error: 'bg-rose-50/60 dark:bg-rose-950/15 hover:bg-rose-50 dark:hover:bg-rose-950/25',
+  warning: 'bg-amber-50/50 dark:bg-amber-950/10 hover:bg-amber-50 dark:hover:bg-amber-950/20',
+};
+
+const STATUS_BADGE: Record<ImportRow['status'], { label: string; cls: string; icon: React.ReactNode }> = {
+  new: { label: 'TẠO MỚI', cls: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300', icon: <PlusCircle className="w-2.5 h-2.5" /> },
+  update: { label: 'CẬP NHẬT', cls: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300', icon: <ArrowUpCircle className="w-2.5 h-2.5" /> },
+  error: { label: 'LỖI', cls: 'bg-rose-100 text-rose-700 dark:bg-rose-900/50 dark:text-rose-300', icon: <XCircle className="w-2.5 h-2.5" /> },
+  warning: { label: 'CẢNH BÁO', cls: 'bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300', icon: <AlertTriangle className="w-2.5 h-2.5" /> },
+};
+
+const PreviewTableRow: React.FC<{ row: ImportRow }> = ({ row }) => {
+  const [expanded, setExpanded] = useState(false);
+  const badge = STATUS_BADGE[row.status];
+  const hasIssues = row.errors.length > 0 || row.warnings.length > 0;
+
+  return (
+    <>
+      <tr
+        className={`${STATUS_ROW_CLASSES[row.status]} transition-colors duration-150 ${hasIssues ? 'cursor-pointer' : ''}`}
+        onClick={() => hasIssues && setExpanded((v) => !v)}
+      >
+        {/* # row */}
+        <td className="py-2 pl-3 pr-2 text-center">
+          <span className="text-[10px] font-mono text-slate-400">#{row.rowIndex}</span>
+        </td>
+        {/* Status */}
+        <td className="py-2 px-2">
+          <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide ${badge.cls}`}>
+            {badge.icon}
+            {badge.label}
+          </span>
+        </td>
+        {/* SKU */}
+        <td className="py-2 px-2">
+          <code className="text-[11px] font-mono font-semibold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">
+            {row.data.sku || <span className="text-rose-400 italic">—</span>}
+          </code>
+        </td>
+        {/* Name */}
+        <td className="py-2 px-2 max-w-[140px]">
+          <span className="text-xs text-slate-700 dark:text-slate-200 font-medium truncate block" title={row.data.name}>
+            {row.data.name || <span className="text-slate-400 italic text-[11px]">Chưa có tên</span>}
+          </span>
+          {row.data.category && (
+            <span className="text-[10px] text-slate-400 truncate block">{row.data.category}</span>
+          )}
+        </td>
+        {/* Cost price */}
+        <td className="py-2 px-2 text-right hidden md:table-cell">
+          {typeof row.data.costPrice === 'number' ? (
+            <span className="text-xs text-slate-600 dark:text-slate-300">{formatCurrency(row.data.costPrice)}</span>
+          ) : (
+            <span className="text-[10px] text-rose-500 font-mono">{String(row.data.costPrice) || '—'}</span>
+          )}
+        </td>
+        {/* Sale price */}
+        <td className="py-2 px-2 text-right">
+          {typeof row.data.salePrice === 'number' ? (
+            <span className="text-xs font-semibold text-slate-800 dark:text-slate-100">{formatCurrency(row.data.salePrice)}</span>
+          ) : (
+            <span className="text-[10px] text-rose-500 font-mono">{String(row.data.salePrice) || '—'}</span>
+          )}
+        </td>
+        {/* Stock */}
+        <td className="py-2 px-2 text-right hidden sm:table-cell">
+          <span className="text-xs text-slate-600 dark:text-slate-300">{row.data.stock}</span>
+          <span className="text-[10px] text-slate-400 ml-1">{row.data.unit}</span>
+        </td>
+        {/* Errors / expand */}
+        <td className="py-2 pl-2 pr-3 text-right">
+          <div className="flex items-center justify-end gap-1">
+            {row.errors.length > 0 && (
+              <span className="inline-flex items-center gap-0.5 text-[10px] text-rose-600 dark:text-rose-400 font-semibold">
+                <XCircle className="w-3 h-3" />{row.errors.length}
+              </span>
+            )}
+            {row.warnings.length > 0 && (
+              <span className="inline-flex items-center gap-0.5 text-[10px] text-amber-600 dark:text-amber-400 font-semibold">
+                <AlertTriangle className="w-3 h-3" />{row.warnings.length}
+              </span>
+            )}
+            {hasIssues && (
+              <span className="text-slate-400 ml-0.5">
+                {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+              </span>
+            )}
+          </div>
+        </td>
+      </tr>
+      {expanded && hasIssues && (
+        <tr className={STATUS_ROW_CLASSES[row.status]}>
+          <td colSpan={8} className="pb-2.5 pl-12 pr-3">
+            <div className="space-y-1">
+              {row.errors.map((e, i) => (
+                <div key={`te-${i}`} className="flex items-start gap-1.5 text-[11px] text-rose-600 dark:text-rose-400">
+                  <XCircle className="w-3 h-3 mt-0.5 shrink-0" />
+                  <span><strong>[{e.field}]</strong> {e.message}</span>
+                </div>
+              ))}
+              {row.warnings.map((w, i) => (
+                <div key={`tw-${i}`} className="flex items-start gap-1.5 text-[11px] text-amber-600 dark:text-amber-400">
+                  <AlertTriangle className="w-3 h-3 mt-0.5 shrink-0" />
+                  <span><strong>[{w.field}]</strong> {w.message}</span>
+                </div>
+              ))}
+            </div>
+          </td>
+        </tr>
+      )}
+    </>
+  );
+};
+
+const PreviewTable: React.FC<PreviewTableProps> = ({ rows }) => {
+  if (rows.length === 0) {
+    return (
+      <div className="text-center py-8 text-slate-400 text-sm">
+        Không có dòng nào phù hợp bộ lọc
+      </div>
+    );
+  }
+  return (
+    <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
+      <table className="w-full text-left border-collapse">
+        <thead>
+          <tr className="bg-slate-50 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-700">
+            <th className="py-2 pl-3 pr-2 text-[10px] font-semibold text-slate-500 uppercase tracking-wide text-center w-8">#</th>
+            <th className="py-2 px-2 text-[10px] font-semibold text-slate-500 uppercase tracking-wide w-24">Trạng thái</th>
+            <th className="py-2 px-2 text-[10px] font-semibold text-slate-500 uppercase tracking-wide">Mã SKU</th>
+            <th className="py-2 px-2 text-[10px] font-semibold text-slate-500 uppercase tracking-wide">Tên / Danh mục</th>
+            <th className="py-2 px-2 text-[10px] font-semibold text-slate-500 uppercase tracking-wide text-right hidden md:table-cell">Giá nhập</th>
+            <th className="py-2 px-2 text-[10px] font-semibold text-slate-500 uppercase tracking-wide text-right">Giá bán</th>
+            <th className="py-2 px-2 text-[10px] font-semibold text-slate-500 uppercase tracking-wide text-right hidden sm:table-cell">Tồn kho</th>
+            <th className="py-2 pl-2 pr-3 text-[10px] font-semibold text-slate-500 uppercase tracking-wide text-right w-16">Lỗi</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+          {rows.map((row) => (
+            <PreviewTableRow key={row.rowIndex} row={row} />
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 };
@@ -477,6 +641,7 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({ isOpen, onCl
 
   const [filterTab, setFilterTab] = useState<FilterTab>('all');
   const [showOnlyErrors, setShowOnlyErrors] = useState(false);
+  const [viewMode, setViewMode] = useState<'list' | 'table'>('table');
   const [reportTab, setReportTab] = useState<'created' | 'updated' | 'skipped'>('created');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -484,6 +649,7 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({ isOpen, onCl
     reset();
     setFilterTab('all');
     setShowOnlyErrors(false);
+    setViewMode('table');
     setReportTab('created');
     onClose();
   }, [reset, onClose]);
@@ -669,11 +835,12 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({ isOpen, onCl
       );
     }
 
-    // PREVIEW STEP
+    // PREVIEW STEP (SCRUM-405)
     if (step === 'preview' && importResult) {
       const { summary } = importResult;
       return (
         <div className="space-y-4">
+          {/* Summary badges */}
           <div className="grid grid-cols-5 gap-2">
             <SummaryBadge count={summary.totalRows} label="Tổng dòng" color="slate" icon={<FileSpreadsheet className="w-4 h-4" />} />
             <SummaryBadge count={summary.newRows} label="Tạo mới" color="green" icon={<PlusCircle className="w-4 h-4" />} />
@@ -682,6 +849,7 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({ isOpen, onCl
             <SummaryBadge count={summary.warningRows} label="Cảnh báo" color="amber" icon={<AlertTriangle className="w-4 h-4" />} />
           </div>
 
+          {/* Error notice */}
           {summary.errorRows > 0 && (
             <div className="flex items-start gap-2.5 p-3 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800 text-xs text-rose-700 dark:text-rose-300">
               <XCircle className="w-4 h-4 mt-0.5 shrink-0" />
@@ -692,32 +860,72 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({ isOpen, onCl
             </div>
           )}
 
+          {/* Filter + view mode toggle */}
           <div className="flex items-center justify-between gap-2">
-            <FilterTabBar active={filterTab} onChange={(t) => { setFilterTab(t); setShowOnlyErrors(false); }} counts={filterCounts} />
-            <button
-              onClick={() => setShowOnlyErrors((v) => !v)}
-              className={`flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1.5 rounded-lg transition-colors whitespace-nowrap
-                ${showOnlyErrors ? 'bg-rose-100 dark:bg-rose-900/50 text-rose-700 dark:text-rose-300' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}
-              `}
-            >
-              {showOnlyErrors ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-              {showOnlyErrors ? 'Tất cả' : 'Chỉ lỗi & cảnh báo'}
-            </button>
+            <FilterTabBar
+              active={filterTab}
+              onChange={(t) => { setFilterTab(t); setShowOnlyErrors(false); }}
+              counts={filterCounts}
+            />
+            <div className="flex items-center gap-1 shrink-0">
+              {/* View mode toggle */}
+              <div className="flex items-center border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
+                <button
+                  onClick={() => setViewMode('table')}
+                  title="Dạng bảng"
+                  className={`p-1.5 transition-colors ${viewMode === 'table' ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+                >
+                  <Table2 className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={() => setViewMode('list')}
+                  title="Dạng danh sách"
+                  className={`p-1.5 transition-colors ${viewMode === 'list' ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+                >
+                  <BarChart3 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              {/* Error only toggle */}
+              <button
+                onClick={() => setShowOnlyErrors((v) => !v)}
+                className={`flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1.5 rounded-lg transition-colors whitespace-nowrap
+                  ${showOnlyErrors ? 'bg-rose-100 dark:bg-rose-900/50 text-rose-700 dark:text-rose-300' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}
+                `}
+              >
+                {showOnlyErrors ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                {showOnlyErrors ? 'Tất cả' : 'Chỉ lỗi & cảnh báo'}
+              </button>
+            </div>
           </div>
 
-          <div className="max-h-[340px] overflow-y-auto pr-0.5">
-            {filteredRows.length === 0 ? (
-              <div className="text-center py-8 text-slate-400 text-sm">Không có dòng nào phù hợp bộ lọc</div>
+          {/* Preview content — list or table */}
+          <div className="max-h-[360px] overflow-y-auto pr-0.5">
+            {viewMode === 'table' ? (
+              <PreviewTable rows={filteredRows} />
             ) : (
-              filteredRows.map((row) => <PreviewRow key={row.rowIndex} row={row} />)
+              filteredRows.length === 0 ? (
+                <div className="text-center py-8 text-slate-400 text-sm">Không có dòng nào phù hợp bộ lọc</div>
+              ) : (
+                filteredRows.map((row) => <PreviewRow key={row.rowIndex} row={row} />)
+              )
             )}
           </div>
 
+          {/* File info footer */}
           <div className="flex items-center gap-2 text-[10px] text-slate-400 border-t border-slate-100 dark:border-slate-800 pt-3">
             <FileSpreadsheet className="w-3.5 h-3.5" />
             <span className="font-medium">{importResult.fileName}</span>
             <span>·</span>
             <span>{(importResult.fileSize / 1024).toFixed(1)} KB</span>
+            <span>·</span>
+            <span>{summary.totalRows} dòng dữ liệu</span>
+            {summary.validRows > 0 && (
+              <>
+                <span>·</span>
+                <span className="text-emerald-600 dark:text-emerald-400 font-medium">{summary.validRows} dòng sẽ được nhập</span>
+              </>
+            )}
           </div>
         </div>
       );
@@ -744,7 +952,7 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({ isOpen, onCl
       );
     }
 
-    // DONE STEP — Detailed Import Report
+    // DONE STEP — Detailed Import Report (SCRUM-406)
     if (step === 'done' && importReport) {
       const createdRows = importReport.rows.filter((r) => r.outcome === 'created');
       const updatedRows = importReport.rows.filter((r) => r.outcome === 'updated');
@@ -769,12 +977,30 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({ isOpen, onCl
               <div className="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur flex items-center justify-center shrink-0">
                 <CheckCircle2 className="w-8 h-8 text-white" />
               </div>
-              <div>
+              <div className="flex-1 min-w-0">
                 <p className="text-lg font-bold leading-tight">Nhập hàng loạt hoàn tất!</p>
                 <p className="text-emerald-100 text-sm mt-0.5">
                   Xử lý <strong className="text-white">{importReport.totalProcessed}</strong> dòng từ{' '}
-                  <strong className="text-white">{importReport.fileName}</strong>
+                  <strong className="text-white truncate">{importReport.fileName}</strong>
                 </p>
+                {/* Quick summary inline */}
+                <div className="flex items-center gap-3 mt-2 flex-wrap">
+                  {importReport.created > 0 && (
+                    <span className="inline-flex items-center gap-1 text-[11px] bg-white/15 px-2 py-0.5 rounded-full font-medium">
+                      <PlusCircle className="w-3 h-3" /> {importReport.created} tạo mới
+                    </span>
+                  )}
+                  {importReport.updated > 0 && (
+                    <span className="inline-flex items-center gap-1 text-[11px] bg-white/15 px-2 py-0.5 rounded-full font-medium">
+                      <ArrowUpCircle className="w-3 h-3" /> {importReport.updated} SKU cập nhật
+                    </span>
+                  )}
+                  {importReport.skippedError > 0 && (
+                    <span className="inline-flex items-center gap-1 text-[11px] bg-rose-400/30 px-2 py-0.5 rounded-full font-medium">
+                      <XCircle className="w-3 h-3" /> {importReport.skippedError} dòng lỗi
+                    </span>
+                  )}
+                </div>
               </div>
               <div className="ml-auto text-right shrink-0">
                 <div className="text-3xl font-black">{successRate}%</div>
@@ -869,7 +1095,7 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({ isOpen, onCl
             </div>
 
             {/* Row list */}
-            <div className="max-h-[280px] overflow-y-auto pr-0.5">
+            <div className="max-h-[260px] overflow-y-auto pr-0.5">
               {reportRows.length === 0 ? (
                 <div className="text-center py-6 text-slate-400 text-sm">
                   {reportTab === 'created' && 'Không có sản phẩm nào được tạo mới'}
@@ -899,7 +1125,7 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({ isOpen, onCl
         <>
           <Button
             variant="ghost"
-            onClick={() => { reset(); setFilterTab('all'); setShowOnlyErrors(false); }}
+            onClick={() => { reset(); setFilterTab('all'); setShowOnlyErrors(false); setViewMode('table'); }}
             leftIcon={<RefreshCw className="w-3.5 h-3.5" />}
           >
             Chọn lại tệp
@@ -930,7 +1156,7 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({ isOpen, onCl
           </Button>
           <Button
             variant="outline"
-            onClick={() => { reset(); setFilterTab('all'); setShowOnlyErrors(false); setReportTab('created'); }}
+            onClick={() => { reset(); setFilterTab('all'); setShowOnlyErrors(false); setViewMode('table'); setReportTab('created'); }}
             leftIcon={<Upload className="w-4 h-4" />}
           >
             Nhập thêm tệp
@@ -957,7 +1183,7 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({ isOpen, onCl
     preview: `${importResult?.fileName ?? ''} — ${importResult?.summary.totalRows ?? 0} dòng dữ liệu`,
     importing: 'Hệ thống đang xử lý, vui lòng chờ...',
     done: importReport
-      ? `${importReport.created} tạo mới · ${importReport.updated} cập nhật · ${importReport.skippedError + importReport.skippedWarning} bỏ qua`
+      ? `${importReport.created} tạo mới · ${importReport.updated} SKU cập nhật · ${importReport.skippedError + importReport.skippedWarning} bỏ qua`
       : 'Dữ liệu đã được cập nhật vào hệ thống',
   };
 
