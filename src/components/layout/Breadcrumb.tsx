@@ -20,6 +20,7 @@ const routeNames: Record<string, string> = {
   revenue: 'Doanh Thu',
   users: 'Người Dùng & Phân Quyền',
   settings: 'Cài Đặt Hệ Thống',
+  profile: 'Hồ Sơ Cá Nhân',
 };
 
 export const Breadcrumb: React.FC = () => {

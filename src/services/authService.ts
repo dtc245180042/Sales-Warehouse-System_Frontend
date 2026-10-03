@@ -1,6 +1,7 @@
 import { User, UserRole } from '../types/User';
 import { initialUsers } from '../mock/users';
 import { getStorageItem, setStorageItem, removeStorageItem } from './storage';
+import { validateVNPhoneNumber } from '../utils/phoneUtils';
 
 const STORAGE_KEYS = {
   CURRENT_USER: 'kv_current_user',
@@ -155,6 +156,51 @@ export const authService = {
       setStorageItem(STORAGE_KEYS.AUTH_TOKEN, freshToken);
       setStorageItem('kv_revoked_sessions_at', new Date().toISOString());
     }
+  },
+
+  updateProfile: async (data: { name: string; phone: string; avatar?: string }): Promise<User> => {
+    await new Promise((res) => setTimeout(res, 300)); // Simulate API latency
+    const currentUser = authService.getCurrentUser();
+    if (!currentUser) {
+      throw new Error('Bạn chưa đăng nhập vào hệ thống.');
+    }
+
+    const trimmedName = data.name ? data.name.trim() : '';
+    if (!trimmedName || trimmedName.length < 2) {
+      throw new Error('Họ và tên không được để trống (tối thiểu 2 ký tự).');
+    }
+
+    const phoneValidation = validateVNPhoneNumber(data.phone);
+    if (!phoneValidation.valid) {
+      throw new Error(phoneValidation.message || 'Số điện thoại không hợp lệ.');
+    }
+
+    const users = authService.initUsers();
+    const userIndex = users.findIndex(
+      (u) => u.id === currentUser.id || u.email.toLowerCase() === currentUser.email.toLowerCase()
+    );
+
+    // SCRUM-210 & SCRUM-360: Giữ nguyên các trường hệ thống không được phép tự đổi:
+    // email, role, roles, warehouse, territory, status, id
+    const updatedUser: User = {
+      ...currentUser,
+      name: trimmedName,
+      phone: phoneValidation.normalized || data.phone.trim(),
+      ...(data.avatar ? { avatar: data.avatar } : {}),
+    };
+
+    if (userIndex !== -1) {
+      users[userIndex] = {
+        ...users[userIndex],
+        name: trimmedName,
+        phone: phoneValidation.normalized || data.phone.trim(),
+        ...(data.avatar ? { avatar: data.avatar } : {}),
+      };
+      setStorageItem(STORAGE_KEYS.USERS, users);
+    }
+
+    setStorageItem(STORAGE_KEYS.CURRENT_USER, updatedUser);
+    return updatedUser;
   },
 
   getRememberedEmail: (): string => {
