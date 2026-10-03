@@ -83,7 +83,13 @@ export const productService = {
 
   delete: async (id: string): Promise<boolean> => {
     await new Promise((r) => setTimeout(r, 250));
-    const products = getStorageItem<Product[]>(STORAGE_KEY, initialProducts);
+    const products = await productService.getAll();
+    const target = products.find((p) => p.id === id);
+    if (target?.hasTransactions) {
+      throw new Error(
+        `Sản phẩm "${target.name}" (${target.sku}) đã phát sinh giao dịch, không thể xóa. Vui lòng chuyển sang ngừng kinh doanh.`
+      );
+    }
     const filtered = products.filter((p) => p.id !== id);
     setStorageItem(STORAGE_KEY, filtered);
     return true;
@@ -91,10 +97,20 @@ export const productService = {
 
   bulkDelete: async (ids: string[]): Promise<boolean> => {
     await new Promise((r) => setTimeout(r, 350));
-    const products = getStorageItem<Product[]>(STORAGE_KEY, initialProducts);
+    const products = await productService.getAll();
+    const hasTx = products.filter((p) => ids.includes(p.id) && p.hasTransactions);
+    if (hasTx.length > 0) {
+      throw new Error(
+        `Có ${hasTx.length} sản phẩm đã phát sinh giao dịch, không thể xóa. Vui lòng chuyển sang ngừng kinh doanh.`
+      );
+    }
     const filtered = products.filter((p) => !ids.includes(p.id));
     setStorageItem(STORAGE_KEY, filtered);
     return true;
+  },
+
+  deactivateProduct: async (id: string): Promise<Product> => {
+    return productService.update(id, { status: 'inactive' });
   },
 
   updateStock: async (id: string, delta: number): Promise<Product> => {

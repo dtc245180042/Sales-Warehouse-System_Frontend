@@ -9,6 +9,7 @@ import { productCategories } from '../../mock/products';
 import { initialSuppliers } from '../../mock/suppliers';
 
 import { productService } from '../../services/productService';
+import { useAuth } from '../../contexts/AuthContext';
 
 const productSchema = z.object({
   name: z.string().min(2, 'Tên sản phẩm tối thiểu 2 ký tự'),
@@ -41,6 +42,10 @@ export const ProductForm: React.FC<ProductFormProps> = ({
   isEdit = false,
 }) => {
   const navigate = useNavigate();
+  const { role } = useAuth();
+  // SCRUM-220 & SCRUM-381: Giá vốn chỉ Quản lý kinh doanh (Admin/SalesManager/Director) xem và sửa được
+  const canManageCostPrice = role === 'Admin' || role === 'SalesManager' || role === 'Director';
+
   const [existingSkus, setExistingSkus] = React.useState<string[]>([]);
   const [skuError, setSkuError] = React.useState<string>('');
 
@@ -109,9 +114,15 @@ export const ProductForm: React.FC<ProductFormProps> = ({
       setSkuError(`Mã SKU "${cleanSku}" đã tồn tại trong hệ thống.`);
       return;
     }
+    // SCRUM-381: Nếu người dùng không có quyền quản lý giá vốn, giữ nguyên giá vốn ban đầu
+    const finalCostPrice = canManageCostPrice
+      ? values.costPrice
+      : (initialValues?.costPrice ?? 0);
+
     await onSubmit({
       ...values,
       sku: cleanSku,
+      costPrice: finalCostPrice,
     });
   };
 
@@ -193,14 +204,30 @@ export const ProductForm: React.FC<ProductFormProps> = ({
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Giá nhập (VNĐ) *
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center justify-between">
+                  <span>Giá nhập (VNĐ) *</span>
+                  {!canManageCostPrice && (
+                    <span className="text-[10px] text-amber-600 dark:text-amber-400 font-medium">
+                      🔒 Chỉ Quản lý xem & sửa
+                    </span>
+                  )}
                 </label>
-                <input
-                  type="number"
-                  {...register('costPrice', { valueAsNumber: true })}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
+                {canManageCostPrice ? (
+                  <input
+                    type="number"
+                    {...register('costPrice', { valueAsNumber: true })}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                ) : (
+                  <input
+                    type="password"
+                    disabled
+                    value="******"
+                    readOnly
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800/80 text-slate-400 text-sm cursor-not-allowed select-none font-mono"
+                    title="Bạn không có quyền xem hoặc chỉnh sửa giá vốn sản phẩm"
+                  />
+                )}
                 {errors.costPrice && <p className="text-xs text-rose-500 mt-1">{errors.costPrice.message}</p>}
               </div>
 

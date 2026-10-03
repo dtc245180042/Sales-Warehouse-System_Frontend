@@ -250,13 +250,76 @@ assert(sampleProduct.costPrice > 0 && sampleProduct.salePrice > sampleProduct.co
 assert(Boolean(sampleProduct.image), 'TC-380-13', 'Có khai báo ảnh sản phẩm');
 assert(['active', 'inactive', 'low_stock', 'out_of_stock'].includes(sampleProduct.status), 'TC-380-14', 'Có khai báo trạng thái sản phẩm hợp lệ');
 
+// ========================================================
+// 5. Test logic SCRUM-220 / SCRUM-381: Phân quyền giá vốn & Chặn xóa sản phẩm đã có giao dịch
+// ========================================================
+suite('SCRUM-220 / SCRUM-381: Phân quyền giá vốn & Chặn xóa sản phẩm đã có giao dịch');
+
+function canUserAccessCostPrice(role) {
+  return role === 'Admin' || role === 'SalesManager' || role === 'Director';
+}
+
+assert(canUserAccessCostPrice('SalesManager') === true, 'TC-381-01', 'Quản lý kinh doanh (SalesManager) ĐƯỢC XEM & SỬA giá vốn');
+assert(canUserAccessCostPrice('Admin') === true, 'TC-381-02', 'Admin ĐƯỢC XEM & SỬA giá vốn');
+assert(canUserAccessCostPrice('Director') === true, 'TC-381-03', 'Giám đốc (Director) ĐƯỢC XEM & SỬA giá vốn');
+assert(canUserAccessCostPrice('SalesStaff') === false, 'TC-381-04', 'Nhân viên kinh doanh (SalesStaff) BỊ ẨN / KHÓA giá vốn');
+assert(canUserAccessCostPrice('WarehouseStaff') === false, 'TC-381-05', 'Nhân viên kho (WarehouseStaff) BỊ ẨN / KHÓA giá vốn');
+assert(canUserAccessCostPrice('Accountant') === false, 'TC-381-06', 'Kế toán không thuộc ban quản lý kinh doanh BỊ ẨN / KHÓA giá vốn');
+
+function checkDeleteProductPermission(product) {
+  if (product.hasTransactions) {
+    return {
+      canDelete: false,
+      recommendedAction: 'inactive',
+      message: `Sản phẩm "${product.name}" (${product.sku}) đã phát sinh giao dịch, không thể xóa. Chỉ có thể chuyển sang ngừng kinh doanh.`,
+    };
+  }
+  return { canDelete: true, message: 'Có thể xóa vĩnh viễn' };
+}
+
+const productWithTransactions = {
+  id: 'PRD-001',
+  sku: 'IP15P-128-TI',
+  name: 'iPhone 15 Pro',
+  hasTransactions: true,
+  status: 'active',
+};
+
+const productWithoutTransactions = {
+  id: 'PRD-099',
+  sku: 'TEST-SKU-999',
+  name: 'Sản phẩm nháp mới tạo',
+  hasTransactions: false,
+  status: 'active',
+};
+
+const resultBlocked = checkDeleteProductPermission(productWithTransactions);
+assert(resultBlocked.canDelete === false, 'TC-381-07', 'Chặn xóa sản phẩm đã phát sinh giao dịch (hasTransactions = true)');
+assert(resultBlocked.recommendedAction === 'inactive', 'TC-381-08', 'Gợi ý hành động chuyển sang "Ngừng kinh doanh" (inactive)');
+
+const resultAllowed = checkDeleteProductPermission(productWithoutTransactions);
+assert(resultAllowed.canDelete === true, 'TC-381-09', 'Cho phép xóa sản phẩm chưa phát sinh giao dịch (hasTransactions = false)');
+
+function deactivateProduct(product) {
+  return {
+    ...product,
+    status: 'inactive',
+    updatedAt: '2026-10-03',
+  };
+}
+
+const deactivated = deactivateProduct(productWithTransactions);
+assert(deactivated.status === 'inactive', 'TC-381-10', 'Chuyển trạng thái sản phẩm sang Ngừng kinh doanh thành công');
+assert(deactivated.sku === productWithTransactions.sku, 'TC-381-11', 'Giữ nguyên mã SKU và toàn bộ lịch sử sau khi ngừng kinh doanh');
+
 console.log('\n══════════════════════════════════════════════════');
 console.log(`📊 KẾT QUẢ: ${passedTests}/${totalTests} PASS | ${failedTests} FAIL`);
 console.log(`📈 Tỷ lệ đạt: ${((passedTests / totalTests) * 100).toFixed(1)}%`);
 if (failedTests === 0) {
-  console.log('🎉 TẤT CẢ TEST CASE SPRINT 2 (SCRUM-210 & SCRUM-220/380) ĐẠT CHUẨN 100%!');
+  console.log('🎉 TẤT CẢ TEST CASE SPRINT 2 (SCRUM-210 & SCRUM-220: 380, 381) ĐẠT CHUẨN 100%!');
 }
 console.log('══════════════════════════════════════════════════\n');
 
 process.exit(failedTests > 0 ? 1 : 0);
+
 

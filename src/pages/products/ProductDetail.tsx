@@ -22,10 +22,13 @@ import { EmptyState } from '../../components/common/EmptyState';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 import { productService } from '../../services/productService';
 import { Product } from '../../types/Product';
+import { useAuth } from '../../contexts/AuthContext';
 
 export const ProductDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { role } = useAuth();
+  const canViewCostPrice = role === 'Admin' || role === 'SalesManager' || role === 'Director';
 
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
@@ -167,16 +170,22 @@ export const ProductDetail: React.FC = () => {
               <p className="text-2xl font-extrabold text-indigo-600 dark:text-indigo-400 mt-1">
                 {formatCurrency(product.salePrice)}
               </p>
-              <p className="text-xs text-slate-400 mt-1">Giá nhập: {formatCurrency(product.costPrice)}</p>
+              <p className="text-xs text-slate-400 mt-1">
+                {canViewCostPrice
+                  ? `Giá nhập: ${formatCurrency(product.costPrice)}`
+                  : 'Giá nhập: ****** (Chỉ Quản lý xem)'}
+              </p>
             </div>
 
             <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-card">
               <span className="text-xs font-bold text-slate-400 uppercase">Tỷ Suất Lợi Nhuận</span>
               <p className="text-2xl font-extrabold text-emerald-600 dark:text-emerald-400 mt-1">
-                {profitMargin}%
+                {canViewCostPrice ? `${profitMargin}%` : '******'}
               </p>
               <p className="text-xs text-slate-400 mt-1">
-                Lãi gộp: {formatCurrency(product.salePrice - product.costPrice)} / sp
+                {canViewCostPrice
+                  ? `Lãi gộp: ${formatCurrency(product.salePrice - product.costPrice)} / sp`
+                  : '🔒 Phân quyền Quản lý kinh doanh'}
               </p>
             </div>
 
