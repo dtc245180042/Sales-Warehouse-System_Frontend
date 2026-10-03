@@ -211,22 +211,26 @@ export const ProfilePage: React.FC = () => {
               <Store className="w-4 h-4 text-blue-600" />
               Chi nhánh công tác
             </h3>
-            <div className="text-xs space-y-2 text-slate-600 dark:text-slate-400">
-              <div>
-                <strong className="text-slate-800 dark:text-slate-200 block">
-                  {profile.storeInfo.name}
-                </strong>
-                <p className="mt-0.5">{profile.storeInfo.address}</p>
+            {profile.storeInfo ? (
+              <div className="text-xs space-y-2 text-slate-600 dark:text-slate-400">
+                <div>
+                  <strong className="text-slate-800 dark:text-slate-200 block">
+                    {profile.storeInfo.name}
+                  </strong>
+                  <p className="mt-0.5">{profile.storeInfo.address}</p>
+                </div>
+                <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
+                  <span className="text-slate-400">Hotline chi nhánh: </span>
+                  <strong className="text-slate-800 dark:text-slate-200">{profile.storeInfo.phone}</strong>
+                </div>
+                <div>
+                  <span className="text-slate-400">Quản lý kho: </span>
+                  <span className="text-slate-700 dark:text-slate-300">{profile.storeInfo.manager}</span>
+                </div>
               </div>
-              <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
-                <span className="text-slate-400">Hotline chi nhánh: </span>
-                <strong className="text-slate-800 dark:text-slate-200">{profile.storeInfo.phone}</strong>
-              </div>
-              <div>
-                <span className="text-slate-400">Quản lý kho: </span>
-                <span className="text-slate-700 dark:text-slate-300">{profile.storeInfo.manager}</span>
-              </div>
-            </div>
+            ) : (
+              <p className="text-xs text-slate-400">Chưa có thông tin chi nhánh</p>
+            )}
           </div>
         </div>
 

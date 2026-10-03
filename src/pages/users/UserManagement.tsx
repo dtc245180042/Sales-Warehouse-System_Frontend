@@ -688,7 +688,7 @@ export const UserManagement: React.FC = () => {
                     <input
                       type="checkbox"
                       checked={isChecked}
-                      disabled={isSelfAdmin}
+                      disabled={Boolean(isSelfAdmin)}
                       onChange={() => handleRoleToggle(role)}
                       className="mt-0.5 w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500"
                     />
@@ -901,7 +901,7 @@ export const UserManagement: React.FC = () => {
         title="Mở Khóa Tài Khoản"
         message={`Bạn có chắc chắn muốn mở khóa tài khoản cho ${unlockingUser?.name}? Nhân sự sẽ được khôi phục quyền đăng nhập và tạo đơn theo quyền hạn phân bổ.`}
         confirmText="Mở khóa tài khoản"
-        variant="primary"
+        variant="info"
       />
 
       {/* Delete User Confirmation */}

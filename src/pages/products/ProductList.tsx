@@ -469,7 +469,7 @@ export const ProductList: React.FC = () => {
             <Button variant="secondary" onClick={() => setBlockedProduct(null)}>
               Đóng
             </Button>
-            <Button variant="warning" onClick={handleDeactivateSingle}>
+            <Button variant="primary" onClick={handleDeactivateSingle}>
               Chuyển sang "Ngừng kinh doanh"
             </Button>
           </>
@@ -504,7 +504,7 @@ export const ProductList: React.FC = () => {
             <Button variant="secondary" onClick={() => setBulkBlockedProducts([])}>
               Hủy bỏ
             </Button>
-            <Button variant="warning" onClick={handleDeactivateBulkBlocked}>
+            <Button variant="primary" onClick={handleDeactivateBulkBlocked}>
               Chuyển {bulkBlockedProducts.length} sản phẩm sang "Ngừng kinh doanh"
             </Button>
           </>

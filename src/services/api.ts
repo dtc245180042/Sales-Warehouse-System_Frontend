@@ -15,7 +15,7 @@ import { validateVNPhoneNumber } from '../utils/phoneUtils';
 
 // Create base Axios instance (ready for real backend URL)
 export const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'https://api.salepro-warehouse.vn/v1',
+  baseURL: (import.meta as unknown as { env: Record<string, string> }).env?.VITE_API_URL || 'https://api.salepro-warehouse.vn/v1',
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
@@ -333,10 +333,10 @@ export const api = {
 
       // Update user today's stats
       const profile = getStored<UserProfileData>(STORAGE_KEYS.PROFILE, initialUserProfile);
-      profile.todayOrdersCount += 1;
-      profile.monthlyOrdersCount += 1;
-      profile.personalRevenue += newOrder.total;
-      profile.productsSoldCount += data.items.reduce((acc, it) => acc + it.quantity, 0);
+      profile.todayOrdersCount = (profile.todayOrdersCount ?? 0) + 1;
+      profile.monthlyOrdersCount = (profile.monthlyOrdersCount ?? 0) + 1;
+      profile.personalRevenue = (profile.personalRevenue ?? 0) + newOrder.total;
+      profile.productsSoldCount = (profile.productsSoldCount ?? 0) + data.items.reduce((acc, it) => acc + it.quantity, 0);
       setStored(STORAGE_KEYS.PROFILE, profile);
 
       return newOrder;
