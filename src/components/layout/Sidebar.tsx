@@ -32,6 +32,22 @@ interface MenuItem {
   }[];
 }
 
+const isSubmenuItemActive = (
+  currentPath: string,
+  itemPath: string,
+  allSubmenuPaths: string[]
+): boolean => {
+  if (currentPath === itemPath) return true;
+  const otherSiblingMatches = allSubmenuPaths.some(
+    (siblingPath) =>
+      siblingPath !== itemPath &&
+      siblingPath.length > itemPath.length &&
+      (currentPath === siblingPath || currentPath.startsWith(siblingPath + '/'))
+  );
+  if (otherSiblingMatches) return false;
+  return currentPath.startsWith(itemPath + '/');
+};
+
 export const Sidebar: React.FC<SidebarProps> = ({
   isMobileOpen,
   onMobileClose,
@@ -130,14 +146,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
               )}
               {visibleItems.map((item, itemIdx) => {
                 if (item.submenu) {
-                  const isAnySubActive = item.submenu.some((sub) => location.pathname === sub.path);
+                  const allSubmenuPaths = item.submenu.map((s) => s.path);
+                  const isAnySubActive = item.submenu.some((sub) =>
+                    isSubmenuItemActive(location.pathname, sub.path, allSubmenuPaths)
+                  );
                   const isSubOpen = openSubmenus[item.title.toLowerCase()] ?? isAnySubActive;
 
                   return (
                     <div key={itemIdx} className="space-y-1">
                       <button
                         onClick={() => toggleSubmenu(item.title.toLowerCase())}
-                        className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
+                        className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-sm font-medium transition-colors outline-none focus:outline-none ${
                           isAnySubActive
                             ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50/60 dark:bg-indigo-950/30'
                             : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60'
@@ -161,23 +180,30 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         <div className="pl-6 space-y-1 pt-1 border-l-2 border-slate-100 dark:border-slate-800 ml-5">
                           {item.submenu
                             .filter((sub) => sub.allowedRoles.includes(role))
-                            .map((sub, sIdx) => (
-                              <NavLink
-                                key={sIdx}
-                                to={sub.path}
-                                onClick={onMobileClose}
-                                className={({ isActive }) =>
-                                  `flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+                            .map((sub, sIdx) => {
+                              const isActive = isSubmenuItemActive(
+                                location.pathname,
+                                sub.path,
+                                allSubmenuPaths
+                              );
+
+                              return (
+                                <NavLink
+                                  key={sIdx}
+                                  to={sub.path}
+                                  end={sub.path === '/products'}
+                                  onClick={onMobileClose}
+                                  className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-all outline-none focus:outline-none ${
                                     isActive
                                       ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-200 dark:shadow-none'
                                       : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/40'
-                                  }`
-                                }
-                              >
-                                {sub.icon}
-                                <span>{sub.title}</span>
-                              </NavLink>
-                            ))}
+                                  }`}
+                                >
+                                  {sub.icon}
+                                  <span>{sub.title}</span>
+                                </NavLink>
+                              );
+                            })}
                         </div>
                       )}
                     </div>
@@ -190,7 +216,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     to={item.path!}
                     onClick={onMobileClose}
                     className={({ isActive }) =>
-                      `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                      `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all outline-none focus:outline-none ${
                         isActive
                           ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/25'
                           : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60'
