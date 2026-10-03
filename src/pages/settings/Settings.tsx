@@ -223,8 +223,14 @@ export const Settings: React.FC = () => {
                       type="tel"
                       value={profilePhone}
                       onChange={(e) => {
-                        setProfilePhone(e.target.value);
-                        if (profilePhoneError) setProfilePhoneError(null);
+                        const val = e.target.value;
+                        setProfilePhone(val);
+                        const check = validateVNPhoneNumber(val);
+                        if (!check.valid) {
+                          setProfilePhoneError(check.message || 'Số điện thoại không hợp lệ.');
+                        } else {
+                          setProfilePhoneError(null);
+                        }
                       }}
                       placeholder="Ví dụ: 0912345678"
                       className={`w-full px-3.5 py-2.5 rounded-xl border text-sm font-mono focus:ring-2 ${
@@ -234,7 +240,7 @@ export const Settings: React.FC = () => {
                       }`}
                     />
                     {profilePhoneError && (
-                      <p className="text-xs text-rose-500 mt-1">{profilePhoneError}</p>
+                      <p className="text-xs text-rose-500 mt-1 font-medium">{profilePhoneError}</p>
                     )}
                   </div>
                   <div>
@@ -275,7 +281,7 @@ export const Settings: React.FC = () => {
                   <Button
                     variant="primary"
                     type="submit"
-                    disabled={isSavingProfile}
+                    disabled={isSavingProfile || !!profilePhoneError}
                     leftIcon={<Save className="w-4 h-4" />}
                   >
                     {isSavingProfile ? 'Đang lưu...' : 'Lưu thông tin hồ sơ'}

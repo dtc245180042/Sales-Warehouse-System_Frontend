@@ -76,17 +76,21 @@ export const Profile: React.FC = () => {
 
   const handlePhoneChange = (val: string) => {
     setPhone(val);
-    if (phoneError) {
-      const check = validateVNPhoneNumber(val);
-      if (check.valid) {
-        setPhoneError(null);
-      }
+    const check = validateVNPhoneNumber(val);
+    if (!check.valid) {
+      setPhoneError(check.message || 'Số điện thoại không hợp lệ.');
+    } else {
+      setPhoneError(null);
     }
   };
 
   const handleNameChange = (val: string) => {
     setFullName(val);
-    if (nameError && val.trim().length >= 2) {
+    if (!val.trim()) {
+      setNameError('Họ và tên không được để trống.');
+    } else if (val.trim().length < 2) {
+      setNameError('Họ và tên phải có tối thiểu 2 ký tự.');
+    } else {
       setNameError(null);
     }
   };
@@ -472,7 +476,7 @@ export const Profile: React.FC = () => {
                   <Button
                     type="submit"
                     variant="primary"
-                    disabled={isSaving || !isChanged}
+                    disabled={isSaving || !isChanged || !!phoneError || !!nameError}
                     className="gap-2 shadow-lg shadow-indigo-500/20"
                   >
                     <Save className="w-4 h-4" />

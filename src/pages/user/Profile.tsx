@@ -17,12 +17,15 @@ import {
 } from 'lucide-react';
 import { mockUserApi } from '../../services/api';
 import { UserProfileData } from '../../data/mockData';
+import { validateVNPhoneNumber } from '../../utils/phoneUtils';
 
 export const ProfilePage: React.FC = () => {
   const [profile, setProfile] = useState<UserProfileData | null>(null);
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [phoneError, setPhoneError] = useState<string | null>(null);
+  const [nameError, setNameError] = useState<string | null>(null);
 
   // Editable fields
   const [fullName, setFullName] = useState('');
@@ -57,24 +60,38 @@ export const ProfilePage: React.FC = () => {
     e.preventDefault();
     if (!profile) return;
 
+    if (!fullName.trim() || fullName.trim().length < 2) {
+      setNameError('Họ và tên không được để trống (tối thiểu 2 ký tự).');
+      return;
+    }
+    setNameError(null);
+
+    const phoneVal = validateVNPhoneNumber(phone);
+    if (!phoneVal.valid) {
+      setPhoneError(phoneVal.message || 'Số điện thoại không hợp lệ.');
+      return;
+    }
+    setPhoneError(null);
+
     setIsSaving(true);
     try {
       const updated = {
-        name: fullName,
+        name: fullName.trim(),
         email,
-        phone,
+        phone: phoneVal.normalized || phone.trim(),
         avatar: avatarUrl,
       };
 
       const res = await mockUserApi.updateProfile(updated);
       if (res.data.success && res.data.data) {
         setProfile(res.data.data);
+        setPhone(res.data.data.phone);
         setToastMessage('✓ Cập nhật thông tin hồ sơ thành công!');
         setTimeout(() => setToastMessage(null), 3500);
       }
-    } catch (err) {
-      console.error('Update profile error', err);
-      alert('Không thể lưu thông tin hồ sơ.');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Không thể lưu thông tin hồ sơ.';
+      setPhoneError(msg);
     } finally {
       setIsSaving(false);
     }
@@ -240,26 +257,51 @@ export const ProfilePage: React.FC = () => {
                     type="text"
                     required
                     value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    className="w-full pl-9 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    onChange={(e) => {
+                      setFullName(e.target.value);
+                      if (nameError) setNameError(null);
+                    }}
+                    className={`w-full pl-9 pr-4 py-2.5 rounded-xl text-sm transition-colors focus:outline-none focus:ring-2 ${
+                      nameError
+                        ? 'border border-rose-500 bg-rose-50/50 dark:bg-rose-950/20 text-rose-900 focus:ring-rose-500'
+                        : 'bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:ring-blue-500'
+                    }`}
                   />
                 </div>
+                {nameError && (
+                  <p className="text-xs text-rose-500 mt-1 font-medium">{nameError}</p>
+                )}
               </div>
 
               <div>
                 <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Số điện thoại <span className="text-rose-500">*</span>
+                  Số điện thoại (Việt Nam) <span className="text-rose-500">*</span>
                 </label>
                 <div className="relative">
                   <Phone className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                   <input
                     type="tel"
                     required
+                    placeholder="Ví dụ: 0912345678"
                     value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    className="w-full pl-9 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    onChange={(e) => {
+                      setPhone(e.target.value);
+                      if (phoneError) setPhoneError(null);
+                    }}
+                    className={`w-full pl-9 pr-4 py-2.5 rounded-xl text-sm font-mono transition-colors focus:outline-none focus:ring-2 ${
+                      phoneError
+                        ? 'border border-rose-500 bg-rose-50/50 dark:bg-rose-950/20 text-rose-900 focus:ring-rose-500'
+                        : 'bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:ring-blue-500'
+                    }`}
                   />
                 </div>
+                {phoneError ? (
+                  <p className="text-xs text-rose-500 mt-1 font-medium">{phoneError}</p>
+                ) : (
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Yêu cầu đúng 10 số, đầu số 03, 05, 07, 08, 09
+                  </p>
+                )}
               </div>
 
               <div className="sm:col-span-2">
