@@ -13,7 +13,7 @@ import {
 import { PageContainer } from '../../components/layout/PageContainer';
 import { AuditLogDetailModal } from '../../components/AuditLogDetailModal';
 import { AuditLogDetail } from '../../types/auditLog';
-import { auditLogService, INITIAL_AUDIT_LOGS } from '../../services/auditLogService';
+import { auditLogService } from '../../services/auditLogService';
 
 export const AuditLogList: React.FC = () => {
   const [logs, setLogs] = useState<AuditLogDetail[]>([]);
@@ -69,12 +69,6 @@ export const AuditLogList: React.FC = () => {
     setIsModalOpen(true);
   };
 
-  const handleOpenDemoScrum373 = () => {
-    const demoLog = logs.find((l) => l.id === 'LOG-88392') || INITIAL_AUDIT_LOGS[0];
-    setSelectedLog(demoLog);
-    setIsModalOpen(true);
-  };
-
   const getActionBadge = (action: AuditLogDetail['action']) => {
     switch (action) {
       case 'CREATE':
@@ -110,7 +104,7 @@ export const AuditLogList: React.FC = () => {
       ]}
     >
       <div className="space-y-6">
-        {/* Top Action Bar & Quick Demo Button */}
+        {/* Top Action Bar */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
           <div className="flex items-center gap-3">
             <div className="p-2.5 bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 rounded-lg">
@@ -127,13 +121,6 @@ export const AuditLogList: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-2">
-            <button
-              onClick={handleOpenDemoScrum373}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg text-sm font-semibold hover:from-blue-700 hover:to-indigo-700 shadow-md shadow-blue-500/20 transition-all cursor-pointer"
-            >
-              <Eye className="w-4 h-4" />
-              Demo Modal SCRUM-373
-            </button>
             <button
               onClick={fetchLogs}
               title="Làm mới"
