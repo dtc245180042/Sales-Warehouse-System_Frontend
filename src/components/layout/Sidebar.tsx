@@ -7,6 +7,7 @@ import {
   FolderTree,
   ChevronDown,
   X,
+  Building2,
   ClipboardList,
   Boxes,
   Scale,
@@ -74,6 +75,28 @@ export const Sidebar: React.FC<SidebarProps> = ({
           title: 'Tổng quan Dashboard',
           path: '/dashboard',
           icon: <LayoutDashboard className="w-5 h-5" />,
+          allowedRoles: [
+            'Admin',
+            'SalesManager',
+            'SalesStaff',
+            'WarehouseManager',
+            'WarehouseStaff',
+            'Accountant',
+            'Director',
+            'Manager',
+            'Staff',
+            'User',
+          ],
+        },
+      ],
+    },
+    {
+      heading: 'ĐỐI TÁC & CUNG ỨNG',
+      items: [
+        {
+          title: 'Nhà cung cấp',
+          path: '/suppliers',
+          icon: <Building2 className="w-5 h-5" />,
           allowedRoles: [
             'Admin',
             'SalesManager',

@@ -18,6 +18,9 @@ import { Dashboard } from '../pages/dashboard/Dashboard';
 import { UserManagement } from '../pages/users/UserManagement';
 import { Settings } from '../pages/settings/Settings';
 import { CategoryManagement } from '../pages/categories/CategoryManagement';
+import { SupplierList } from '../pages/suppliers/SupplierList';
+import { SupplierDetail } from '../pages/suppliers/SupplierDetail';
+
 // Sprint 2 Pages - Nhật ký thao tác
 import ActivityLogPage from '../pages/activitylog/ActivityLogPage';
 
@@ -113,6 +116,24 @@ export const AppRoutes: React.FC = () => {
           element={
             <ProtectedRoute allowedRoles={['Admin', 'SalesManager', 'Manager', 'Staff']}>
               <CategoryManagement />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Quản lý Nhà cung cấp */}
+        <Route
+          path="/suppliers"
+          element={
+            <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
+              <SupplierList />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/suppliers/:id"
+          element={
+            <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
+              <SupplierDetail />
             </ProtectedRoute>
           }
         />
