@@ -18,6 +18,7 @@ import { Dashboard } from '../pages/dashboard/Dashboard';
 import { UserManagement } from '../pages/users/UserManagement';
 import { Settings } from '../pages/settings/Settings';
 import { Profile } from '../pages/profile/Profile';
+import { CategoryManagement } from '../pages/categories/CategoryManagement';
 
 // Supplier Management Pages
 import { SupplierList } from '../pages/suppliers/SupplierList';
@@ -108,6 +109,16 @@ export const AppRoutes: React.FC = () => {
           element={
             <ProtectedRoute allowedRoles={['Admin']}>
               <UserManagement />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Quản lý Nhóm hàng nhiều cấp - Quản lý kinh doanh & Admin (SCRUM-214) */}
+        <Route
+          path="/categories"
+          element={
+            <ProtectedRoute allowedRoles={['Admin', 'SalesManager', 'Manager', 'Staff']}>
+              <CategoryManagement />
             </ProtectedRoute>
           }
         />
