@@ -17,7 +17,20 @@ import { ErrorPage } from '../pages/error/ErrorPage';
 import { Dashboard } from '../pages/dashboard/Dashboard';
 import { UserManagement } from '../pages/users/UserManagement';
 import { Settings } from '../pages/settings/Settings';
+import { CategoryManagement } from '../pages/categories/CategoryManagement';
+import { SupplierList } from '../pages/suppliers/SupplierList';
+import { SupplierDetail } from '../pages/suppliers/SupplierDetail';
+
+// Sprint 2 Pages - Nhật ký thao tác & kiểm toán
+import ActivityLogPage from '../pages/activitylog/ActivityLogPage';
 import { AuditLogList } from '../pages/audit/AuditLogList';
+
+// Danh mục sản phẩm
+import { ProductList } from '../pages/products/ProductList';
+import { ProductDetail } from '../pages/products/ProductDetail';
+import { ProductCreate } from '../pages/products/ProductCreate';
+import { ProductEdit } from '../pages/products/ProductEdit';
+import { ProductUnitPage } from '../pages/products/ProductUnitPage';
 
 // All 7 business roles allowed in Sprint 1 backoffice
 const ALL_BACKOFFICE_ROLES: UserRole[] = [
@@ -98,6 +111,34 @@ export const AppRoutes: React.FC = () => {
           }
         />
 
+        {/* Quản lý Nhóm hàng nhiều cấp - Quản lý kinh doanh & Admin (SCRUM-214) */}
+        <Route
+          path="/categories"
+          element={
+            <ProtectedRoute allowedRoles={['Admin', 'SalesManager', 'Manager', 'Staff']}>
+              <CategoryManagement />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Quản lý Nhà cung cấp */}
+        <Route
+          path="/suppliers"
+          element={
+            <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
+              <SupplierList />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/suppliers/:id"
+          element={
+            <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
+              <SupplierDetail />
+            </ProtectedRoute>
+          }
+        />
+
         {/* Nhật ký hoạt động & Kiểm toán - SCRUM-373 */}
         <Route
           path="/audit-logs"
@@ -114,6 +155,60 @@ export const AppRoutes: React.FC = () => {
           element={
             <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
               <Settings />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Nhật ký thao tác - Chỉ Admin (Sprint 2) */}
+        <Route
+          path="/activity-log"
+          element={
+            <ProtectedRoute allowedRoles={['Admin']}>
+              <ActivityLogPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* ============================================================ */}
+        {/* DANH MỤC SẢN PHẨM                                           */}
+        {/* ============================================================ */}
+        <Route
+          path="/products"
+          element={
+            <ProtectedRoute allowedRoles={['Admin', 'SalesManager', 'SalesStaff', 'WarehouseManager', 'WarehouseStaff', 'Director', 'Manager', 'Staff']}>
+              <ProductList />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/products/new"
+          element={
+            <ProtectedRoute allowedRoles={['Admin', 'SalesManager', 'WarehouseManager', 'Director', 'Manager']}>
+              <ProductCreate />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/products/units"
+          element={
+            <ProtectedRoute allowedRoles={['Admin', 'SalesManager', 'WarehouseManager', 'Director', 'Manager']}>
+              <ProductUnitPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/products/:id"
+          element={
+            <ProtectedRoute allowedRoles={['Admin', 'SalesManager', 'SalesStaff', 'WarehouseManager', 'WarehouseStaff', 'Director', 'Manager', 'Staff']}>
+              <ProductDetail />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/products/:id/edit"
+          element={
+            <ProtectedRoute allowedRoles={['Admin', 'SalesManager', 'WarehouseManager', 'Director', 'Manager']}>
+              <ProductEdit />
             </ProtectedRoute>
           }
         />

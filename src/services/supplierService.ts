@@ -1,8 +1,11 @@
 import { Supplier } from '../types/Supplier';
+import { StockInReceipt } from '../types/Inventory';
 import { initialSuppliers } from '../mock/suppliers';
+import { initialStockInReceipts } from '../mock/inventory';
 import { getStorageItem, setStorageItem } from './storage';
 
 const STORAGE_KEY = 'kv_suppliers';
+const STOCK_IN_KEY = 'kv_stock_in_receipts';
 
 export const supplierService = {
   getAll: async (): Promise<Supplier[]> => {
@@ -16,17 +19,19 @@ export const supplierService = {
     return suppliers.find((s) => s.id === id || s.code === id);
   },
 
-  create: async (data: Omit<Supplier, 'id' | 'code' | 'createdAt' | 'totalImports' | 'totalSpent'>): Promise<Supplier> => {
+  create: async (
+    data: Omit<Supplier, 'id' | 'createdAt' | 'totalImports' | 'totalSpent'> & { code?: string }
+  ): Promise<Supplier> => {
     await new Promise((r) => setTimeout(r, 300));
     const suppliers = getStorageItem<Supplier[]>(STORAGE_KEY, initialSuppliers);
     const newSupplier: Supplier = {
       ...data,
       id: `SUP-${String(suppliers.length + 1).padStart(3, '0')}`,
-      code: `NCC-${String(suppliers.length + 1).padStart(2, '0')}`,
+      code: data.code?.trim() || `NCC-${String(suppliers.length + 1).padStart(2, '0')}`,
       totalImports: 0,
       totalSpent: 0,
       createdAt: new Date().toISOString().split('T')[0],
-      status: 'active',
+      status: data.status || 'active',
     };
     const updated = [newSupplier, ...suppliers];
     setStorageItem(STORAGE_KEY, updated);
@@ -51,5 +56,34 @@ export const supplierService = {
     const filtered = suppliers.filter((s) => s.id !== id);
     setStorageItem(STORAGE_KEY, filtered);
     return true;
-  }
+  },
+
+  /** Kiểm tra xem nhà cung cấp đã từng có phiếu nhập kho hay chưa */
+  hasImportReceipts: async (supplierId: string): Promise<boolean> => {
+    await new Promise((r) => setTimeout(r, 100));
+    const receipts = getStorageItem<StockInReceipt[]>(STOCK_IN_KEY, initialStockInReceipts);
+    const supplier = getStorageItem<Supplier[]>(STORAGE_KEY, initialSuppliers).find(
+      (s) => s.id === supplierId
+    );
+    return receipts.some(
+      (r) =>
+        r.supplierId === supplierId ||
+        (supplier && r.supplierName === supplier.name)
+    );
+  },
+
+  /** Ngừng giao dịch với nhà cung cấp (chuyển status -> inactive kèm lý do) */
+  suspend: async (id: string, reason?: string): Promise<Supplier> => {
+    await new Promise((r) => setTimeout(r, 200));
+    const suppliers = getStorageItem<Supplier[]>(STORAGE_KEY, initialSuppliers);
+    const index = suppliers.findIndex((s) => s.id === id);
+    if (index === -1) throw new Error('Không tìm thấy nhà cung cấp');
+    suppliers[index] = {
+      ...suppliers[index],
+      status: 'inactive',
+      ...(reason ? { suspendReason: reason.trim() } : {}),
+    };
+    setStorageItem(STORAGE_KEY, [...suppliers]);
+    return suppliers[index];
+  },
 };
