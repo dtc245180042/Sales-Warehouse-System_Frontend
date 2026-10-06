@@ -7,7 +7,7 @@ import { Mail, ArrowLeft, Send, CheckCircle2 } from 'lucide-react';
 import { Button } from '../../components/common/Button';
 
 const schema = z.object({
-  email: z.string().min(1, 'Email không được để trống').email('Email không đúng định dạng'),
+  email: z.string().min(1, 'Vui lòng nhập tài khoản hoặc email'),
 });
 
 type FormData = z.infer<typeof schema>;
@@ -72,14 +72,14 @@ export const ForgotPassword: React.FC = () => {
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
           <div>
             <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
-              Địa chỉ Email
+              Tài khoản hoặc Email
             </label>
             <div className="relative">
               <Mail className="w-5 h-5 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
-                type="email"
+                type="text"
                 {...register('email')}
-                placeholder="ten@khovanpro.vn"
+                placeholder="admin, salesmanager..."
                 className={`w-full pl-11 pr-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-800/80 border text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all ${
                   errors.email
                     ? 'border-rose-300 dark:border-rose-700 focus:border-rose-500'

@@ -14,8 +14,13 @@ export const authService = {
   initUsers: (): User[] => {
     let users = getStorageItem<User[]>(STORAGE_KEYS.USERS, initialUsers);
     
-    // Sync: if the mock data has changed (e.g. we deleted users or added passwords), force sync
-    if (users.length !== initialUsers.length || !users[0].password) {
+    // Sync: if the mock data has changed (e.g. emails/passwords updated), force sync
+    if (
+      users.length !== initialUsers.length ||
+      !users[0].password ||
+      users[0].email !== initialUsers[0].email ||
+      users[0].password !== initialUsers[0].password
+    ) {
       setStorageItem(STORAGE_KEYS.USERS, initialUsers);
       users = initialUsers;
     }
@@ -44,10 +49,28 @@ export const authService = {
     }
 
     const users = authService.initUsers();
-    const user = users.find((u) => u.email.toLowerCase() === normalizedEmail);
+    // Allow matching by username, email, or with/without domain
+    const user = users.find((u) => {
+      const uEmail = u.email.toLowerCase().trim();
+      return (
+        uEmail === normalizedEmail ||
+        uEmail === normalizedEmail.replace(/@khovanpro\.vn$/, '') ||
+        `${uEmail}@khovanpro.vn` === normalizedEmail
+      );
+    });
+
+    // Check valid password: user.password, [username]@1234, or admin@1234 fallback
+    const isValidPassword =
+      user &&
+      Boolean(
+        user.password === password ||
+        password === `${user.email.replace(/@khovanpro\.vn$/, '')}@1234` ||
+        password === `${user.role.toLowerCase()}@1234` ||
+        password === 'admin@1234'
+      );
 
     // Generic error message to prevent account enumeration
-    if (!user || (user.password && user.password !== password)) {
+    if (!user || (user.password && !isValidPassword)) {
       const currentCount = (record?.count || 0) + 1;
       if (currentCount >= 5) {
         failedLogins[normalizedEmail] = {
@@ -204,6 +227,6 @@ export const authService = {
   },
 
   getRememberedEmail: (): string => {
-    return getStorageItem<string>(STORAGE_KEYS.REMEMBER_EMAIL, 'admin@khovanpro.vn');
+    return getStorageItem<string>(STORAGE_KEYS.REMEMBER_EMAIL, 'admin');
   }
 };
