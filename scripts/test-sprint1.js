@@ -1,4 +1,5 @@
 /* global process */
+/* eslint-disable no-unused-vars */
 /**
  * KIỂM THỬ TỰ ĐỘNG SPRINT 1 - OMS Pro
  * Bao gồm: SCRUM-198, 199, 200, 201, 202, 203, 204, 205, 206, 207

@@ -17,6 +17,8 @@ import { ErrorPage } from '../pages/error/ErrorPage';
 import { Dashboard } from '../pages/dashboard/Dashboard';
 import { UserManagement } from '../pages/users/UserManagement';
 import { Settings } from '../pages/settings/Settings';
+import { SupplierList } from '../pages/suppliers/SupplierList';
+import { SupplierDetail } from '../pages/suppliers/SupplierDetail';
 
 <<<<<<< HEAD
 // Sprint 2 Pages
@@ -105,6 +107,24 @@ export const AppRoutes: React.FC = () => {
           element={
             <ProtectedRoute allowedRoles={['Admin']}>
               <UserManagement />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Quản lý Nhà cung cấp */}
+        <Route
+          path="/suppliers"
+          element={
+            <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
+              <SupplierList />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/suppliers/:id"
+          element={
+            <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
+              <SupplierDetail />
             </ProtectedRoute>
           }
         />

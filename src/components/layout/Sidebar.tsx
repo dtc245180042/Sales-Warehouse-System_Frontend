@@ -6,13 +6,11 @@ import {
   Settings,
   ChevronDown,
   X,
-<<<<<<< HEAD
+Building2,
   ClipboardList,
-=======
   Boxes,
   Scale,
   LayoutList,
->>>>>>> 51fdeb51cfaf11d1c555108c4dee36d39048c5ee
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { UserRole } from '../../types/User';
@@ -92,6 +90,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
       ],
     },
     {
+      heading: 'ĐỐI TÁC & CUNG ỨNG',
+      items: [
+        {
+          title: 'Nhà cung cấp',
+          path: '/suppliers',
+          icon: <Building2 className="w-5 h-5" />,
       heading: 'DANH MỤC SẢN PHẨM',
       items: [
         {
@@ -103,6 +107,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
             'SalesStaff',
             'WarehouseManager',
             'WarehouseStaff',
+            'Accountant',
+            'Director',
+            'Manager',
+            'Staff',
+            'User',
             'Director',
             'Manager',
             'Staff',
