@@ -21,8 +21,9 @@ import { CategoryManagement } from '../pages/categories/CategoryManagement';
 import { SupplierList } from '../pages/suppliers/SupplierList';
 import { SupplierDetail } from '../pages/suppliers/SupplierDetail';
 
-// Sprint 2 Pages - Nhật ký thao tác
+// Sprint 2 Pages - Nhật ký thao tác & kiểm toán
 import ActivityLogPage from '../pages/activitylog/ActivityLogPage';
+import { AuditLogList } from '../pages/audit/AuditLogList';
 
 // Danh mục sản phẩm
 import { ProductList } from '../pages/products/ProductList';
@@ -134,6 +135,16 @@ export const AppRoutes: React.FC = () => {
           element={
             <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
               <SupplierDetail />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Nhật ký hoạt động & Kiểm toán - SCRUM-373 */}
+        <Route
+          path="/audit-logs"
+          element={
+            <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
+              <AuditLogList />
             </ProtectedRoute>
           }
         />
