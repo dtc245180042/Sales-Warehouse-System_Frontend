@@ -3,15 +3,12 @@ import { Link, useNavigate } from 'react-router-dom';
 import {
   Plus,
   Search,
-  Filter,
   Download,
   Upload,
   Trash2,
   Edit,
   Eye,
   AlertTriangle,
-  Boxes,
-  FileSpreadsheet,
 } from 'lucide-react';
 import { PageContainer } from '../../components/layout/PageContainer';
 import { DataTable, Column } from '../../components/common/DataTable';
@@ -19,6 +16,7 @@ import { Button } from '../../components/common/Button';
 import { Badge } from '../../components/common/Badge';
 import { ConfirmDialog } from '../../components/common/ConfirmDialog';
 import { Modal } from '../../components/common/Modal';
+import { ExcelImportModal } from '../../components/products/ExcelImportModal';
 import { formatCurrency, formatDateOnly } from '../../utils/formatters';
 import { productService } from '../../services/productService';
 import { Product } from '../../types/Product';
@@ -538,45 +536,16 @@ export const ProductList: React.FC = () => {
         </div>
       </Modal>
 
-      {/* Import Modal */}
-      <Modal
+      {/* Excel Import Modal */}
+      <ExcelImportModal
         isOpen={isImportModalOpen}
         onClose={() => setIsImportModalOpen(false)}
-        title="Nhập dữ liệu sản phẩm từ Excel"
-        maxWidth="md"
-        footer={
-          <>
-            <Button variant="secondary" onClick={() => setIsImportModalOpen(false)}>
-              Hủy bỏ
-            </Button>
-            <Button
-              variant="primary"
-              onClick={() => {
-                showToast('Đã nhập 15 sản phẩm từ tệp mẫu thành công!', 'success');
-                setIsImportModalOpen(false);
-              }}
-            >
-              Tiến hành nhập file
-            </Button>
-          </>
-        }
-      >
-        <div className="space-y-4 text-xs sm:text-sm">
-          <p className="text-slate-600 dark:text-slate-300">
-            Tải lên tệp danh sách sản phẩm theo định dạng chuẩn (.xlsx hoặc .csv).
-          </p>
-          <div className="border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl p-6 text-center hover:border-indigo-500 transition-colors cursor-pointer bg-slate-50 dark:bg-slate-800/40">
-            <FileSpreadsheet className="w-10 h-10 text-indigo-500 mx-auto mb-2" />
-            <p className="font-semibold text-slate-800 dark:text-slate-200">
-              Kéo thả tệp vào đây hoặc nhấn để chọn
-            </p>
-            <p className="text-[11px] text-slate-400 mt-1">Hỗ trợ tệp XLSX, CSV tối đa 10MB</p>
-          </div>
-          <div className="text-[11px] text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer">
-            Tải về tệp mẫu nhập sản phẩm (.xlsx)
-          </div>
-        </div>
-      </Modal>
+        onImportSuccess={(count) => {
+          showToast(`Đã nhập thành công ${count} sản phẩm vào hệ thống!`, 'success');
+          setIsImportModalOpen(false);
+          loadProducts();
+        }}
+      />
     </PageContainer>
   );
 };
