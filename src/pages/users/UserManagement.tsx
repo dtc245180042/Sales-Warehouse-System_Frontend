@@ -569,13 +569,13 @@ export const UserManagement: React.FC = () => {
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                Email đăng nhập *
+                Tài khoản / Email đăng nhập *
               </label>
               <input
-                type="email"
+                type="text"
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                placeholder="user@khovanpro.vn"
+                placeholder="admin, nv_kho hoặc email..."
                 className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500"
                 required
               />
