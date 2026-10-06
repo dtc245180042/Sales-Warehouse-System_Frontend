@@ -10,6 +10,7 @@ interface AuthContextType {
   login: (email: string, pass: string, remember?: boolean) => Promise<User>;
   logout: () => Promise<void>;
   changePassword: (currentPass: string, newPass: string, revokeOthers?: boolean) => Promise<void>;
+  updateProfile: (data: { name: string; phone: string; avatar?: string }) => Promise<User>;
   switchRole: (role: UserRole) => void;
   canAccess: (allowedRoles: UserRole[]) => boolean;
 }
@@ -98,6 +99,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(updatedUser);
   };
 
+  const updateProfile = async (data: { name: string; phone: string; avatar?: string }): Promise<User> => {
+    setIsLoading(true);
+    try {
+      const updated = await authService.updateProfile(data);
+      setUser(updated);
+      return updated;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const switchRole = (newRole: UserRole) => {
     const switchedUser = authService.switchRole(newRole);
     setUser(switchedUser);
@@ -121,6 +133,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         login,
         logout,
         changePassword,
+        updateProfile,
         switchRole,
         canAccess,
       }}

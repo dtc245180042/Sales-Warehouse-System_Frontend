@@ -27,6 +27,7 @@ import { userService } from '../../services/userService';
 import { User, UserRole, UserStatus } from '../../types/User';
 import { useToast } from '../../contexts/ToastContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { validateVNPhoneNumber, normalizeVNPhoneNumber } from '../../utils/phoneUtils';
 
 const WAREHOUSE_OPTIONS = [
   'Kho Tổng Hà Nội',
@@ -61,6 +62,7 @@ export const UserManagement: React.FC = () => {
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [phoneError, setPhoneError] = useState<string | null>(null);
 
   // Add / Edit Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -120,6 +122,7 @@ export const UserManagement: React.FC = () => {
 
   const handleOpenCreate = () => {
     setEditingUser(null);
+    setPhoneError(null);
     setFormData({
       name: '',
       email: '',
@@ -137,6 +140,7 @@ export const UserManagement: React.FC = () => {
 
   const handleOpenEdit = (u: User) => {
     setEditingUser(u);
+    setPhoneError(null);
     const assignedRoles = u.roles && u.roles.length > 0 ? u.roles : [u.role];
     setFormData({
       name: u.name,
@@ -186,6 +190,16 @@ export const UserManagement: React.FC = () => {
       showToast('Vui lòng nhập họ tên và email tài khoản', 'warning');
       return;
     }
+
+    if (formData.phone && formData.phone.trim()) {
+      const phoneVal = validateVNPhoneNumber(formData.phone);
+      if (!phoneVal.valid) {
+        setPhoneError(phoneVal.message || 'Số điện thoại không hợp lệ.');
+        showToast(phoneVal.message || 'Số điện thoại không hợp lệ.', 'error', 'Lỗi số điện thoại');
+        return;
+      }
+    }
+    setPhoneError(null);
 
     // SCRUM-206: Warehouse role must be bound to at least one warehouse
     const hasWarehouseRole = formData.roles.some((r) =>
@@ -585,15 +599,31 @@ export const UserManagement: React.FC = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                Số điện thoại
+                Số điện thoại (Việt Nam)
               </label>
               <input
                 type="tel"
                 value={formData.phone}
-                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                placeholder="0912345678"
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500"
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setFormData({ ...formData, phone: val });
+                  if (val.trim()) {
+                    const check = validateVNPhoneNumber(val);
+                    setPhoneError(check.valid ? null : check.message || 'Số điện thoại không hợp lệ.');
+                  } else {
+                    setPhoneError(null);
+                  }
+                }}
+                placeholder="Ví dụ: 0912345678"
+                className={`w-full px-3 py-2 rounded-xl border text-sm font-mono focus:ring-2 ${
+                  phoneError
+                    ? 'border-rose-500 bg-rose-50/50 dark:bg-rose-950/20 text-rose-900 focus:ring-rose-500'
+                    : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:ring-indigo-500'
+                }`}
               />
+              {phoneError && (
+                <p className="text-xs text-rose-500 mt-1 font-medium">{phoneError}</p>
+              )}
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
@@ -658,7 +688,7 @@ export const UserManagement: React.FC = () => {
                     <input
                       type="checkbox"
                       checked={isChecked}
-                      disabled={isSelfAdmin}
+                      disabled={Boolean(isSelfAdmin)}
                       onChange={() => handleRoleToggle(role)}
                       className="mt-0.5 w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500"
                     />
@@ -749,7 +779,7 @@ export const UserManagement: React.FC = () => {
             <Button variant="secondary" type="button" onClick={() => setIsModalOpen(false)}>
               Hủy
             </Button>
-            <Button variant="primary" type="submit">
+            <Button variant="primary" type="submit" disabled={!!phoneError}>
               {editingUser ? 'Lưu thay đổi' : 'Tạo tài khoản & Gửi email kích hoạt'}
             </Button>
           </div>
@@ -871,7 +901,7 @@ export const UserManagement: React.FC = () => {
         title="Mở Khóa Tài Khoản"
         message={`Bạn có chắc chắn muốn mở khóa tài khoản cho ${unlockingUser?.name}? Nhân sự sẽ được khôi phục quyền đăng nhập và tạo đơn theo quyền hạn phân bổ.`}
         confirmText="Mở khóa tài khoản"
-        variant="primary"
+        variant="info"
       />
 
       {/* Delete User Confirmation */}

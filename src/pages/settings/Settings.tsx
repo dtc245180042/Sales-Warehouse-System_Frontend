@@ -17,9 +17,10 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useToast } from '../../contexts/ToastContext';
 import { getRoleDisplayName } from '../../utils/roleUtils';
+import { validateVNPhoneNumber, normalizeVNPhoneNumber } from '../../utils/phoneUtils';
 
 export const Settings: React.FC = () => {
-  const { user, role, changePassword } = useAuth();
+  const { user, role, changePassword, updateProfile } = useAuth();
   const { theme, setTheme } = useTheme();
   const { showToast } = useToast();
 
@@ -28,6 +29,8 @@ export const Settings: React.FC = () => {
   // Profile local state
   const [profileName, setProfileName] = useState(user?.name || '');
   const [profilePhone, setProfilePhone] = useState(user?.phone || '');
+  const [profilePhoneError, setProfilePhoneError] = useState<string | null>(null);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
 
   // Security state (SCRUM-201)
   const [oldPassword, setOldPassword] = useState('');
@@ -36,9 +39,37 @@ export const Settings: React.FC = () => {
   const [revokeOthers, setRevokeOthers] = useState(true);
   const [isChangingPass, setIsChangingPass] = useState(false);
 
-  const handleSaveProfile = (e: React.FormEvent) => {
+  const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    showToast('Đã lưu thông tin hồ sơ người dùng thành công!', 'success');
+    const trimmedName = profileName.trim();
+    if (!trimmedName || trimmedName.length < 2) {
+      showToast('Họ và tên không được để trống (tối thiểu 2 ký tự).', 'warning');
+      return;
+    }
+
+    const phoneVal = validateVNPhoneNumber(profilePhone);
+    if (!phoneVal.valid) {
+      setProfilePhoneError(phoneVal.message || 'Số điện thoại không hợp lệ.');
+      showToast(phoneVal.message || 'Số điện thoại không hợp lệ.', 'error');
+      return;
+    }
+    setProfilePhoneError(null);
+
+    setIsSavingProfile(true);
+    try {
+      const normalizedPhone = normalizeVNPhoneNumber(profilePhone);
+      await updateProfile({
+        name: trimmedName,
+        phone: normalizedPhone,
+      });
+      setProfilePhone(normalizedPhone);
+      showToast('Đã lưu thông tin hồ sơ người dùng thành công!', 'success');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Không thể lưu thông tin hồ sơ.';
+      showToast(message, 'error');
+    } finally {
+      setIsSavingProfile(false);
+    }
   };
 
   const handleSaveSecurity = async (e: React.FormEvent) => {
@@ -186,14 +217,31 @@ export const Settings: React.FC = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                      Số điện thoại
+                      Số điện thoại (Việt Nam) <span className="text-rose-500">*</span>
                     </label>
                     <input
                       type="tel"
                       value={profilePhone}
-                      onChange={(e) => setProfilePhone(e.target.value)}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm focus:ring-2 focus:ring-indigo-500"
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setProfilePhone(val);
+                        const check = validateVNPhoneNumber(val);
+                        if (!check.valid) {
+                          setProfilePhoneError(check.message || 'Số điện thoại không hợp lệ.');
+                        } else {
+                          setProfilePhoneError(null);
+                        }
+                      }}
+                      placeholder="Ví dụ: 0912345678"
+                      className={`w-full px-3.5 py-2.5 rounded-xl border text-sm font-mono focus:ring-2 ${
+                        profilePhoneError
+                          ? 'border-rose-400 bg-rose-50/50 dark:bg-rose-950/20 text-rose-900 focus:ring-rose-400'
+                          : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-indigo-500'
+                      }`}
                     />
+                    {profilePhoneError && (
+                      <p className="text-xs text-rose-500 mt-1 font-medium">{profilePhoneError}</p>
+                    )}
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
@@ -230,8 +278,13 @@ export const Settings: React.FC = () => {
                 </div>
 
                 <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
-                  <Button variant="primary" type="submit" leftIcon={<Save className="w-4 h-4" />}>
-                    Lưu thông tin hồ sơ
+                  <Button
+                    variant="primary"
+                    type="submit"
+                    disabled={isSavingProfile || !!profilePhoneError}
+                    leftIcon={<Save className="w-4 h-4" />}
+                  >
+                    {isSavingProfile ? 'Đang lưu...' : 'Lưu thông tin hồ sơ'}
                   </Button>
                 </div>
               </form>

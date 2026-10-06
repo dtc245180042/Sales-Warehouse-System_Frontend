@@ -17,14 +17,17 @@ import { ErrorPage } from '../pages/error/ErrorPage';
 import { Dashboard } from '../pages/dashboard/Dashboard';
 import { UserManagement } from '../pages/users/UserManagement';
 import { Settings } from '../pages/settings/Settings';
+import { Profile } from '../pages/profile/Profile';
 import { CategoryManagement } from '../pages/categories/CategoryManagement';
+
+// Supplier Management Pages
 import { SupplierList } from '../pages/suppliers/SupplierList';
 import { SupplierDetail } from '../pages/suppliers/SupplierDetail';
 
-// Sprint 2 Pages - Nhật ký thao tác
+// Sprint 2 Pages - Activity Log
 import ActivityLogPage from '../pages/activitylog/ActivityLogPage';
 
-// Danh mục sản phẩm
+// Product Catalog Pages (Sprint 2: SCRUM-220, SCRUM-380, SCRUM-381)
 import { ProductList } from '../pages/products/ProductList';
 import { ProductDetail } from '../pages/products/ProductDetail';
 import { ProductCreate } from '../pages/products/ProductCreate';
@@ -148,6 +151,16 @@ export const AppRoutes: React.FC = () => {
           }
         />
 
+        {/* Hồ sơ cá nhân - Xem và cập nhật họ tên, SĐT Việt Nam - Mọi vai trò (SCRUM-210, SCRUM-361) */}
+        <Route
+          path="/profile"
+          element={
+            <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
+              <Profile />
+            </ProtectedRoute>
+          }
+        />
+
         {/* Nhật ký thao tác - Chỉ Admin (Sprint 2) */}
         <Route
           path="/activity-log"
@@ -159,7 +172,7 @@ export const AppRoutes: React.FC = () => {
         />
 
         {/* ============================================================ */}
-        {/* DANH MỤC SẢN PHẨM                                           */}
+        {/* DANH MỤC SẢN PHẨM                                            */}
         {/* ============================================================ */}
         <Route
           path="/products"
@@ -171,6 +184,14 @@ export const AppRoutes: React.FC = () => {
         />
         <Route
           path="/products/new"
+          element={
+            <ProtectedRoute allowedRoles={['Admin', 'SalesManager', 'WarehouseManager', 'Director', 'Manager']}>
+              <ProductCreate />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/products/create"
           element={
             <ProtectedRoute allowedRoles={['Admin', 'SalesManager', 'WarehouseManager', 'Director', 'Manager']}>
               <ProductCreate />

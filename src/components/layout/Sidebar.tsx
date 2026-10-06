@@ -124,6 +124,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             'SalesStaff',
             'WarehouseManager',
             'WarehouseStaff',
+
             'Director',
             'Manager',
             'Staff',

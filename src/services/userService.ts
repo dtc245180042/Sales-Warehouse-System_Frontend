@@ -1,6 +1,7 @@
 import { User } from '../types/User';
 import { initialUsers } from '../mock/users';
 import { getStorageItem, setStorageItem } from './storage';
+import { validateVNPhoneNumber } from '../utils/phoneUtils';
 
 const STORAGE_KEY = 'kv_users';
 
@@ -20,8 +21,18 @@ export const userService = {
       throw new Error(`Email "${data.email}" đã tồn tại trong hệ thống. Vui lòng nhập email khác.`);
     }
 
+    let normalizedPhone = data.phone;
+    if (data.phone && data.phone.trim()) {
+      const phoneVal = validateVNPhoneNumber(data.phone);
+      if (!phoneVal.valid) {
+        throw new Error(phoneVal.message || 'Số điện thoại không hợp lệ.');
+      }
+      normalizedPhone = phoneVal.normalized;
+    }
+
     const newUser: User = {
       ...data,
+      phone: normalizedPhone,
       id: `USR-${String(users.length + 1).padStart(3, '0')}`,
       createdAt: new Date().toISOString().split('T')[0],
       lastLogin: 'Chưa đăng nhập (Chờ kích hoạt)',
@@ -45,7 +56,20 @@ export const userService = {
       }
     }
 
-    const updated = { ...users[index], ...data };
+    let normalizedPhone = data.phone;
+    if (data.phone !== undefined && data.phone !== null && data.phone.trim()) {
+      const phoneVal = validateVNPhoneNumber(data.phone);
+      if (!phoneVal.valid) {
+        throw new Error(phoneVal.message || 'Số điện thoại không hợp lệ.');
+      }
+      normalizedPhone = phoneVal.normalized;
+    }
+
+    const updated = {
+      ...users[index],
+      ...data,
+      ...(data.phone !== undefined ? { phone: normalizedPhone } : {}),
+    };
     users[index] = updated;
     setStorageItem(STORAGE_KEY, [...users]);
     return updated;
