@@ -120,6 +120,17 @@ export const UserManagement: React.FC = () => {
     });
   }, [users, search, roleFilter, statusFilter]);
 
+  // SCRUM-206: Danh sách địa bàn gợi ý (5 vùng có sẵn + các địa bàn người dùng đã nhập trước đó)
+  const suggestedTerritories = useMemo(() => {
+    const list = [...TERRITORY_OPTIONS];
+    users.forEach((u) => {
+      if (u.territory && u.territory.trim() && !list.includes(u.territory.trim())) {
+        list.push(u.territory.trim());
+      }
+    });
+    return list;
+  }, [users]);
+
   const handleOpenCreate = () => {
     setEditingUser(null);
     setPhoneError(null);
@@ -738,22 +749,23 @@ export const UserManagement: React.FC = () => {
           {/* SCRUM-206: Territory Binding (Required for Sales roles) */}
           {formData.roles.some((r) => ['SalesManager', 'SalesStaff'].includes(r)) && (
             <div className="p-3.5 rounded-2xl bg-amber-50/60 dark:bg-amber-950/30 border border-amber-200/60 dark:border-amber-800/40">
-              <label className="block text-xs font-bold text-amber-900 dark:text-amber-200 mb-1.5 flex items-center gap-1.5">
-                <span>Gán địa bàn hoạt động (Bắt buộc với vai trò Quản lý / Nhân viên kinh doanh) *</span>
+              <label className="block text-xs font-bold text-amber-900 dark:text-amber-200 mb-1.5">
+                Gán địa bàn hoạt động (Bắt buộc với vai trò Quản lý / Nhân viên kinh doanh) *
               </label>
-              <select
+              <input
+                type="text"
+                list="territory-datalist"
                 value={formData.territory}
                 onChange={(e) => setFormData({ ...formData, territory: e.target.value })}
-                className="w-full px-3 py-2 rounded-xl border border-amber-200 dark:border-amber-800 bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-amber-500"
+                placeholder="Chọn hoặc nhập địa bàn phụ trách..."
+                className="w-full px-3 py-2 rounded-xl border border-amber-300 dark:border-amber-700 bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-amber-500"
                 required
-              >
-                <option value="">-- Vui lòng chọn địa bàn phụ trách --</option>
-                {TERRITORY_OPTIONS.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
+              />
+              <datalist id="territory-datalist">
+                {suggestedTerritories.map((t) => (
+                  <option key={t} value={t} />
                 ))}
-              </select>
+              </datalist>
               <p className="text-[11px] text-amber-700 dark:text-amber-400 mt-1">
                 Nhân viên kinh doanh chỉ phụ trách chăm sóc các đại lý thuộc địa bàn này.
               </p>
