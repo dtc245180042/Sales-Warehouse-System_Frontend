@@ -4,9 +4,10 @@ import {
   LayoutDashboard,
   ShieldCheck,
   Settings,
+  FolderTree,
   ChevronDown,
   X,
-Building2,
+  Building2,
   ClipboardList,
   Boxes,
   Scale,
@@ -96,11 +97,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
           title: 'Nhà cung cấp',
           path: '/suppliers',
           icon: <Building2 className="w-5 h-5" />,
-      heading: 'DANH MỤC SẢN PHẨM',
-      items: [
-        {
-          title: 'Sản phẩm',
-          icon: <Boxes className="w-5 h-5" />,
           allowedRoles: [
             'Admin',
             'SalesManager',
@@ -112,6 +108,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
             'Manager',
             'Staff',
             'User',
+          ],
+        },
+      ],
+    },
+    {
+      heading: 'DANH MỤC SẢN PHẨM',
+      items: [
+        {
+          title: 'Sản phẩm',
+          icon: <Boxes className="w-5 h-5" />,
+          allowedRoles: [
+            'Admin',
+            'SalesManager',
+            'SalesStaff',
+            'WarehouseManager',
+            'WarehouseStaff',
             'Director',
             'Manager',
             'Staff',
@@ -144,6 +156,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 'Manager',
               ],
             },
+          ],
+        },
+        {
+          title: 'Nhóm hàng & Ngành hàng',
+          path: '/categories',
+          icon: <FolderTree className="w-5 h-5" />,
+          allowedRoles: [
+            'Admin',
+            'SalesManager',
+            'Manager',
+            'Staff',
           ],
         },
       ],

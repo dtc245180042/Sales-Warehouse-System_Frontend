@@ -17,20 +17,19 @@ import { ErrorPage } from '../pages/error/ErrorPage';
 import { Dashboard } from '../pages/dashboard/Dashboard';
 import { UserManagement } from '../pages/users/UserManagement';
 import { Settings } from '../pages/settings/Settings';
+import { CategoryManagement } from '../pages/categories/CategoryManagement';
 import { SupplierList } from '../pages/suppliers/SupplierList';
 import { SupplierDetail } from '../pages/suppliers/SupplierDetail';
 
-<<<<<<< HEAD
-// Sprint 2 Pages
+// Sprint 2 Pages - Nhật ký thao tác
 import ActivityLogPage from '../pages/activitylog/ActivityLogPage';
-=======
+
 // Danh mục sản phẩm
 import { ProductList } from '../pages/products/ProductList';
 import { ProductDetail } from '../pages/products/ProductDetail';
 import { ProductCreate } from '../pages/products/ProductCreate';
 import { ProductEdit } from '../pages/products/ProductEdit';
 import { ProductUnitPage } from '../pages/products/ProductUnitPage';
->>>>>>> 51fdeb51cfaf11d1c555108c4dee36d39048c5ee
 
 // All 7 business roles allowed in Sprint 1 backoffice
 const ALL_BACKOFFICE_ROLES: UserRole[] = [
@@ -111,6 +110,16 @@ export const AppRoutes: React.FC = () => {
           }
         />
 
+        {/* Quản lý Nhóm hàng nhiều cấp - Quản lý kinh doanh & Admin (SCRUM-214) */}
+        <Route
+          path="/categories"
+          element={
+            <ProtectedRoute allowedRoles={['Admin', 'SalesManager', 'Manager', 'Staff']}>
+              <CategoryManagement />
+            </ProtectedRoute>
+          }
+        />
+
         {/* Quản lý Nhà cung cấp */}
         <Route
           path="/suppliers"
@@ -139,14 +148,16 @@ export const AppRoutes: React.FC = () => {
           }
         />
 
-<<<<<<< HEAD
         {/* Nhật ký thao tác - Chỉ Admin (Sprint 2) */}
         <Route
           path="/activity-log"
           element={
             <ProtectedRoute allowedRoles={['Admin']}>
               <ActivityLogPage />
-=======
+            </ProtectedRoute>
+          }
+        />
+
         {/* ============================================================ */}
         {/* DANH MỤC SẢN PHẨM                                           */}
         {/* ============================================================ */}
@@ -187,7 +198,6 @@ export const AppRoutes: React.FC = () => {
           element={
             <ProtectedRoute allowedRoles={['Admin', 'SalesManager', 'WarehouseManager', 'Director', 'Manager']}>
               <ProductEdit />
->>>>>>> 51fdeb51cfaf11d1c555108c4dee36d39048c5ee
             </ProtectedRoute>
           }
         />
