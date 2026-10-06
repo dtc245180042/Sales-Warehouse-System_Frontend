@@ -112,7 +112,7 @@ export const AuditLogList: React.FC = () => {
             </div>
             <div>
               <h2 className="text-base font-bold text-slate-900 dark:text-white">
-                Kiểm soát lịch sử thay đổi (SCRUM-373)
+                Kiểm soát lịch sử thay đổi
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400">
                 Ghi nhận các trường thông tin thay đổi trước và sau khi thao tác
