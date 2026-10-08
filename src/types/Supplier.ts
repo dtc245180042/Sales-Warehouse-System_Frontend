@@ -14,3 +14,4 @@ export interface Supplier {
   status: 'active' | 'inactive';
   suspendReason?: string;
 }
+

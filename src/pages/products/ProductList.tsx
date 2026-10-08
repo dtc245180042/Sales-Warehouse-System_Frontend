@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Plus,
   Search,
@@ -9,6 +9,9 @@ import {
   Edit,
   Eye,
   AlertTriangle,
+  RefreshCw,
+  X,
+  Layers,
 } from 'lucide-react';
 import { PageContainer } from '../../components/layout/PageContainer';
 import { DataTable, Column } from '../../components/common/DataTable';
@@ -18,23 +21,140 @@ import { ConfirmDialog } from '../../components/common/ConfirmDialog';
 import { Modal } from '../../components/common/Modal';
 import { ExcelImportModal } from '../../components/products/ExcelImportModal';
 import { formatCurrency, formatDateOnly } from '../../utils/formatters';
+import { exportToCSV } from '../../utils/csvExporter';
 import { productService } from '../../services/productService';
+import { categoryService } from '../../services/categoryService';
+import { CategoryTree } from '../../types/Category';
 import { Product } from '../../types/Product';
 import { productCategories } from '../../mock/products';
 import { useToast } from '../../contexts/ToastContext';
 import { useAuth } from '../../contexts/AuthContext';
 
+// Chuẩn hóa bỏ dấu tiếng Việt để tìm kiếm và lọc không phân biệt dấu
+export function normalizeSearchText(str: string): string {
+  if (!str) return '';
+  return str
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'D')
+    .toLowerCase()
+    .trim();
+}
+
+// SCRUM-220 & SCRUM-214: Thu thập toàn bộ họ hàng cha - con - cháu của một nhóm hàng trong cây danh mục
+export function getCategoryFamily(
+  selectedVal: string,
+  tree: CategoryTree[]
+): { ids: Set<number>; keywords: Set<string> } {
+  const ids = new Set<number>();
+  const keywords = new Set<string>();
+
+  if (!selectedVal || selectedVal === 'all') {
+    return { ids, keywords };
+  }
+
+  const normSelected = normalizeSearchText(selectedVal);
+
+  function findNode(nodes: CategoryTree[]): CategoryTree | null {
+    for (const node of nodes) {
+      if (
+        String(node.id) === selectedVal ||
+        normalizeSearchText(node.name) === normSelected ||
+        (node.code && normalizeSearchText(node.code) === normSelected)
+      ) {
+        return node;
+      }
+      if (node.children && node.children.length > 0) {
+        const found = findNode(node.children);
+        if (found) return found;
+      }
+    }
+    return null;
+  }
+
+  const targetNode = findNode(tree);
+
+  function collectAllDescendants(node: CategoryTree) {
+    ids.add(node.id);
+    const nodeNorm = normalizeSearchText(node.name);
+    keywords.add(nodeNorm);
+    // Bổ sung các cụm từ con (ví dụ: "Điện thoại & Máy tính bảng" -> "dien thoai", "may tinh bang")
+    nodeNorm.split(/&|,|\(|\)|\//).forEach((part) => {
+      const p = part.trim();
+      if (p.length >= 2) keywords.add(p);
+    });
+
+    if (node.children && node.children.length > 0) {
+      node.children.forEach(collectAllDescendants);
+    }
+  }
+
+  if (targetNode) {
+    collectAllDescendants(targetNode);
+  } else {
+    // Nếu không khớp node trong cây, dùng chính giá trị lọc làm từ khóa tra cứu
+    keywords.add(normSelected);
+    normSelected.split(/&|,|\(|\)|\//).forEach((part) => {
+      const p = part.trim();
+      if (p.length >= 2) keywords.add(p);
+    });
+  }
+
+  return { ids, keywords };
+}
+
 export const ProductList: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { showToast } = useToast();
   const { role } = useAuth();
 
+  // Đọc giá trị ban đầu từ URL Query Parameters
+  const urlSearch = searchParams.get('q') || '';
+  const urlCategory = searchParams.get('category') || 'all';
+  const urlStatus = searchParams.get('status') || 'all';
+
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [search, setSearch] = useState<string>('');
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const [selectedStatus, setSelectedStatus] = useState<string>('all');
+  const [search, setSearch] = useState<string>(urlSearch);
+  const [selectedCategory, setSelectedCategory] = useState<string>(urlCategory);
+  const [categoryTree, setCategoryTree] = useState<CategoryTree[]>([]);
+  const [categoryFilterOptions, setCategoryFilterOptions] = useState<{ id: string; name: string; label: string }[]>([]);
+  const [selectedStatus, setSelectedStatus] = useState<string>(urlStatus);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
+  // Đồng bộ hai chiều từ URL -> State khi người dùng nhấn Back / Forward trên trình duyệt
+  useEffect(() => {
+    setSearch(urlSearch);
+    setSelectedCategory(urlCategory);
+    setSelectedStatus(urlStatus);
+  }, [urlSearch, urlCategory, urlStatus]);
+
+  // Hàm cập nhật URL Search Params khi bộ lọc thay đổi
+  const handleSearchChange = (newSearch: string) => {
+    setSearch(newSearch);
+    const params = new URLSearchParams(searchParams);
+    if (newSearch.trim()) params.set('q', newSearch.trim());
+    else params.delete('q');
+    setSearchParams(params, { replace: true });
+  };
+
+  const handleCategoryChange = (newCat: string) => {
+    setSelectedCategory(newCat);
+    const params = new URLSearchParams(searchParams);
+    if (newCat && newCat !== 'all') params.set('category', newCat);
+    else params.delete('category');
+    setSearchParams(params, { replace: true });
+  };
+
+  const handleStatusChange = (newStat: string) => {
+    setSelectedStatus(newStat);
+    const params = new URLSearchParams(searchParams);
+    if (newStat && newStat !== 'all') params.set('status', newStat);
+    else params.delete('status');
+    setSearchParams(params, { replace: true });
+  };
 
   // Dialogs
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -57,20 +177,92 @@ export const ProductList: React.FC = () => {
 
   useEffect(() => {
     loadProducts();
+
+    // Tải danh mục ngành hàng / nhóm hàng dạng cây 3 cấp (SCRUM-214)
+    categoryService.getTree().then((tree) => {
+      if (tree && tree.length > 0) {
+        setCategoryTree(tree);
+        const opts: { id: string; name: string; label: string }[] = [];
+        const traverse = (nodes: CategoryTree[], depth: number = 0) => {
+          nodes.forEach((n) => {
+            const prefix = '  '.repeat(depth);
+            const tag = n.level === 1 ? '📁 [Ngành]' : n.level === 2 ? '📁 [Nhóm]' : '📄 [Tiểu nhóm]';
+            opts.push({
+              id: String(n.id),
+              name: n.name,
+              label: `${prefix}${tag} ${n.name}`,
+            });
+            if (n.children && n.children.length > 0) {
+              traverse(n.children, depth + 1);
+            }
+          });
+        };
+        traverse(tree);
+        setCategoryFilterOptions(opts);
+      }
+    }).catch((err) => {
+      console.warn('Không thể tải cây ngành hàng để lọc:', err);
+    });
   }, []);
 
-  // Filter products
+  // SCRUM-220: Bộ lọc thông minh phân cấp Cha - Con và tìm kiếm Full-text không dấu
   const filteredProducts = useMemo(() => {
+    const q = normalizeSearchText(search);
+    const catFamily = getCategoryFamily(selectedCategory, categoryTree);
+    const hasCatFilter = selectedCategory && selectedCategory !== 'all';
+    const normSelectedStatus = (selectedStatus || 'all').toLowerCase();
+
     return products.filter((p) => {
-      const matchSearch =
-        p.name.toLowerCase().includes(search.toLowerCase()) ||
-        p.sku.toLowerCase().includes(search.toLowerCase()) ||
-        p.barcode.includes(search);
-      const matchCategory = selectedCategory === 'all' || p.category === selectedCategory;
-      const matchStatus = selectedStatus === 'all' || p.status === selectedStatus;
-      return matchSearch && matchCategory && matchStatus;
+      // 1. Tìm kiếm Full-text không dấu trên Tên, SKU, Barcode, Danh mục, Nhà cung cấp
+      if (q) {
+        const pName = normalizeSearchText(p.name);
+        const pSku = normalizeSearchText(p.sku);
+        const pBarcode = normalizeSearchText(p.barcode);
+        const pCat = normalizeSearchText(p.category);
+        const pSupplier = normalizeSearchText(p.supplierName);
+
+        const matchSearch =
+          pName.includes(q) ||
+          pSku.includes(q) ||
+          pBarcode.includes(q) ||
+          pCat.includes(q) ||
+          pSupplier.includes(q);
+
+        if (!matchSearch) return false;
+      }
+
+      // 2. Lọc theo Ngành hàng & Nhóm hàng (Phân cấp Cha - Con thông minh)
+      if (hasCatFilter) {
+        let matchCat = false;
+        // Khớp theo categoryId nếu sản phẩm có gán categoryId nằm trong gia đình nhóm được chọn
+        if (p.categoryId !== undefined && catFamily.ids.has(Number(p.categoryId))) {
+          matchCat = true;
+        }
+        // Khớp theo từ khóa nhóm hàng (không dấu)
+        if (!matchCat && p.category) {
+          const pNormCat = normalizeSearchText(p.category);
+          for (const kw of catFamily.keywords) {
+            if (pNormCat.includes(kw) || kw.includes(pNormCat)) {
+              matchCat = true;
+              break;
+            }
+          }
+        }
+        if (!matchCat) return false;
+      }
+
+      // 3. Lọc theo trạng thái kinh doanh / tồn kho
+      if (normSelectedStatus !== 'all') {
+        const pStatus = (p.status || '').toLowerCase();
+        if (normSelectedStatus === 'active' && pStatus !== 'active') return false;
+        if (normSelectedStatus === 'low_stock' && pStatus !== 'low_stock') return false;
+        if (normSelectedStatus === 'out_of_stock' && pStatus !== 'out_of_stock') return false;
+        if (normSelectedStatus === 'inactive' && pStatus !== 'inactive') return false;
+      }
+
+      return true;
     });
-  }, [products, search, selectedCategory, selectedStatus]);
+  }, [products, search, selectedCategory, categoryTree, selectedStatus]);
 
   // Actions
   const handleRequestDelete = (product: Product) => {
@@ -150,27 +342,22 @@ export const ProductList: React.FC = () => {
   };
 
   const handleExportCSV = () => {
-    const csvRows = [
-      ['Mã SKU', 'Tên sản phẩm', 'Danh mục', 'Giá nhập', 'Giá bán', 'Tồn kho', 'Trạng thái'],
-      ...filteredProducts.map((p) => [
+    exportToCSV({
+      filename: `danh_sach_san_pham_${Date.now()}`,
+      headers: ['Mã SKU', 'Mã vạch', 'Tên sản phẩm', 'Danh mục', 'Giá nhập', 'Giá bán', 'Tồn kho', 'Đơn vị tính', 'Trạng thái'],
+      rows: filteredProducts.map((p) => [
         p.sku,
-        `"${p.name.replace(/"/g, '""')}"`,
+        p.barcode,
+        p.name,
         p.category,
         p.costPrice,
         p.salePrice,
         p.stock,
+        p.unit,
         p.status,
       ]),
-    ];
-    const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + csvRows.map((e) => e.join(',')).join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `danh_sach_san_pham_${Date.now()}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    showToast('Đã xuất file CSV thành công!', 'success');
+    });
+    showToast(`Đã xuất ${filteredProducts.length} sản phẩm ra file Excel/CSV thành công!`, 'success');
   };
 
   // SCRUM-202: Giá vốn và biên lợi nhuận chỉ lộ ra với vai trò Quản lý kinh doanh (và Admin/Ban giám đốc)
@@ -192,26 +379,22 @@ export const ProductList: React.FC = () => {
     },
     {
       key: 'name',
-      header: 'Sản Phẩm',
+      header: 'Tên Sản Phẩm',
       sortable: true,
-      className: 'min-w-[220px]',
+      className: 'min-w-[280px]',
       render: (p) => (
-        <div className="flex items-center gap-3">
-          <img
-            src={p.image}
-            alt={p.name}
-            className="w-10 h-10 rounded-xl object-cover bg-slate-100 dark:bg-slate-800 shrink-0 border border-slate-200 dark:border-slate-700"
-            onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = "/images/product-placeholder.jpg"; }}
-          />
-          <div className="truncate">
-            <Link
-              to={`/products/${p.id}`}
-              className="font-bold text-slate-900 dark:text-slate-100 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors truncate block"
-            >
-              {p.name}
-            </Link>
-            <span className="text-[11px] text-slate-400">{p.supplierName}</span>
-          </div>
+        <div className="py-0.5">
+          <Link
+            to={`/products/${p.id}`}
+            className="font-bold text-slate-900 dark:text-slate-100 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors block text-sm leading-snug"
+          >
+            {p.name}
+          </Link>
+          {p.supplierName && (
+            <span className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5 block">
+              {p.supplierName}
+            </span>
+          )}
         </div>
       ),
     },
@@ -352,19 +535,32 @@ export const ProductList: React.FC = () => {
           <Button
             variant="outline"
             size="sm"
+            onClick={() => {
+              loadProducts();
+              showToast('Đang làm mới danh mục sản phẩm từ CSDL MySQL...', 'info');
+            }}
+            disabled={loading}
+            leftIcon={<RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />}
+          >
+            Làm mới
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
             onClick={handleExportCSV}
             leftIcon={<Download className="w-4 h-4" />}
           >
             Xuất Excel/CSV
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setIsImportModalOpen(true)}
-            leftIcon={<Upload className="w-4 h-4" />}
-          >
-            Nhập file
-          </Button>
+          <Link to="/products/import">
+            <Button
+              variant="outline"
+              size="sm"
+              leftIcon={<Upload className="w-4 h-4" />}
+            >
+              Nhập từ Excel
+            </Button>
+          </Link>
           <Link to="/products/create">
             <Button variant="primary" size="sm" leftIcon={<Plus className="w-4 h-4" />}>
               Thêm sản phẩm
@@ -392,42 +588,66 @@ export const ProductList: React.FC = () => {
         }
         filterComponent={
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 w-full">
-            {/* Search */}
+            {/* Search Input with Clear Button */}
             <div className="relative flex-1 max-w-md">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
               <input
                 type="text"
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Tìm theo tên, SKU, mã vạch..."
-                className="w-full pl-9 pr-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs sm:text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                onChange={(e) => handleSearchChange(e.target.value)}
+                placeholder="Tìm theo tên, SKU, mã vạch, nhóm hàng..."
+                className="w-full pl-9 pr-9 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs sm:text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
               />
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => handleSearchChange('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 rounded-full text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                  title="Xóa tìm kiếm"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
 
-            {/* Category and Status Dropdowns */}
-            <div className="flex items-center gap-2">
+            {/* Category and Status Dropdowns & Counter Badge */}
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs font-semibold px-2.5 py-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/60 shrink-0">
+                Hiển thị {filteredProducts.length.toLocaleString('vi-VN')} / {products.length.toLocaleString('vi-VN')} sp
+              </span>
+
               <select
                 value={selectedCategory}
-                onChange={(e) => setSelectedCategory(e.target.value)}
-                className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs sm:text-sm text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                onChange={(e) => handleCategoryChange(e.target.value)}
+                className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs sm:text-sm text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-sans max-w-[260px] shadow-sm truncate"
+                title="Lọc theo ngành hàng hoặc nhóm hàng"
               >
-                <option value="all">Tất cả ngành hàng</option>
-                {productCategories.map((c) => (
-                  <option key={c.id} value={c.name}>
-                    {c.name}
-                  </option>
-                ))}
+                <option value="all">Tất cả ngành hàng & nhóm hàng</option>
+                {categoryFilterOptions.length > 0 ? (
+                  categoryFilterOptions.map((c) => (
+                    <option key={c.id} value={c.name}>
+                      {c.label}
+                    </option>
+                  ))
+                ) : (
+                  productCategories.map((c) => (
+                    <option key={c.id} value={c.name}>
+                      {c.name}
+                    </option>
+                  ))
+                )}
               </select>
 
               <select
                 value={selectedStatus}
-                onChange={(e) => setSelectedStatus(e.target.value)}
-                className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs sm:text-sm text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                onChange={(e) => handleStatusChange(e.target.value)}
+                className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs sm:text-sm text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
               >
                 <option value="all">Tất cả trạng thái</option>
                 <option value="active">Còn hàng</option>
                 <option value="low_stock">Sắp hết hàng</option>
                 <option value="out_of_stock">Hết hàng</option>
+                <option value="inactive">Ngừng kinh doanh</option>
               </select>
             </div>
           </div>

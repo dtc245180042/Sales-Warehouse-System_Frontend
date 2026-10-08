@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   History,
   Search,
@@ -15,15 +15,27 @@ import {
   Clock,
   Wifi,
   ChevronDown,
+  Loader2,
+  Laptop,
+  Smartphone,
+  Tablet,
+  LogIn,
+  LogOut,
+  ShieldAlert,
 } from 'lucide-react';
 import { Badge } from '../../components/common/Badge';
-import { mockActivityLogs } from '../../mock/activityLogs';
 import {
   ActivityLog,
   ActivityAction,
   ActivityModule,
   ActivityStatus,
 } from '../../types/ActivityLog';
+import {
+  fetchAuditLogs,
+  fetchAuditStats,
+  exportAuditLogsExcel,
+  AuditLogStatsData,
+} from '../../services/auditLogService';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -152,6 +164,22 @@ const ModuleBadge: React.FC<ModuleBadgeProps> = ({ module }) => {
   );
 };
 
+interface DeviceIconProps {
+  device?: string;
+  className?: string;
+}
+
+const DeviceIcon: React.FC<DeviceIconProps> = ({ device, className = 'w-3.5 h-3.5' }) => {
+  const d = (device || '').toLowerCase();
+  if (d.includes('điện thoại') || d.includes('mobile') || d.includes('iphone') || d.includes('android')) {
+    return <Smartphone className={`${className} text-indigo-500 shrink-0`} />;
+  }
+  if (d.includes('máy tính bảng') || d.includes('tablet') || d.includes('ipad')) {
+    return <Tablet className={`${className} text-indigo-500 shrink-0`} />;
+  }
+  return <Laptop className={`${className} text-indigo-500 shrink-0`} />;
+};
+
 interface DetailDrawerProps {
   log: ActivityLog | null;
   onClose: () => void;
@@ -161,11 +189,26 @@ const DetailDrawer: React.FC<DetailDrawerProps> = ({ log, onClose }) => {
   if (!log) return null;
 
   const formatDateTime = (ts: string) => {
+    if (log?.metadata?.['Thời điểm đăng nhập']) {
+      return String(log.metadata['Thời điểm đăng nhập']);
+    }
+    if (log?.metadata?.['Thời điểm đăng xuất']) {
+      return String(log.metadata['Thời điểm đăng xuất']);
+    }
+    if (!ts) return '';
     const d = new Date(ts);
-    return d.toLocaleString('vi-VN', {
-      day: '2-digit', month: '2-digit', year: 'numeric',
-      hour: '2-digit', minute: '2-digit', second: '2-digit',
+    if (isNaN(d.getTime())) return ts;
+    const time = d.toLocaleTimeString('vi-VN', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
     });
+    const date = d.toLocaleDateString('vi-VN', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    });
+    return `${time} ngày ${date}`;
   };
 
   return (
@@ -219,6 +262,11 @@ const DetailDrawer: React.FC<DetailDrawerProps> = ({ log, onClose }) => {
           {/* Fields */}
           <div className="space-y-3">
             <DrawerField icon={<Clock className="w-4 h-4" />} label="Thời gian" value={formatDateTime(log.timestamp)} />
+            <DrawerField
+              icon={<DeviceIcon device={log.device} className="w-4 h-4" />}
+              label="Thiết bị thao tác"
+              value={log.device || 'Trình duyệt Web'}
+            />
             <DrawerField icon={<Wifi className="w-4 h-4" />} label="Địa chỉ IP" value={log.ipAddress} mono />
             <DrawerField icon={<History className="w-4 h-4" />} label="Đối tượng tác động" value={log.target} />
           </div>
@@ -287,6 +335,7 @@ const StatCard: React.FC<StatCardProps> = ({ label, value, icon, colorClass }) =
 
 const ActivityLogPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [filterAction, setFilterAction] = useState<ActivityAction | ''>('');
   const [filterModule, setFilterModule] = useState<ActivityModule | ''>('');
   const [filterStatus, setFilterStatus] = useState<ActivityStatus | ''>('');
@@ -299,54 +348,102 @@ const ActivityLogPage: React.FC = () => {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [sortDesc, setSortDesc] = useState(true);
 
-  // Sorted data (newest first by default)
-  const sortedLogs = useMemo(
-    () =>
-      [...mockActivityLogs].sort((a, b) =>
-        sortDesc
-          ? new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-          : new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-      ),
-    [sortDesc]
-  );
+  // Dữ liệu từ Server
+  const [logs, setLogs] = useState<ActivityLog[]>([]);
+  const [totalRecords, setTotalRecords] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [stats, setStats] = useState<AuditLogStatsData>({
+    total: 0,
+    success: 0,
+    failed: 0,
+    warning: 0,
+  });
+  const [isLoading, setIsLoading] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
-  // Filtering
-  const filteredLogs = useMemo(() => {
-    return sortedLogs.filter((log) => {
-      if (filterAction && log.action !== filterAction) return false;
-      if (filterModule && log.module !== filterModule) return false;
-      if (filterStatus && log.status !== filterStatus) return false;
-      if (filterUser && !log.userName.toLowerCase().includes(filterUser.toLowerCase())) return false;
-      if (filterDateFrom && log.timestamp < filterDateFrom) return false;
-      if (filterDateTo && log.timestamp > filterDateTo + 'T23:59:59') return false;
-      if (searchQuery) {
-        const q = searchQuery.toLowerCase();
-        return (
-          log.detail.toLowerCase().includes(q) ||
-          log.target.toLowerCase().includes(q) ||
-          log.userName.toLowerCase().includes(q) ||
-          log.ipAddress.includes(q) ||
-          log.id.toLowerCase().includes(q)
-        );
+  // Debounce tìm kiếm từ khóa 300ms chống nghẽn máy khách và server
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+      setCurrentPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Tải nhật ký từ máy chủ (Server-side Pagination & Filtering)
+  const loadLogs = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const res = await fetchAuditLogs({
+        page: currentPage,
+        pageSize: pageSize,
+        search: debouncedSearch,
+        action: filterAction || undefined,
+        entityType: filterModule || undefined,
+        status: filterStatus || undefined,
+        username: filterUser || undefined,
+        startDate: filterDateFrom || undefined,
+        endDate: filterDateTo || undefined,
+        sortDesc: sortDesc,
+      });
+
+      setLogs(res.items);
+      setTotalRecords(res.total);
+      setTotalPages(res.totalPages);
+      if (res.stats) {
+        setStats(res.stats);
       }
-      return true;
-    });
-  }, [sortedLogs, filterAction, filterModule, filterStatus, filterUser, filterDateFrom, filterDateTo, searchQuery]);
+    } catch (err) {
+      console.error('Lỗi khi tải nhật ký thao tác:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [
+    currentPage,
+    pageSize,
+    debouncedSearch,
+    filterAction,
+    filterModule,
+    filterStatus,
+    filterUser,
+    filterDateFrom,
+    filterDateTo,
+    sortDesc,
+  ]);
 
-  // Stats
-  const stats = useMemo(() => ({
-    total: filteredLogs.length,
-    success: filteredLogs.filter((l) => l.status === 'success').length,
-    failed: filteredLogs.filter((l) => l.status === 'failed').length,
-    warning: filteredLogs.filter((l) => l.status === 'warning').length,
-  }), [filteredLogs]);
+  useEffect(() => {
+    loadLogs();
+  }, [loadLogs]);
 
-  // Pagination
-  const totalPages = Math.max(1, Math.ceil(filteredLogs.length / pageSize));
-  const safePage = Math.min(currentPage, totalPages);
-  const paginated = filteredLogs.slice((safePage - 1) * pageSize, safePage * pageSize);
+  // Nạp thống kê tổng quan
+  useEffect(() => {
+    fetchAuditStats().then(setStats).catch(() => {});
+  }, []);
 
-  const hasActiveFilters = filterAction || filterModule || filterStatus || filterUser || filterDateFrom || filterDateTo;
+  // Xử lý Xuất file Excel / CSV trực tiếp từ máy chủ
+  const handleExportExcel = async () => {
+    setIsExporting(true);
+    try {
+      await exportAuditLogsExcel({
+        search: debouncedSearch,
+        action: filterAction || undefined,
+        entityType: filterModule || undefined,
+        status: filterStatus || undefined,
+        username: filterUser || undefined,
+        startDate: filterDateFrom || undefined,
+        endDate: filterDateTo || undefined,
+        sortDesc: sortDesc,
+      });
+    } catch (err) {
+      console.error('Lỗi khi xuất file Excel:', err);
+      alert('Không thể xuất file Excel. Vui lòng kiểm tra lại đường truyền mạng.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const hasActiveFilters =
+    filterAction || filterModule || filterStatus || filterUser || filterDateFrom || filterDateTo;
 
   const resetFilters = () => {
     setFilterAction('');
@@ -359,8 +456,21 @@ const ActivityLogPage: React.FC = () => {
     setCurrentPage(1);
   };
 
-  const formatDateTime = (ts: string) => {
+  const formatDateTime = (ts: string, logItem?: ActivityLog) => {
+    if (logItem?.metadata?.['Thời điểm đăng nhập']) {
+      const parts = String(logItem.metadata['Thời điểm đăng nhập']).split(' ngày ');
+      if (parts.length === 2) {
+        return { time: parts[0], date: parts[1] };
+      }
+    }
+    if (logItem?.metadata?.['Thời điểm đăng xuất']) {
+      const parts = String(logItem.metadata['Thời điểm đăng xuất']).split(' ngày ');
+      if (parts.length === 2) {
+        return { time: parts[0], date: parts[1] };
+      }
+    }
     const d = new Date(ts);
+    if (isNaN(d.getTime())) return { date: ts, time: '' };
     return {
       date: d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }),
       time: d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
@@ -379,29 +489,36 @@ const ActivityLogPage: React.FC = () => {
             <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">Nhật ký thao tác</h1>
           </div>
           <p className="text-sm text-slate-500 dark:text-slate-400 ml-12">
-            Theo dõi toàn bộ hoạt động của người dùng trong hệ thống
+            Theo dõi toàn bộ hoạt động của người dùng trong hệ thống (Lọc trực tiếp từ máy chủ)
           </p>
         </div>
         <div className="flex items-center gap-2">
           <button
             id="activity-log-refresh"
-            onClick={() => setCurrentPage(1)}
-            className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+            onClick={() => {
+              loadLogs();
+              fetchAuditStats().then(setStats).catch(() => {});
+            }}
+            disabled={isLoading}
+            className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors disabled:opacity-60"
           >
-            <RefreshCw className="w-4 h-4" />
+            <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
             <span className="hidden sm:inline">Làm mới</span>
           </button>
           <button
             id="activity-log-export"
-            className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 shadow-md shadow-indigo-500/25 transition-colors"
+            onClick={handleExportExcel}
+            disabled={isExporting}
+            className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 shadow-md shadow-indigo-500/25 transition-colors disabled:opacity-60"
           >
-            <Download className="w-4 h-4" />
-            <span className="hidden sm:inline">Xuất Excel</span>
+            {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+            <span className="hidden sm:inline">{isExporting ? 'Đang xuất...' : 'Xuất Excel'}</span>
           </button>
         </div>
       </div>
 
       {/* Stats Row */}
+
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <StatCard
           label="Tổng nhật ký"
@@ -446,7 +563,7 @@ const ActivityLogPage: React.FC = () => {
           </div>
 
           {/* Quick status filter pills */}
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 flex-wrap">
             {(['', 'success', 'failed', 'warning'] as const).map((s) => (
               <button
                 key={s || 'all'}
@@ -458,9 +575,30 @@ const ActivityLogPage: React.FC = () => {
                     : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700'
                 }`}
               >
-                {s === '' ? 'Tất cả' : s === 'success' ? '✓ Thành công' : s === 'failed' ? '✗ Thất bại' : '⚠ Cảnh báo'}
+                {s === '' ? 'Tất cả trạng thái' : s === 'success' ? '✓ Thành công' : s === 'failed' ? '✗ Thất bại' : '⚠ Cảnh báo'}
               </button>
             ))}
+
+            {/* Quick Auth Filter (Đăng nhập / Đăng xuất) */}
+            <button
+              id="filter-quick-auth"
+              onClick={() => {
+                if (filterModule === 'AUTH') {
+                  setFilterModule('');
+                } else {
+                  setFilterModule('AUTH');
+                }
+                setCurrentPage(1);
+              }}
+              className={`px-3 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                filterModule === 'AUTH'
+                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/25'
+                  : 'text-indigo-600 dark:text-indigo-400 bg-indigo-50/60 dark:bg-indigo-950/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 border border-indigo-200 dark:border-indigo-800'
+              }`}
+            >
+              <LogIn className="w-3.5 h-3.5" />
+              Đăng nhập / Đăng xuất
+            </button>
           </div>
 
           {/* Advanced filter toggle */}
@@ -604,7 +742,7 @@ const ActivityLogPage: React.FC = () => {
         {/* Table header bar */}
         <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between gap-3 bg-slate-50/60 dark:bg-slate-900/60">
           <p className="text-xs text-slate-500 dark:text-slate-400">
-            Hiển thị <span className="font-semibold text-slate-700 dark:text-slate-200">{(safePage - 1) * pageSize + 1}–{Math.min(safePage * pageSize, filteredLogs.length)}</span> trong tổng số <span className="font-semibold text-slate-700 dark:text-slate-200">{filteredLogs.length}</span> bản ghi
+            Hiển thị <span className="font-semibold text-slate-700 dark:text-slate-200">{totalRecords > 0 ? (currentPage - 1) * pageSize + 1 : 0}–{Math.min(currentPage * pageSize, totalRecords)}</span> trong tổng số <span className="font-semibold text-slate-700 dark:text-slate-200">{totalRecords.toLocaleString()}</span> bản ghi
           </p>
           <button
             id="activity-log-sort-toggle"
@@ -625,14 +763,50 @@ const ActivityLogPage: React.FC = () => {
                 <th className="px-4 py-3.5 whitespace-nowrap">Hành động</th>
                 <th className="px-4 py-3.5 whitespace-nowrap">Module</th>
                 <th className="px-4 py-3.5 whitespace-nowrap">Đối tượng / Mô tả</th>
-                <th className="px-4 py-3.5 whitespace-nowrap">IP</th>
+                <th className="px-4 py-3.5 whitespace-nowrap">Thiết bị & IP</th>
                 <th className="px-4 py-3.5 whitespace-nowrap">Kết quả</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {paginated.length > 0 ? (
-                paginated.map((log) => {
-                  const { date, time } = formatDateTime(log.timestamp);
+              {isLoading ? (
+                // Skeleton loading state
+                Array.from({ length: Math.min(pageSize, 8) }).map((_, idx) => (
+                  <tr key={`skeleton-${idx}`} className="animate-pulse">
+                    <td className="px-4 py-3.5 whitespace-nowrap">
+                      <div className="h-3.5 bg-slate-200 dark:bg-slate-700 rounded w-16 mb-1.5" />
+                      <div className="h-3 bg-slate-100 dark:bg-slate-800 rounded w-20" />
+                    </td>
+                    <td className="px-4 py-3.5 whitespace-nowrap">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-7 h-7 rounded-full bg-slate-200 dark:bg-slate-700 shrink-0" />
+                        <div>
+                          <div className="h-3.5 bg-slate-200 dark:bg-slate-700 rounded w-24 mb-1" />
+                          <div className="h-3 bg-slate-100 dark:bg-slate-800 rounded w-16" />
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3.5 whitespace-nowrap">
+                      <div className="h-5 bg-slate-200 dark:bg-slate-700 rounded-md w-16" />
+                    </td>
+                    <td className="px-4 py-3.5 whitespace-nowrap">
+                      <div className="h-5 bg-slate-200 dark:bg-slate-700 rounded-md w-20" />
+                    </td>
+                    <td className="px-4 py-3.5 max-w-xs">
+                      <div className="h-3.5 bg-slate-200 dark:bg-slate-700 rounded w-44 mb-1" />
+                      <div className="h-3 bg-slate-100 dark:bg-slate-800 rounded w-56" />
+                    </td>
+                    <td className="px-4 py-3.5 whitespace-nowrap">
+                      <div className="h-3.5 bg-slate-200 dark:bg-slate-700 rounded w-24 mb-1" />
+                      <div className="h-3 bg-slate-100 dark:bg-slate-800 rounded w-16" />
+                    </td>
+                    <td className="px-4 py-3.5 whitespace-nowrap">
+                      <div className="h-5 bg-slate-200 dark:bg-slate-700 rounded-full w-20" />
+                    </td>
+                  </tr>
+                ))
+              ) : logs.length > 0 ? (
+                logs.map((log) => {
+                  const { date, time } = formatDateTime(log.timestamp, log);
                   return (
                     <tr
                       key={log.id}
@@ -684,9 +858,15 @@ const ActivityLogPage: React.FC = () => {
                         </p>
                       </td>
 
-                      {/* IP */}
-                      <td className="px-4 py-3.5 whitespace-nowrap font-mono text-xs text-slate-500 dark:text-slate-400">
-                        {log.ipAddress}
+                      {/* Device & IP */}
+                      <td className="px-4 py-3.5 whitespace-nowrap">
+                        <div className="flex items-center gap-1.5 text-xs text-slate-700 dark:text-slate-300 font-medium">
+                          <DeviceIcon device={log.device} />
+                          <span className="max-w-[150px] truncate" title={log.device || 'Trình duyệt Web'}>
+                            {log.device || 'Trình duyệt Web'}
+                          </span>
+                        </div>
+                        <p className="font-mono text-[11px] text-slate-400 mt-0.5 pl-5">{log.ipAddress}</p>
                       </td>
 
                       {/* Status */}
@@ -722,7 +902,7 @@ const ActivityLogPage: React.FC = () => {
         </div>
 
         {/* Pagination Footer */}
-        {filteredLogs.length > 0 && (
+        {totalRecords > 0 && (
           <div className="px-4 py-3.5 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs sm:text-sm text-slate-500 dark:text-slate-400">
             <div className="flex items-center gap-2">
               <span>Hiển thị</span>
@@ -734,22 +914,22 @@ const ActivityLogPage: React.FC = () => {
               >
                 {PAGE_SIZES.map((s) => <option key={s} value={s}>{s}</option>)}
               </select>
-              <span>trong tổng số {filteredLogs.length} bản ghi</span>
+              <span>trong tổng số {totalRecords.toLocaleString()} bản ghi</span>
             </div>
             <div className="flex items-center gap-1.5">
               <button
                 id="activity-log-prev-page"
                 onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                disabled={safePage <= 1}
+                disabled={currentPage <= 1 || isLoading}
                 className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
-              <span className="px-2 font-medium">Trang {safePage} / {totalPages}</span>
+              <span className="px-2 font-medium">Trang {currentPage} / {totalPages}</span>
               <button
                 id="activity-log-next-page"
                 onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                disabled={safePage >= totalPages}
+                disabled={currentPage >= totalPages || isLoading}
                 className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
                 <ChevronRight className="w-4 h-4" />

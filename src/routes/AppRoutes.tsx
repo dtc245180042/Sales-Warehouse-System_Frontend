@@ -12,29 +12,38 @@ import { Login } from '../pages/auth/Login';
 import { ForgotPassword } from '../pages/auth/ForgotPassword';
 import { ResetPassword } from '../pages/auth/ResetPassword';
 import { ErrorPage } from '../pages/error/ErrorPage';
+import { ErrorBoundary } from '../components/common/ErrorBoundary';
 
 // Core Dashboard & Management Pages (Sprint 1: SCRUM-198, SCRUM-201, SCRUM-202, SCRUM-205, SCRUM-206, SCRUM-207)
 import { Dashboard } from '../pages/dashboard/Dashboard';
 import { UserManagement } from '../pages/users/UserManagement';
+import { UserImportPage } from '../pages/users/UserImportPage';
 import { Settings } from '../pages/settings/Settings';
 import { Profile } from '../pages/profile/Profile';
+import { PriceListManagement } from '../pages/sales/PriceListManagement';
 import { CategoryManagement } from '../pages/categories/CategoryManagement';
 
-// Supplier Management Pages
+// Supplier Management Pages (SCRUM-217)
 import { SupplierList } from '../pages/suppliers/SupplierList';
 import { SupplierDetail } from '../pages/suppliers/SupplierDetail';
 
-// Sprint 2 Pages - Activity Log
+// Sprint 2 Pages - Activity Log (SCRUM-212)
 import ActivityLogPage from '../pages/activitylog/ActivityLogPage';
 
-// Product Catalog Pages (Sprint 2: SCRUM-220, SCRUM-380, SCRUM-381)
+// Product Catalog Pages (Sprint 2: SCRUM-220, SCRUM-380, SCRUM-381, SCRUM-215, SCRUM-216)
 import { ProductList } from '../pages/products/ProductList';
 import { ProductDetail } from '../pages/products/ProductDetail';
 import { ProductCreate } from '../pages/products/ProductCreate';
 import { ProductEdit } from '../pages/products/ProductEdit';
 import { ProductUnitPage } from '../pages/products/ProductUnitPage';
+import { ProductImportPage } from '../pages/products/ProductImportPage';
 
-// All 7 business roles allowed in Sprint 1 backoffice
+// Report Pages (Báo cáo bán hàng theo ngành hàng & Doanh thu)
+import { SalesReport } from '../pages/reports/SalesReport';
+import { RevenueReport } from '../pages/reports/RevenueReport';
+import { InventoryReport } from '../pages/reports/InventoryReport';
+
+// All 7 business roles allowed in Sprint 1 & 2 backoffice
 const ALL_BACKOFFICE_ROLES: UserRole[] = [
   'Admin',
   'SalesManager',
@@ -84,12 +93,14 @@ export const AppRoutes: React.FC = () => {
       />
 
       {/* ================================================================ */}
-      {/* SPRINT 1 BACKOFFICE ROUTES                                       */}
+      {/* SPRINT 1 & 2 BACKOFFICE ROUTES                                   */}
       {/* ================================================================ */}
       <Route
         element={
           <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
-            <DashboardLayout />
+            <ErrorBoundary>
+              <DashboardLayout />
+            </ErrorBoundary>
           </ProtectedRoute>
         }
       >
@@ -113,17 +124,49 @@ export const AppRoutes: React.FC = () => {
           }
         />
 
-        {/* Quản lý Nhóm hàng nhiều cấp - Quản lý kinh doanh & Admin (SCRUM-214) */}
+        {/* Nhập người dùng hàng loạt từ Excel - SC-209 */}
         <Route
-          path="/categories"
+          path="/users/import"
           element={
-            <ProtectedRoute allowedRoles={['Admin', 'SalesManager', 'Manager', 'Staff']}>
-              <CategoryManagement />
+            <ProtectedRoute allowedRoles={['Admin']}>
+              <UserImportPage />
             </ProtectedRoute>
           }
         />
 
-        {/* Quản lý Nhà cung cấp */}
+        {/* Quản lý Bảng giá theo nhóm khách hàng (SCRUM-420, SCRUM-421) */}
+        <Route
+          path="/price-lists"
+          element={
+            <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
+              <PriceListManagement />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Quản lý Nhóm hàng nhiều cấp - Quản lý kinh doanh & Admin (SCRUM-214) */}
+        <Route
+          path="/categories"
+          element={
+            <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
+              <ErrorBoundary>
+                <CategoryManagement />
+              </ErrorBoundary>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/products/categories"
+          element={
+            <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
+              <ErrorBoundary>
+                <CategoryManagement />
+              </ErrorBoundary>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Quản lý Nhà cung cấp (SCRUM-217) */}
         <Route
           path="/suppliers"
           element={
@@ -141,16 +184,6 @@ export const AppRoutes: React.FC = () => {
           }
         />
 
-        {/* Cài đặt & Bảo mật tài khoản / Đổi mật khẩu - Mọi vai trò (SCRUM-201) */}
-        <Route
-          path="/settings"
-          element={
-            <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
-              <Settings />
-            </ProtectedRoute>
-          }
-        />
-
         {/* Hồ sơ cá nhân - Xem và cập nhật họ tên, SĐT Việt Nam - Mọi vai trò (SCRUM-210, SCRUM-361) */}
         <Route
           path="/profile"
@@ -161,7 +194,17 @@ export const AppRoutes: React.FC = () => {
           }
         />
 
-        {/* Nhật ký thao tác - Chỉ Admin (Sprint 2) */}
+        {/* Cài đặt & Bảo mật tài khoản / Đổi mật khẩu - Mọi vai trò (SCRUM-201) */}
+        <Route
+          path="/settings"
+          element={
+            <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
+              <Settings />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Nhật ký thao tác - Chỉ Admin (Sprint 2 - SCRUM-212) */}
         <Route
           path="/activity-log"
           element={
@@ -172,7 +215,7 @@ export const AppRoutes: React.FC = () => {
         />
 
         {/* ============================================================ */}
-        {/* DANH MỤC SẢN PHẨM                                            */}
+        {/* DANH MỤC SẢN PHẨM (SCRUM-220, SCRUM-380, SCRUM-381)          */}
         {/* ============================================================ */}
         <Route
           path="/products"
@@ -207,6 +250,14 @@ export const AppRoutes: React.FC = () => {
           }
         />
         <Route
+          path="/products/import"
+          element={
+            <ProtectedRoute allowedRoles={['Admin', 'SalesManager', 'Director', 'Manager']}>
+              <ProductImportPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/products/:id"
           element={
             <ProtectedRoute allowedRoles={['Admin', 'SalesManager', 'SalesStaff', 'WarehouseManager', 'WarehouseStaff', 'Director', 'Manager', 'Staff']}>
@@ -219,6 +270,34 @@ export const AppRoutes: React.FC = () => {
           element={
             <ProtectedRoute allowedRoles={['Admin', 'SalesManager', 'WarehouseManager', 'Director', 'Manager']}>
               <ProductEdit />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* ============================================================ */}
+        {/* BÁO CÁO & THỐNG KÊ DOANH SỐ THEO NGÀNH HÀNG                  */}
+        {/* ============================================================ */}
+        <Route
+          path="/reports/sales"
+          element={
+            <ProtectedRoute allowedRoles={['Admin', 'SalesManager', 'SalesStaff', 'Director', 'Accountant', 'Manager', 'Staff']}>
+              <SalesReport />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/reports/revenue"
+          element={
+            <ProtectedRoute allowedRoles={['Admin', 'SalesManager', 'Director', 'Accountant', 'Manager']}>
+              <RevenueReport />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/reports/inventory"
+          element={
+            <ProtectedRoute allowedRoles={['Admin', 'WarehouseManager', 'WarehouseStaff', 'Director', 'Manager']}>
+              <InventoryReport />
             </ProtectedRoute>
           }
         />

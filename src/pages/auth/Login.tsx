@@ -3,14 +3,14 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Mail, Lock, Eye, EyeOff, LogIn, Warehouse, Shield, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, LogIn, Warehouse, Shield, CheckCircle, AlertTriangle, ShieldAlert } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
 import { Button } from '../../components/common/Button';
 import { getHomePathForRole } from '../../utils/roleUtils';
 
 const loginSchema = z.object({
-  email: z.string().min(1, 'Tài khoản không được để trống'),
+  email: z.string().min(1, 'Tên đăng nhập hoặc Email không được để trống'),
   password: z.string().min(1, 'Mật khẩu không được để trống'),
   rememberMe: z.boolean().optional(),
 });
@@ -24,6 +24,7 @@ export const Login: React.FC = () => {
   const location = useLocation();
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [loginError, setLoginError] = useState<string | null>(null);
   const isExpired = new URLSearchParams(location.search).get('expired') === '1';
 
   const {
@@ -41,13 +42,19 @@ export const Login: React.FC = () => {
 
   const onSubmit = async (data: LoginFormData) => {
     setIsLoading(true);
+    setLoginError(null);
     try {
       const user = await login(data.email, data.password, data.rememberMe);
       showToast(`Chào mừng ${user.name} đã quay trở lại hệ thống!`, 'success', 'Đăng nhập thành công');
       const targetPath = getHomePathForRole(user.role);
       navigate(targetPath);
     } catch (error: any) {
-      showToast(error.message || 'Email hoặc mật khẩu không chính xác', 'error', 'Đăng nhập thất bại');
+      const errorMsg =
+        error.response?.data?.detail ||
+        error.message ||
+        'Tên đăng nhập hoặc mật khẩu không chính xác';
+      setLoginError(errorMsg);
+      showToast(errorMsg, 'error', 'Đăng nhập thất bại');
     } finally {
       setIsLoading(false);
     }
@@ -74,18 +81,42 @@ export const Login: React.FC = () => {
         </div>
       )}
 
+      {loginError && (
+        <div
+          className={`mb-6 p-4 rounded-2xl border flex items-start gap-3 transition-all animate-shake ${
+            loginError.toLowerCase().includes('khóa')
+              ? 'bg-rose-50 dark:bg-rose-950/40 border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-200'
+              : 'bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200'
+          }`}
+        >
+          {loginError.toLowerCase().includes('khóa') ? (
+            <ShieldAlert className="w-5 h-5 shrink-0 text-rose-500 mt-0.5" />
+          ) : (
+            <AlertTriangle className="w-5 h-5 shrink-0 text-amber-500 mt-0.5" />
+          )}
+          <div className="text-xs sm:text-sm">
+            <span className="font-semibold block mb-0.5">
+              {loginError.toLowerCase().includes('khóa')
+                ? 'Tài khoản hoặc thiết bị bị tạm khóa 15 phút'
+                : 'Thông báo đăng nhập'}
+            </span>
+            {loginError}
+          </div>
+        </div>
+      )}
+
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
         {/* Email field */}
         <div>
           <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
-            Tài khoản đăng nhập
+            Email / Tên đăng nhập
           </label>
           <div className="relative">
             <Mail className="w-5 h-5 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
               {...register('email')}
-              placeholder="admin, salesmanager, whstaff..."
+              placeholder="admin@warehouse.local hoặc admin"
               className={`w-full pl-11 pr-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-800/80 border text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all ${
                 errors.email
                   ? 'border-rose-300 dark:border-rose-700 focus:border-rose-500'

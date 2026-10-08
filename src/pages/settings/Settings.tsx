@@ -10,6 +10,8 @@ import {
   MapPin,
   Lock,
   Camera,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import { PageContainer } from '../../components/layout/PageContainer';
 import { Button } from '../../components/common/Button';
@@ -18,13 +20,15 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { useToast } from '../../contexts/ToastContext';
 import { getRoleDisplayName } from '../../utils/roleUtils';
 import { validateVNPhoneNumber, normalizeVNPhoneNumber } from '../../utils/phoneUtils';
+import { AvatarUploadModal } from '../../components/common/AvatarUploadModal';
 
 export const Settings: React.FC = () => {
-  const { user, role, changePassword, updateProfile } = useAuth();
+  const { user, role, changePassword, updateProfile, updateUserAvatar } = useAuth();
   const { theme, setTheme } = useTheme();
   const { showToast } = useToast();
 
   const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'appearance'>('profile');
+  const [isAvatarModalOpen, setIsAvatarModalOpen] = useState(false);
 
   // Profile local state
   const [profileName, setProfileName] = useState(user?.name || '');
@@ -38,6 +42,11 @@ export const Settings: React.FC = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [revokeOthers, setRevokeOthers] = useState(true);
   const [isChangingPass, setIsChangingPass] = useState(false);
+
+  // Bật/tắt hiển thị mật khẩu
+  const [showOldPassword, setShowOldPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,6 +70,7 @@ export const Settings: React.FC = () => {
       await updateProfile({
         name: trimmedName,
         phone: normalizedPhone,
+        avatar: user?.avatar,
       });
       setProfilePhone(normalizedPhone);
       showToast('Đã lưu thông tin hồ sơ người dùng thành công!', 'success');
@@ -153,23 +163,31 @@ export const Settings: React.FC = () => {
                 Thông Tin Tài Khoản
               </h3>
               <form onSubmit={handleSaveProfile} className="space-y-5">
-                {/* Ảnh đại diện: Trạng thái chờ */}
+                {/* Ảnh đại diện */}
                 <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-6 p-4 rounded-2xl bg-slate-50/80 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800">
-                  <div className="relative shrink-0 w-fit">
+                  <div className="relative shrink-0 w-fit cursor-pointer" onClick={() => setIsAvatarModalOpen(true)}>
                     <img
                       src={user?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150'}
                       alt="Avatar"
-                      className="w-16 h-16 rounded-2xl object-cover ring-2 ring-indigo-500/20 shadow-sm opacity-90"
+                      className="w-16 h-16 rounded-2xl object-cover ring-2 ring-indigo-500/20 shadow-sm"
                     />
-                    <span className="absolute -bottom-1 -right-1 p-1 rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400 text-[10px]" title="Tính năng đang ở trạng thái chờ">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setIsAvatarModalOpen(true);
+                      }}
+                      className="absolute -bottom-1 -right-1 p-1 rounded-lg bg-indigo-600 text-white text-[10px] hover:bg-indigo-700 transition-colors shadow-sm"
+                      title="Thay đổi ảnh đại diện"
+                    >
                       <Camera className="w-3.5 h-3.5" />
-                    </span>
+                    </button>
                   </div>
                   <div className="space-y-1">
                     <div className="flex items-center gap-2 flex-wrap">
                       <h4 className="text-sm font-bold text-slate-900 dark:text-white">{user?.name}</h4>
-                      <span className="text-[11px] font-medium px-2.5 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800">
-                        Ảnh đại diện: Đang ở trạng thái chờ
+                      <span className="text-[11px] font-medium px-2.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
+                        {getRoleDisplayName(role)}
                       </span>
                     </div>
                     <div className="flex items-center gap-2 pt-1">
@@ -177,13 +195,14 @@ export const Settings: React.FC = () => {
                         variant="outline"
                         size="sm"
                         type="button"
-                        disabled
-                        className="opacity-50 cursor-not-allowed text-xs"
+                        onClick={() => setIsAvatarModalOpen(true)}
+                        className="text-xs"
+                        leftIcon={<Camera className="w-3.5 h-3.5" />}
                       >
                         Thay đổi ảnh đại diện
                       </Button>
                       <span className="text-[11px] text-slate-400">
-                        (Tính năng tải ảnh đại diện sẽ được hỗ trợ trong phiên bản tiếp theo)
+                        Hỗ trợ ảnh JPG/PNG tối đa 2MB (SCRUM-363)
                       </span>
                     </div>
                   </div>
@@ -306,26 +325,48 @@ export const Settings: React.FC = () => {
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                     Mật khẩu hiện tại <span className="text-rose-500">*</span>
                   </label>
-                  <input
-                    type="password"
-                    value={oldPassword}
-                    onChange={(e) => setOldPassword(e.target.value)}
-                    placeholder="Nhập mật khẩu hiện tại đang dùng"
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm focus:ring-2 focus:ring-indigo-500"
-                  />
+                  <div className="relative">
+                    <input
+                      type={showOldPassword ? 'text' : 'password'}
+                      value={oldPassword}
+                      onChange={(e) => setOldPassword(e.target.value)}
+                      placeholder="Nhập mật khẩu hiện tại đang dùng"
+                      className="w-full pl-3.5 pr-11 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm focus:ring-2 focus:ring-indigo-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowOldPassword(!showOldPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-lg focus:outline-none transition-colors"
+                      title={showOldPassword ? 'Ẩn mật khẩu' : 'Hiển thị mật khẩu'}
+                      aria-label={showOldPassword ? 'Ẩn mật khẩu' : 'Hiển thị mật khẩu'}
+                    >
+                      {showOldPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
                 </div>
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                     Mật khẩu mới <span className="text-rose-500">*</span>
                   </label>
-                  <input
-                    type="password"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="Tối thiểu 8 ký tự, bao gồm cả chữ và số"
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm focus:ring-2 focus:ring-indigo-500"
-                  />
+                  <div className="relative">
+                    <input
+                      type={showNewPassword ? 'text' : 'password'}
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="Tối thiểu 8 ký tự, bao gồm cả chữ và số"
+                      className="w-full pl-3.5 pr-11 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm focus:ring-2 focus:ring-indigo-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowNewPassword(!showNewPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-lg focus:outline-none transition-colors"
+                      title={showNewPassword ? 'Ẩn mật khẩu' : 'Hiển thị mật khẩu'}
+                      aria-label={showNewPassword ? 'Ẩn mật khẩu' : 'Hiển thị mật khẩu'}
+                    >
+                      {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
                   <p className="text-[11px] text-slate-400 mt-1">Yêu cầu tối thiểu 8 ký tự, có cả chữ cái và chữ số</p>
                 </div>
 
@@ -333,13 +374,24 @@ export const Settings: React.FC = () => {
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                     Xác nhận mật khẩu mới <span className="text-rose-500">*</span>
                   </label>
-                  <input
-                    type="password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="Nhập lại chính xác mật khẩu mới"
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm focus:ring-2 focus:ring-indigo-500"
-                  />
+                  <div className="relative">
+                    <input
+                      type={showConfirmPassword ? 'text' : 'password'}
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="Nhập lại chính xác mật khẩu mới"
+                      className="w-full pl-3.5 pr-11 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm focus:ring-2 focus:ring-indigo-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-lg focus:outline-none transition-colors"
+                      title={showConfirmPassword ? 'Ẩn mật khẩu' : 'Hiển thị mật khẩu'}
+                      aria-label={showConfirmPassword ? 'Ẩn mật khẩu' : 'Hiển thị mật khẩu'}
+                    >
+                      {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
                 </div>
 
                 <div className="pt-2">
@@ -417,6 +469,17 @@ export const Settings: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* Modal Tải Lên & Xem Trước Ảnh Đại Diện (SCRUM-363) */}
+      <AvatarUploadModal
+        isOpen={isAvatarModalOpen}
+        onClose={() => setIsAvatarModalOpen(false)}
+        currentAvatar={user?.avatar}
+        userId={user?.id}
+        onAvatarUpdated={(newAvatarUrl) => {
+          updateUserAvatar(newAvatarUrl);
+        }}
+      />
     </PageContainer>
   );
 };

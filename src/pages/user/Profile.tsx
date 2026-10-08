@@ -17,15 +17,16 @@ import {
 } from 'lucide-react';
 import { mockUserApi } from '../../services/api';
 import { UserProfileData } from '../../data/mockData';
-import { validateVNPhoneNumber } from '../../utils/phoneUtils';
+import { useAuth } from '../../contexts/AuthContext';
+import { AvatarUploadModal } from '../../components/common/AvatarUploadModal';
 
 export const ProfilePage: React.FC = () => {
+  const { user, updateUserAvatar } = useAuth();
   const [profile, setProfile] = useState<UserProfileData | null>(null);
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [phoneError, setPhoneError] = useState<string | null>(null);
-  const [nameError, setNameError] = useState<string | null>(null);
+  const [isAvatarModalOpen, setIsAvatarModalOpen] = useState(false);
 
   // Editable fields
   const [fullName, setFullName] = useState('');
@@ -60,38 +61,34 @@ export const ProfilePage: React.FC = () => {
     e.preventDefault();
     if (!profile) return;
 
-    if (!fullName.trim() || fullName.trim().length < 2) {
-      setNameError('Họ và tên không được để trống (tối thiểu 2 ký tự).');
+    const cleanPhone = phone.replace(/\D/g, '');
+    if (cleanPhone.length !== 10) {
+      alert('Số điện thoại phải gồm đúng 10 chữ số (hiện có ' + cleanPhone.length + '/10).');
       return;
     }
-    setNameError(null);
-
-    const phoneVal = validateVNPhoneNumber(phone);
-    if (!phoneVal.valid) {
-      setPhoneError(phoneVal.message || 'Số điện thoại không hợp lệ.');
+    if (!cleanPhone.startsWith('0')) {
+      alert('Số điện thoại phải bắt đầu bằng chữ số 0.');
       return;
     }
-    setPhoneError(null);
 
     setIsSaving(true);
     try {
       const updated = {
-        name: fullName.trim(),
+        name: fullName,
         email,
-        phone: phoneVal.normalized || phone.trim(),
+        phone: cleanPhone,
         avatar: avatarUrl,
       };
 
       const res = await mockUserApi.updateProfile(updated);
       if (res.data.success && res.data.data) {
         setProfile(res.data.data);
-        setPhone(res.data.data.phone);
-        setToastMessage('✓ Cập nhật thông tin hồ sơ thành công!');
+        setToastMessage('Đã lưu thông tin hồ sơ người dùng thành công!');
         setTimeout(() => setToastMessage(null), 3500);
       }
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Không thể lưu thông tin hồ sơ.';
-      setPhoneError(msg);
+    } catch (err) {
+      console.error('Update profile error', err);
+      alert('Không thể lưu thông tin hồ sơ.');
     } finally {
       setIsSaving(false);
     }
@@ -111,10 +108,10 @@ export const ProfilePage: React.FC = () => {
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      {/* Toast Alert */}
+    <div className="max-w-6xl mx-auto space-y-6">
+      {/* Toast Alert - Bottom Right Corner */}
       {toastMessage && (
-        <div className="fixed bottom-6 left-6 z-50 bg-emerald-600 text-white px-5 py-3 rounded-2xl shadow-xl flex items-center gap-3 animate-bounce">
+        <div className="fixed bottom-6 right-6 z-50 bg-emerald-600 text-white px-5 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3 animate-slide-left border border-emerald-400/30">
           <CheckCircle2 className="w-5 h-5" />
           <span className="text-sm font-semibold">{toastMessage}</span>
         </div>
@@ -139,11 +136,29 @@ export const ProfilePage: React.FC = () => {
               <img
                 src={avatarUrl || profile.avatar}
                 alt={profile.name}
-                className="w-28 h-28 rounded-full object-cover ring-4 ring-blue-500/20 shadow-md"
+                className="w-28 h-28 rounded-full object-cover ring-4 ring-blue-500/20 shadow-md cursor-pointer hover:opacity-90 transition-opacity"
+                onClick={() => setIsAvatarModalOpen(true)}
+                title="Nhấp để thay đổi ảnh đại diện"
               />
-              <div className="absolute bottom-1 right-1 p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-md cursor-pointer transition-colors" title="Đổi ảnh">
+              <button
+                type="button"
+                onClick={() => setIsAvatarModalOpen(true)}
+                className="absolute bottom-1 right-1 p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-md cursor-pointer transition-colors"
+                title="Thay đổi ảnh đại diện (JPG/PNG <= 2MB)"
+              >
                 <Camera className="w-4 h-4" />
-              </div>
+              </button>
+            </div>
+
+            <div className="mb-3">
+              <button
+                type="button"
+                onClick={() => setIsAvatarModalOpen(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 hover:bg-blue-100 text-xs font-semibold transition-colors"
+              >
+                <Camera className="w-3.5 h-3.5" />
+                Tải lên ảnh mới
+              </button>
             </div>
 
             <h2 className="text-lg font-bold text-slate-900 dark:text-white">
@@ -211,26 +226,22 @@ export const ProfilePage: React.FC = () => {
               <Store className="w-4 h-4 text-blue-600" />
               Chi nhánh công tác
             </h3>
-            {profile.storeInfo ? (
-              <div className="text-xs space-y-2 text-slate-600 dark:text-slate-400">
-                <div>
-                  <strong className="text-slate-800 dark:text-slate-200 block">
-                    {profile.storeInfo.name}
-                  </strong>
-                  <p className="mt-0.5">{profile.storeInfo.address}</p>
-                </div>
-                <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
-                  <span className="text-slate-400">Hotline chi nhánh: </span>
-                  <strong className="text-slate-800 dark:text-slate-200">{profile.storeInfo.phone}</strong>
-                </div>
-                <div>
-                  <span className="text-slate-400">Quản lý kho: </span>
-                  <span className="text-slate-700 dark:text-slate-300">{profile.storeInfo.manager}</span>
-                </div>
+            <div className="text-xs space-y-2 text-slate-600 dark:text-slate-400">
+              <div>
+                <strong className="text-slate-800 dark:text-slate-200 block">
+                  {profile.storeInfo.name}
+                </strong>
+                <p className="mt-0.5">{profile.storeInfo.address}</p>
               </div>
-            ) : (
-              <p className="text-xs text-slate-400">Chưa có thông tin chi nhánh</p>
-            )}
+              <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
+                <span className="text-slate-400">Hotline chi nhánh: </span>
+                <strong className="text-slate-800 dark:text-slate-200">{profile.storeInfo.phone}</strong>
+              </div>
+              <div>
+                <span className="text-slate-400">Quản lý kho: </span>
+                <span className="text-slate-700 dark:text-slate-300">{profile.storeInfo.manager}</span>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -261,51 +272,31 @@ export const ProfilePage: React.FC = () => {
                     type="text"
                     required
                     value={fullName}
-                    onChange={(e) => {
-                      setFullName(e.target.value);
-                      if (nameError) setNameError(null);
-                    }}
-                    className={`w-full pl-9 pr-4 py-2.5 rounded-xl text-sm transition-colors focus:outline-none focus:ring-2 ${
-                      nameError
-                        ? 'border border-rose-500 bg-rose-50/50 dark:bg-rose-950/20 text-rose-900 focus:ring-rose-500'
-                        : 'bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:ring-blue-500'
-                    }`}
+                    onChange={(e) => setFullName(e.target.value)}
+                    className="w-full pl-9 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
-                {nameError && (
-                  <p className="text-xs text-rose-500 mt-1 font-medium">{nameError}</p>
-                )}
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Số điện thoại (Việt Nam) <span className="text-rose-500">*</span>
+                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex justify-between items-center">
+                  <span>Số điện thoại <span className="text-rose-500">*</span></span>
+                  <span className="text-xs font-mono text-slate-400">{phone.length}/10 số</span>
                 </label>
                 <div className="relative">
                   <Phone className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                   <input
                     type="tel"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={10}
+                    placeholder="Ví dụ: 0901234567"
                     required
-                    placeholder="Ví dụ: 0912345678"
                     value={phone}
-                    onChange={(e) => {
-                      setPhone(e.target.value);
-                      if (phoneError) setPhoneError(null);
-                    }}
-                    className={`w-full pl-9 pr-4 py-2.5 rounded-xl text-sm font-mono transition-colors focus:outline-none focus:ring-2 ${
-                      phoneError
-                        ? 'border border-rose-500 bg-rose-50/50 dark:bg-rose-950/20 text-rose-900 focus:ring-rose-500'
-                        : 'bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:ring-blue-500'
-                    }`}
+                    onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                    className="w-full pl-9 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
-                {phoneError ? (
-                  <p className="text-xs text-rose-500 mt-1 font-medium">{phoneError}</p>
-                ) : (
-                  <p className="text-[11px] text-slate-400 mt-1">
-                    Yêu cầu đúng 10 số, đầu số 03, 05, 07, 08, 09
-                  </p>
-                )}
               </div>
 
               <div className="sm:col-span-2">
@@ -376,6 +367,21 @@ export const ProfilePage: React.FC = () => {
           </form>
         </div>
       </div>
+
+      {/* Modal Tải Lên & Xem Trước Ảnh Đại Diện (SCRUM-363, SCRUM-365, SCRUM-366) */}
+      <AvatarUploadModal
+        isOpen={isAvatarModalOpen}
+        onClose={() => setIsAvatarModalOpen(false)}
+        currentAvatar={avatarUrl || profile.avatar}
+        userId={user?.id}
+        onAvatarUpdated={(newAvatarUrl) => {
+          setAvatarUrl(newAvatarUrl);
+          if (profile) {
+            setProfile({ ...profile, avatar: newAvatarUrl });
+          }
+          updateUserAvatar(newAvatarUrl);
+        }}
+      />
     </div>
   );
 };
