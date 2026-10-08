@@ -1,5 +1,5 @@
 import { User, UserRole } from '../types/User';
-import { initialUsers } from '../mock/users';
+import { apiClient } from '../api/client';
 import { getStorageItem, setStorageItem, removeStorageItem } from './storage';
 import { validateVNPhoneNumber } from '../utils/phoneUtils';
 
@@ -7,104 +7,81 @@ const STORAGE_KEYS = {
   CURRENT_USER: 'kv_current_user',
   AUTH_TOKEN: 'kv_auth_token',
   REMEMBER_EMAIL: 'kv_remember_email',
-  USERS: 'kv_users',
+};
+
+// Helper: Chuyển đổi định dạng User từ Backend API sang User của Frontend
+export function mapBackendUserToFrontend(apiUser: any): User {
+  let role: UserRole = 'Staff';
+  const rawRole = apiUser.role || '';
+
+  if (rawRole === 'Admin') role = 'Admin';
+  else if (rawRole === 'Sales Manager') role = 'SalesManager';
+  else if (rawRole === 'Sales Rep') role = 'SalesStaff';
+  else if (rawRole === 'WH Manager') role = 'WarehouseManager';
+  else if (rawRole === 'Warehouse') role = 'WarehouseStaff';
+  else if (rawRole === 'Accountant') role = 'Accountant';
+  else if (rawRole === 'Director') role = 'Director';
+  else if (rawRole === 'Customer') role = 'User';
+  else role = (rawRole as UserRole) || 'Staff';
+
+  const displayName = apiUser.full_name || apiUser.username || apiUser.email;
+  const isSalesRole = ['SalesManager', 'SalesStaff'].includes(role);
+  const location = apiUser.assigned_warehouse || '';
+
+  return {
+    id: String(apiUser.id),
+    name: displayName,
+    email: apiUser.email,
+    role: role,
+    roles: apiUser.roles?.map((r: any) => r.name || r) || [role],
+    status: apiUser.is_active ? 'active' : 'locked',
+    avatar: apiUser.avatar_url || apiUser.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=6366f1&color=fff`,
+    phone: apiUser.phone_number || '',
+    warehouse: isSalesRole ? '' : location,
+    territory: isSalesRole ? location : '',
+    lockReason: apiUser.lock_reason || undefined,
+    lastLogin: apiUser.created_at || new Date().toISOString(),
+    createdAt: apiUser.created_at || new Date().toISOString(),
+  };
 };
 
 export const authService = {
-  initUsers: (): User[] => {
-    let users = getStorageItem<User[]>(STORAGE_KEYS.USERS, initialUsers);
-    
-    // Sync: if the mock data has changed (e.g. emails/passwords updated), force sync
-    if (
-      users.length !== initialUsers.length ||
-      !users[0].password ||
-      users[0].email !== initialUsers[0].email ||
-      users[0].password !== initialUsers[0].password
-    ) {
-      setStorageItem(STORAGE_KEYS.USERS, initialUsers);
-      users = initialUsers;
-    }
-    
-    return users;
-  },
-
   getCurrentUser: (): User | null => {
-    // SCRUM-198: Only return user if a valid auth token AND user session exist
     const token = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
     if (!token) return null;
-    const user = getStorageItem<User | null>(STORAGE_KEYS.CURRENT_USER, null);
-    return user;
+    return getStorageItem<User | null>(STORAGE_KEYS.CURRENT_USER, null);
   },
 
-  login: async (email: string, password: string, remember: boolean = true): Promise<User> => {
-    await new Promise((res) => setTimeout(res, 600)); // Simulate API latency
-    const normalizedEmail = email.toLowerCase().trim();
-
-    // Check failed attempts lock (15 minutes after 5 consecutive failures - SCRUM-198)
-    const failedLogins = getStorageItem<Record<string, { count: number; lockedUntil: number }>>('kv_failed_logins', {});
-    const record = failedLogins[normalizedEmail];
-    if (record && record.lockedUntil > Date.now()) {
-      const remainingMinutes = Math.ceil((record.lockedUntil - Date.now()) / 60000);
-      throw new Error(`Tài khoản tạm thời bị khóa do nhập sai quá 5 lần liên tiếp. Vui lòng thử lại sau ${remainingMinutes} phút.`);
-    }
-
-    const users = authService.initUsers();
-    // Allow matching by username, email, or with/without domain
-    const user = users.find((u) => {
-      const uEmail = u.email.toLowerCase().trim();
-      return (
-        uEmail === normalizedEmail ||
-        uEmail === normalizedEmail.replace(/@khovanpro\.vn$/, '') ||
-        `${uEmail}@khovanpro.vn` === normalizedEmail
-      );
+  login: async (emailOrUsername: string, password: string, remember: boolean = true): Promise<User> => {
+    // Gọi trực tiếp API Backend FastAPI: POST /api/v1/auth/login
+    const response = await apiClient.post('/auth/login', {
+      username: emailOrUsername.trim(),
+      password: password,
     });
 
-    // Check valid password: user.password, [username]@1234, or admin@1234 fallback
-    const isValidPassword =
-      user &&
-      Boolean(
-        user.password === password ||
-        password === `${user.email.replace(/@khovanpro\.vn$/, '')}@1234` ||
-        password === `${user.role.toLowerCase()}@1234` ||
-        password === 'admin@1234'
-      );
+    const data = response.data;
+    const { access_token, user: apiUser } = data;
 
-    // Generic error message to prevent account enumeration
-    if (!user || (user.password && !isValidPassword)) {
-      const currentCount = (record?.count || 0) + 1;
-      if (currentCount >= 5) {
-        failedLogins[normalizedEmail] = {
-          count: currentCount,
-          lockedUntil: Date.now() + 15 * 60 * 1000 // 15 mins lock
-        };
-        setStorageItem('kv_failed_logins', failedLogins);
-        throw new Error('Bạn đã nhập sai 5 lần liên tiếp. Tài khoản tạm thời bị khóa 15 phút.');
-      } else {
-        failedLogins[normalizedEmail] = {
-          count: currentCount,
-          lockedUntil: 0
-        };
-        setStorageItem('kv_failed_logins', failedLogins);
-        throw new Error('Email hoặc mật khẩu không chính xác.');
+    // Lưu JWT token và thông tin phiên
+    localStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, access_token);
+    localStorage.setItem('access_token', access_token); // Hỗ trợ tương thích ngược
+
+    const user = mapBackendUserToFrontend(apiUser);
+
+    // Tự động kiểm tra và đồng bộ ảnh đại diện đã tải lên từ backend (SCRUM-364)
+    try {
+      const avatarRes = await apiClient.get('/user-avatars/me');
+      if (avatarRes.data?.avatar_url) {
+        user.avatar = avatarRes.data.avatar_url;
       }
-    }
-
-    // Check if account was locked by Admin (SCRUM-207)
-    if (user.status === 'locked') {
-      throw new Error('Tài khoản này đã bị khóa. Vui lòng liên hệ quản trị viên để mở khóa.');
-    }
-
-    // Reset failed count on success
-    if (failedLogins[normalizedEmail]) {
-      delete failedLogins[normalizedEmail];
-      setStorageItem('kv_failed_logins', failedLogins);
+    } catch {
+      // Bỏ qua nếu người dùng chưa cài đặt avatar
     }
 
     setStorageItem(STORAGE_KEYS.CURRENT_USER, user);
-    setStorageItem(STORAGE_KEYS.AUTH_TOKEN, `token-${Date.now()}`);
 
     if (remember) {
-      setStorageItem(STORAGE_KEYS.REMEMBER_EMAIL, email);
+      setStorageItem(STORAGE_KEYS.REMEMBER_EMAIL, emailOrUsername.trim());
     } else {
       removeStorageItem(STORAGE_KEYS.REMEMBER_EMAIL);
     }
@@ -112,82 +89,72 @@ export const authService = {
     return user;
   },
 
+  getMe: async (): Promise<User> => {
+    const response = await apiClient.get('/auth/me');
+    const user = mapBackendUserToFrontend(response.data);
+
+    try {
+      const avatarRes = await apiClient.get('/user-avatars/me');
+      if (avatarRes.data?.avatar_url) {
+        user.avatar = avatarRes.data.avatar_url;
+      }
+    } catch {
+      // Bỏ qua nếu người dùng chưa cài đặt avatar
+    }
+
+    setStorageItem(STORAGE_KEYS.CURRENT_USER, user);
+    return user;
+  },
+
   logout: async (): Promise<void> => {
-    await new Promise((res) => setTimeout(res, 200));
-    removeStorageItem(STORAGE_KEYS.CURRENT_USER);
-    removeStorageItem(STORAGE_KEYS.AUTH_TOKEN);
-    // SCRUM-199: Also clear session expiry timer on logout
-    localStorage.removeItem('kv_session_expires_at');
+    try {
+      // Thu hồi phiên trên Backend Database
+      await apiClient.post('/auth/logout');
+    } catch {
+      // Bỏ qua nếu lỗi mạng hoặc token đã hết hạn
+    } finally {
+      removeStorageItem(STORAGE_KEYS.CURRENT_USER);
+      removeStorageItem(STORAGE_KEYS.AUTH_TOKEN);
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('kv_session_expires_at');
+    }
   },
 
   switchRole: (role: UserRole): User => {
-    const users = authService.initUsers();
-    const targetUser = users.find((u) => u.role === role) || users[0];
-    setStorageItem(STORAGE_KEYS.CURRENT_USER, targetUser);
-    setStorageItem(STORAGE_KEYS.AUTH_TOKEN, `token-switch-${Date.now()}`);
-    return targetUser;
+    const current = authService.getCurrentUser();
+    if (!current) throw new Error('Chưa đăng nhập');
+    const updated = { ...current, role };
+    setStorageItem(STORAGE_KEYS.CURRENT_USER, updated);
+    return updated;
   },
 
-  changePassword: async (currentPassword: string, newPassword: string, revokeOtherSessions: boolean = true): Promise<void> => {
-    await new Promise((res) => setTimeout(res, 500)); // Simulate API latency
-    const currentUser = authService.getCurrentUser();
-    if (!currentUser) {
-      throw new Error('Bạn chưa đăng nhập vào hệ thống.');
-    }
+  changePassword: async (
+    currentPassword: string,
+    newPassword: string,
+    revokeOtherSessions: boolean = true
+  ): Promise<void> => {
+    // Gọi trực tiếp Backend FastAPI: POST /api/v1/auth/change-password
+    await apiClient.post('/auth/change-password', {
+      old_password: currentPassword,
+      new_password: newPassword,
+      revoke_other_sessions: revokeOtherSessions,
+    });
+  },
 
-    if (!currentPassword) {
-      throw new Error('Vui lòng nhập mật khẩu hiện tại.');
-    }
+  forgotPassword: async (email: string): Promise<string> => {
+    const res = await apiClient.post('/auth/forgot-password', { email });
+    return res.data?.message || 'Liên kết đặt lại mật khẩu đã được gửi đến email.';
+  },
 
-    const users = authService.initUsers();
-    const userIndex = users.findIndex((u) => u.id === currentUser.id || u.email.toLowerCase() === currentUser.email.toLowerCase());
-    
-    if (userIndex !== -1) {
-      const dbUser = users[userIndex];
-      if (dbUser.password && dbUser.password !== currentPassword) {
-        throw new Error('Mật khẩu hiện tại không chính xác.');
-      }
-    }
-
-    // Validation: min 8 chars, must contain both letters and digits
-    if (newPassword.length < 8) {
-      throw new Error('Mật khẩu mới phải có tối thiểu 8 ký tự.');
-    }
-    const hasLetter = /[a-zA-Z]/.test(newPassword);
-    const hasDigit = /[0-9]/.test(newPassword);
-    if (!hasLetter || !hasDigit) {
-      throw new Error('Mật khẩu mới phải bao gồm cả chữ cái và chữ số.');
-    }
-
-    if (newPassword === currentPassword) {
-      throw new Error('Mật khẩu mới trùng với mật khẩu hiện tại.');
-    }
-
-    // Update in users storage
-    if (userIndex !== -1) {
-      users[userIndex].password = newPassword;
-      setStorageItem(STORAGE_KEYS.USERS, users);
-    }
-
-    // Update current user
-    const updatedUser = { ...currentUser, password: newPassword };
-    setStorageItem(STORAGE_KEYS.CURRENT_USER, updatedUser);
-
-    if (revokeOtherSessions) {
-      // Revoke other active sessions by rotating the auth token timestamp
-      const freshToken = `token-fresh-${Date.now()}`;
-      setStorageItem(STORAGE_KEYS.AUTH_TOKEN, freshToken);
-      setStorageItem('kv_revoked_sessions_at', new Date().toISOString());
-    }
+  resetPassword: async (tokenOrCode: string, newPassword: string): Promise<string> => {
+    const res = await apiClient.post('/auth/reset-password', {
+      token: tokenOrCode,
+      new_password: newPassword,
+    });
+    return res.data?.message || 'Đặt lại mật khẩu thành công.';
   },
 
   updateProfile: async (data: { name: string; phone: string; avatar?: string }): Promise<User> => {
-    await new Promise((res) => setTimeout(res, 300)); // Simulate API latency
-    const currentUser = authService.getCurrentUser();
-    if (!currentUser) {
-      throw new Error('Bạn chưa đăng nhập vào hệ thống.');
-    }
-
     const trimmedName = data.name ? data.name.trim() : '';
     if (!trimmedName || trimmedName.length < 2) {
       throw new Error('Họ và tên không được để trống (tối thiểu 2 ký tự).');
@@ -198,13 +165,37 @@ export const authService = {
       throw new Error(phoneValidation.message || 'Số điện thoại không hợp lệ.');
     }
 
-    const users = authService.initUsers();
-    const userIndex = users.findIndex(
-      (u) => u.id === currentUser.id || u.email.toLowerCase() === currentUser.email.toLowerCase()
-    );
+    if (data.avatar && data.avatar.trim()) {
+      try {
+        await apiClient.post('/user-avatars/set-url', {
+          avatar_url: data.avatar.trim(),
+        });
+      } catch (avatarErr) {
+        console.warn('Lỗi đồng bộ avatar URL:', avatarErr);
+      }
+    }
 
-    // SCRUM-210 & SCRUM-360: Giữ nguyên các trường hệ thống không được phép tự đổi:
-    // email, role, roles, warehouse, territory, status, id
+    try {
+      const res = await apiClient.put('/profile/me', {
+        full_name: trimmedName,
+        phone_number: phoneValidation.normalized || data.phone.trim(),
+        avatar_url: data.avatar,
+      });
+      if (res.data) {
+        const user = mapBackendUserToFrontend(res.data);
+        if (data.avatar && data.avatar.trim()) {
+          user.avatar = data.avatar.trim();
+        }
+        setStorageItem(STORAGE_KEYS.CURRENT_USER, user);
+        return user;
+      }
+    } catch {
+      // Fallback local
+    }
+
+    const currentUser = authService.getCurrentUser();
+    if (!currentUser) throw new Error('Chưa đăng nhập');
+
     const updatedUser: User = {
       ...currentUser,
       name: trimmedName,
@@ -212,21 +203,11 @@ export const authService = {
       ...(data.avatar ? { avatar: data.avatar } : {}),
     };
 
-    if (userIndex !== -1) {
-      users[userIndex] = {
-        ...users[userIndex],
-        name: trimmedName,
-        phone: phoneValidation.normalized || data.phone.trim(),
-        ...(data.avatar ? { avatar: data.avatar } : {}),
-      };
-      setStorageItem(STORAGE_KEYS.USERS, users);
-    }
-
     setStorageItem(STORAGE_KEYS.CURRENT_USER, updatedUser);
     return updatedUser;
   },
 
   getRememberedEmail: (): string => {
-    return getStorageItem<string>(STORAGE_KEYS.REMEMBER_EMAIL, 'admin');
-  }
+    return getStorageItem<string>(STORAGE_KEYS.REMEMBER_EMAIL, 'admin@warehouse.local');
+  },
 };

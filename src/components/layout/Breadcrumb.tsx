@@ -21,6 +21,10 @@ const routeNames: Record<string, string> = {
   users: 'Người Dùng & Phân Quyền',
   settings: 'Cài Đặt Hệ Thống',
   profile: 'Hồ Sơ Cá Nhân',
+  categories: 'Nhóm Hàng & Ngành Hàng',
+  'activity-log': 'Nhật Ký Thao Tác',
+  'price-lists': 'Bảng Giá Phân Phối',
+  units: 'Đơn Vị Tính & Quy Đổi',
 };
 
 export const Breadcrumb: React.FC = () => {

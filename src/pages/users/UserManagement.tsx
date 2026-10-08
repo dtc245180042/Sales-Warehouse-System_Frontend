@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Plus,
+  FileSpreadsheet,
   Search,
   ShieldCheck,
   Shield,
@@ -16,6 +18,8 @@ import {
   Warehouse as WarehouseIcon,
   CheckCircle2,
   Camera,
+  RefreshCw,
+  ShieldAlert,
 } from 'lucide-react';
 import { PageContainer } from '../../components/layout/PageContainer';
 import { DataTable, Column } from '../../components/common/DataTable';
@@ -24,24 +28,18 @@ import { Badge } from '../../components/common/Badge';
 import { Modal } from '../../components/common/Modal';
 import { ConfirmDialog } from '../../components/common/ConfirmDialog';
 import { userService } from '../../services/userService';
-import { User, UserRole, UserStatus } from '../../types/User';
+import { authService } from '../../services/authService';
+import { TerritorySelector } from '../../components/common/TerritorySelector';
+import { User, UserRole, UserStatus, UserCanDeleteResponse } from '../../types/User';
 import { useToast } from '../../contexts/ToastContext';
 import { useAuth } from '../../contexts/AuthContext';
-import { validateVNPhoneNumber, normalizeVNPhoneNumber } from '../../utils/phoneUtils';
+import { validateVNPhoneNumber } from '../../utils/phoneUtils';
 
 const WAREHOUSE_OPTIONS = [
   'Kho Tổng Hà Nội',
   'Kho Tổng TP. HCM',
   'Kho Đà Nẵng',
   'Kho Cần Thơ',
-];
-
-const TERRITORY_OPTIONS = [
-  'Địa bàn Miền Bắc (Hà Nội, Hải Phòng, Quảng Ninh...)',
-  'Địa bàn Miền Trung (Đà Nẵng, Huế, Khánh Hòa...)',
-  'Địa bàn Miền Nam (TP. HCM, Bình Dương, Đồng Nai...)',
-  'Địa bàn Tây Nguyên (Đắk Lắk, Gia Lai, Lâm Đồng...)',
-  'Địa bàn Tây Nam Bộ (Cần Thơ, An Giang, Kiên Giang...)',
 ];
 
 const AVAILABLE_ROLES: { role: UserRole; label: string; desc: string }[] = [
@@ -55,18 +53,24 @@ const AVAILABLE_ROLES: { role: UserRole; label: string; desc: string }[] = [
 ];
 
 export const UserManagement: React.FC = () => {
+  const navigate = useNavigate();
   const { user: currentUser } = useAuth();
   const { showToast } = useToast();
   const [users, setUsers] = useState<User[]>([]);
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [phoneError, setPhoneError] = useState<string | null>(null);
+
+  // Trạng thái kiểm tra phụ thuộc & xóa người dùng
+  const [deletingUser, setDeletingUser] = useState<User | null>(null);
+  const [canDeleteInfo, setCanDeleteInfo] = useState<UserCanDeleteResponse | null>(null);
+  const [isCheckingCanDelete, setIsCheckingCanDelete] = useState(false);
+  const [isDeletingUser, setIsDeletingUser] = useState(false);
 
   // Add / Edit Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [phoneError, setPhoneError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -75,7 +79,7 @@ export const UserManagement: React.FC = () => {
     role: 'SalesStaff' as UserRole,
     roles: ['SalesStaff'] as UserRole[],
     warehouse: 'Kho Tổng TP. HCM',
-    territory: 'Địa bàn Miền Nam (TP. HCM, Bình Dương, Đồng Nai...)',
+    territory: '',
     status: 'active' as UserStatus,
     avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
   });
@@ -86,6 +90,7 @@ export const UserManagement: React.FC = () => {
   const [lockHandoverTo, setLockHandoverTo] = useState('');
   const [isSubmittingLock, setIsSubmittingLock] = useState(false);
   const [unlockingUser, setUnlockingUser] = useState<User | null>(null);
+  const [resettingUserId, setResettingUserId] = useState<string | null>(null);
 
   const loadUsers = async () => {
     const data = await userService.getAll();
@@ -120,17 +125,6 @@ export const UserManagement: React.FC = () => {
     });
   }, [users, search, roleFilter, statusFilter]);
 
-  // SCRUM-206: Danh sách địa bàn gợi ý (5 vùng có sẵn + các địa bàn người dùng đã nhập trước đó)
-  const suggestedTerritories = useMemo(() => {
-    const list = [...TERRITORY_OPTIONS];
-    users.forEach((u) => {
-      if (u.territory && u.territory.trim() && !list.includes(u.territory.trim())) {
-        list.push(u.territory.trim());
-      }
-    });
-    return list;
-  }, [users]);
-
   const handleOpenCreate = () => {
     setEditingUser(null);
     setPhoneError(null);
@@ -142,7 +136,7 @@ export const UserManagement: React.FC = () => {
       role: 'SalesStaff',
       roles: ['SalesStaff'],
       warehouse: 'Kho Tổng TP. HCM',
-      territory: 'Địa bàn Miền Nam (TP. HCM, Bình Dương, Đồng Nai...)',
+      territory: '',
       status: 'active',
       avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
     });
@@ -160,8 +154,8 @@ export const UserManagement: React.FC = () => {
       department: u.department || '',
       role: u.role,
       roles: assignedRoles,
-      warehouse: u.warehouse || 'Kho Tổng TP. HCM',
-      territory: u.territory || 'Địa bàn Miền Nam (TP. HCM, Bình Dương, Đồng Nai...)',
+      warehouse: u.warehouse || '',
+      territory: u.territory || '',
       status: u.status,
       avatar: u.avatar,
     });
@@ -198,19 +192,9 @@ export const UserManagement: React.FC = () => {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name.trim() || !formData.email.trim()) {
-      showToast('Vui lòng nhập họ tên và email tài khoản', 'warning');
+      showToast('Vui lòng nhập họ tên và email tài khoản.', 'warning', 'Thiếu thông tin');
       return;
     }
-
-    if (formData.phone && formData.phone.trim()) {
-      const phoneVal = validateVNPhoneNumber(formData.phone);
-      if (!phoneVal.valid) {
-        setPhoneError(phoneVal.message || 'Số điện thoại không hợp lệ.');
-        showToast(phoneVal.message || 'Số điện thoại không hợp lệ.', 'error', 'Lỗi số điện thoại');
-        return;
-      }
-    }
-    setPhoneError(null);
 
     // SCRUM-206: Warehouse role must be bound to at least one warehouse
     const hasWarehouseRole = formData.roles.some((r) =>
@@ -221,13 +205,22 @@ export const UserManagement: React.FC = () => {
       return;
     }
 
-    // SCRUM-206: Sales role must be bound to a territory
+    // SCRUM-206: Sales role territory handling
     const hasSalesRole = formData.roles.some((r) =>
       ['SalesManager', 'SalesStaff'].includes(r)
     );
-    if (hasSalesRole && !formData.territory) {
-      showToast('Người dùng thuộc vai trò kinh doanh phải gắn với ít nhất một địa bàn cụ thể.', 'warning', 'Ràng buộc địa bàn');
-      return;
+
+    // Ràng buộc số điện thoại 10 số di động bắt đầu bằng 0
+    if (formData.phone) {
+      const cleanPhone = formData.phone.replace(/\D/g, '');
+      if (cleanPhone.length !== 10) {
+        showToast(`Số điện thoại phải gồm đúng 10 chữ số (hiện có ${cleanPhone.length}/10 số).`, 'warning', 'Ràng buộc số điện thoại');
+        return;
+      }
+      if (!cleanPhone.startsWith('0')) {
+        showToast('Số điện thoại phải bắt đầu bằng chữ số 0.', 'warning', 'Ràng buộc số điện thoại');
+        return;
+      }
     }
 
     try {
@@ -243,7 +236,7 @@ export const UserManagement: React.FC = () => {
           territory: formData.territory,
           status: formData.status,
         });
-        showToast('Cập nhật tài khoản người dùng thành công!', 'success');
+        showToast('Cập nhật thông tin tài khoản người dùng thành công!', 'success', 'Thành công');
       } else {
         // SCRUM-205: Create user, send activation email with temp password
         const tempPassword = `Pass@${Math.floor(100000 + Math.random() * 900000)}`;
@@ -262,16 +255,46 @@ export const UserManagement: React.FC = () => {
           assignedDealersCount: hasSalesRole ? 3 : 0,
           assignedDealers: hasSalesRole ? ['Đại lý Tân Phú', 'Đại lý Bình Thạnh', 'Đại lý Thủ Đức'] : [],
         });
+
+        // Kích hoạt gửi email chứa mã OTP xác minh và hướng dẫn kích hoạt tài khoản
+        try {
+          await authService.forgotPassword(formData.email.trim());
+        } catch (emailErr) {
+          console.warn('Không thể gửi email kích hoạt tự động:', emailErr);
+        }
+
         showToast(
-          `Đã tạo tài khoản thành công! Email kích hoạt kèm mật khẩu tạm (${tempPassword}) đã được gửi tới ${formData.email}`,
+          `Đã tạo tài khoản thành công! Mật khẩu khởi tạo: ${tempPassword} (đã kích hoạt gửi email tới ${formData.email})`,
           'success',
-          'Kích hoạt tài khoản'
+          'Tạo tài khoản thành công'
         );
       }
       setIsModalOpen(false);
       loadUsers();
     } catch (err: any) {
-      showToast(err.message || 'Có lỗi xảy ra khi lưu tài khoản', 'error');
+      let errorMsg = 'Có lỗi xảy ra trong quá trình lưu tài khoản người dùng.';
+      const rawMsg = err?.message || (typeof err === 'string' ? err : '');
+
+      if (rawMsg.includes('hasSalesRole') || rawMsg.includes('not defined')) {
+        errorMsg = 'Lỗi phân bổ dữ liệu vai trò kinh doanh hoặc địa bàn phụ trách. Vui lòng thử lại.';
+      } else if (rawMsg.includes('đã tồn tại') || rawMsg.includes('already registered')) {
+        errorMsg = rawMsg.includes('email') || rawMsg.includes('Email')
+          ? 'Địa chỉ email này đã được sử dụng bởi một tài khoản khác.'
+          : 'Tên đăng nhập này đã tồn tại trong hệ thống. Vui lòng chọn tên khác.';
+      } else if (rawMsg.includes('Network Error') || rawMsg.includes('503') || rawMsg.includes('ERR_CONNECTION_REFUSED')) {
+        errorMsg = 'Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối mạng hoặc thử lại sau.';
+      } else if (rawMsg.includes('Request failed with status code 400')) {
+        errorMsg = 'Dữ liệu không hợp lệ hoặc thông tin tài khoản đã tồn tại trên hệ thống.';
+      } else if (rawMsg.includes('Request failed with status code 401')) {
+        errorMsg = 'Phiên làm việc đã hết hạn. Vui lòng đăng nhập lại.';
+      } else if (rawMsg.includes('Request failed with status code 403')) {
+        errorMsg = 'Bạn không có quyền thực hiện thao tác quản trị tài khoản này.';
+      } else if (rawMsg.includes('Request failed with status code 422')) {
+        errorMsg = 'Dữ liệu nhập vào chưa đúng định dạng. Vui lòng kiểm tra lại họ tên, email hoặc số điện thoại.';
+      } else if (rawMsg) {
+        errorMsg = rawMsg;
+      }
+      showToast(errorMsg, 'error', 'Thao tác không thành công');
     }
   };
 
@@ -325,19 +348,71 @@ export const UserManagement: React.FC = () => {
     }
   };
 
-  const handleResetPassword = (u: User) => {
-    showToast(`Đã gửi mật khẩu mới tạm thời (Abc@123456) tới email ${u.email}`, 'success', 'Đặt lại mật khẩu');
+  const handleResetPassword = async (u: User) => {
+    if (!u.email) {
+      showToast('Tài khoản này không có địa chỉ email để nhận mật khẩu!', 'warning', 'Thiếu email');
+      return;
+    }
+    setResettingUserId(u.id);
+    try {
+      const msg = await authService.forgotPassword(u.email);
+      showToast(
+        msg || `Đã gửi mã xác minh và liên kết đặt lại mật khẩu đến hòm thư ${u.email}!`,
+        'success',
+        'Gửi email thành công'
+      );
+    } catch (err: any) {
+      const rawMsg = err?.message || '';
+      let friendlyMsg = 'Lỗi khi gửi email đặt lại mật khẩu.';
+      if (rawMsg.includes('không tồn tại')) {
+        friendlyMsg = `Không tìm thấy tài khoản với email hoặc tên "${u.email}" trên hệ thống.`;
+      } else if (rawMsg.includes('Network Error') || rawMsg.includes('503') || rawMsg.includes('ERR_CONNECTION_REFUSED')) {
+        friendlyMsg = 'Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối mạng hoặc thử lại sau.';
+      } else if (rawMsg) {
+        friendlyMsg = rawMsg;
+      }
+      showToast(friendlyMsg, 'error', 'Thao tác không thành công');
+    } finally {
+      setResettingUserId(null);
+    }
   };
 
-  const handleDelete = async () => {
-    if (!deleteId) return;
+  const handleOpenDelete = async (u: User) => {
+    setDeletingUser(u);
+    setIsCheckingCanDelete(true);
+    setCanDeleteInfo(null);
     try {
-      await userService.delete(deleteId);
-      showToast('Đã xóa người dùng khỏi hệ thống', 'success');
-      setDeleteId(null);
+      const info = await userService.canDelete(u.id);
+      setCanDeleteInfo(info);
+    } catch (err: any) {
+      showToast(err.message || 'Lỗi kiểm tra ràng buộc dữ liệu người dùng', 'warning');
+    } finally {
+      setIsCheckingCanDelete(false);
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deletingUser) return;
+    setIsDeletingUser(true);
+    try {
+      const res = await userService.delete(deletingUser.id);
+      showToast(res.message || 'Đã xóa vĩnh viễn tài khoản khỏi hệ thống', 'success', 'Xóa thành công');
+      setDeletingUser(null);
+      setCanDeleteInfo(null);
       loadUsers();
-    } catch {
-      showToast('Lỗi khi xóa người dùng', 'error');
+    } catch (err: any) {
+      showToast(err.message || 'Không thể xóa tài khoản người dùng', 'error', 'Thao tác bị từ chối');
+    } finally {
+      setIsDeletingUser(false);
+    }
+  };
+
+  const handleSwitchFromDeleteToLock = () => {
+    const target = deletingUser;
+    setDeletingUser(null);
+    setCanDeleteInfo(null);
+    if (target) {
+      handleOpenLock(target);
     }
   };
 
@@ -406,24 +481,37 @@ export const UserManagement: React.FC = () => {
       key: 'warehouse',
       header: 'Kho / Địa Bàn Phụ Trách',
       sortable: true,
-      render: (u) => (
-        <div className="text-xs space-y-0.5">
-          <div className="font-medium text-slate-800 dark:text-slate-200 flex items-center gap-1">
-            <WarehouseIcon className="w-3.5 h-3.5 text-slate-400" />
-            <span>{u.warehouse || 'Toàn hệ thống'}</span>
+      render: (u) => {
+        const hasLocation = Boolean(u.warehouse || u.territory);
+        return (
+          <div className="text-xs space-y-0.5">
+            {hasLocation ? (
+              <>
+                {u.warehouse && (
+                  <div className="font-medium text-slate-800 dark:text-slate-200 flex items-center gap-1">
+                    <WarehouseIcon className="w-3.5 h-3.5 text-slate-400" />
+                    <span>{u.warehouse}</span>
+                  </div>
+                )}
+                {u.territory && (
+                  <div className="text-[11px] text-indigo-600 dark:text-indigo-400 font-medium">
+                    {u.territory}
+                  </div>
+                )}
+              </>
+            ) : (
+              <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200/50 dark:border-amber-800/50">
+                Chưa có
+              </span>
+            )}
+            {u.assignedDealersCount ? (
+              <span className="text-[11px] text-amber-600 dark:text-amber-400 font-medium block">
+                Phụ trách {u.assignedDealersCount} đại lý
+              </span>
+            ) : null}
           </div>
-          {u.territory && (
-            <div className="text-[11px] text-indigo-600 dark:text-indigo-400 font-medium">
-              {u.territory}
-            </div>
-          )}
-          {u.assignedDealersCount ? (
-            <span className="text-[11px] text-amber-600 dark:text-amber-400 font-medium block">
-              Phụ trách {u.assignedDealersCount} đại lý
-            </span>
-          ) : null}
-        </div>
-      ),
+        );
+      },
     },
     {
       key: 'phone',
@@ -459,10 +547,15 @@ export const UserManagement: React.FC = () => {
         <div className="flex items-center justify-end gap-1.5">
           <button
             onClick={() => handleResetPassword(u)}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-            title="Gửi lại mật khẩu tạm"
+            disabled={resettingUserId === u.id}
+            className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors disabled:opacity-50"
+            title="Gửi email đặt lại / cấp mật khẩu tạm"
           >
-            <KeyRound className="w-4 h-4" />
+            {resettingUserId === u.id ? (
+              <RefreshCw className="w-4 h-4 animate-spin text-indigo-600" />
+            ) : (
+              <KeyRound className="w-4 h-4" />
+            )}
           </button>
 
           {/* Lock / Unlock button (SCRUM-207) */}
@@ -492,7 +585,7 @@ export const UserManagement: React.FC = () => {
             <Edit className="w-4 h-4" />
           </button>
           <button
-            onClick={() => setDeleteId(u.id)}
+            onClick={() => handleOpenDelete(u)}
             disabled={currentUser?.id === u.id}
             className={`p-1.5 rounded-lg transition-colors ${
               currentUser?.id === u.id
@@ -513,9 +606,19 @@ export const UserManagement: React.FC = () => {
       title="Người Dùng & Phân Quyền Hệ Thống"
       subtitle={`Quản lý ${users.length} tài khoản nhân sự và phân bổ quyền thao tác nghiệp vụ`}
       actions={
-        <Button variant="primary" size="sm" onClick={handleOpenCreate} leftIcon={<Plus className="w-4 h-4" />}>
-          Thêm người dùng mới
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigate('/users/import')}
+            leftIcon={<FileSpreadsheet className="w-4 h-4 text-emerald-600" />}
+          >
+            Nhập từ Excel
+          </Button>
+          <Button variant="primary" size="sm" onClick={handleOpenCreate} leftIcon={<Plus className="w-4 h-4" />}>
+            Thêm người dùng mới
+          </Button>
+        </div>
       }
     >
       {/* SCRUM-205: defaultPageSize is 20 rows */}
@@ -594,13 +697,13 @@ export const UserManagement: React.FC = () => {
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                Tài khoản / Email đăng nhập *
+                Email đăng nhập *
               </label>
               <input
-                type="text"
+                type="email"
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                placeholder="admin, nv_kho hoặc email..."
+                placeholder="user@khovanpro.vn"
                 className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500"
                 required
               />
@@ -699,7 +802,7 @@ export const UserManagement: React.FC = () => {
                     <input
                       type="checkbox"
                       checked={isChecked}
-                      disabled={Boolean(isSelfAdmin)}
+                      disabled={isSelfAdmin}
                       onChange={() => handleRoleToggle(role)}
                       className="mt-0.5 w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500"
                     />
@@ -746,29 +849,13 @@ export const UserManagement: React.FC = () => {
             </div>
           )}
 
-          {/* SCRUM-206: Territory Binding (Required for Sales roles) */}
+          {/* SCRUM-206: Territory Binding (Text input or Preset list with add/edit/delete) */}
           {formData.roles.some((r) => ['SalesManager', 'SalesStaff'].includes(r)) && (
             <div className="p-3.5 rounded-2xl bg-amber-50/60 dark:bg-amber-950/30 border border-amber-200/60 dark:border-amber-800/40">
-              <label className="block text-xs font-bold text-amber-900 dark:text-amber-200 mb-1.5">
-                Gán địa bàn hoạt động (Bắt buộc với vai trò Quản lý / Nhân viên kinh doanh) *
-              </label>
-              <input
-                type="text"
-                list="territory-datalist"
+              <TerritorySelector
                 value={formData.territory}
-                onChange={(e) => setFormData({ ...formData, territory: e.target.value })}
-                placeholder="Chọn hoặc nhập địa bàn phụ trách..."
-                className="w-full px-3 py-2 rounded-xl border border-amber-300 dark:border-amber-700 bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-amber-500"
-                required
+                onChange={(val) => setFormData({ ...formData, territory: val })}
               />
-              <datalist id="territory-datalist">
-                {suggestedTerritories.map((t) => (
-                  <option key={t} value={t} />
-                ))}
-              </datalist>
-              <p className="text-[11px] text-amber-700 dark:text-amber-400 mt-1">
-                Nhân viên kinh doanh chỉ phụ trách chăm sóc các đại lý thuộc địa bàn này.
-              </p>
             </div>
           )}
 
@@ -916,16 +1003,138 @@ export const UserManagement: React.FC = () => {
         variant="info"
       />
 
-      {/* Delete User Confirmation */}
-      <ConfirmDialog
-        isOpen={!!deleteId}
-        onClose={() => setDeleteId(null)}
-        onConfirm={handleDelete}
-        title="Xác nhận xóa tài khoản người dùng"
-        message="Hành động này sẽ thu hồi quyền truy cập của nhân viên này vĩnh viễn khỏi hệ thống."
-        confirmText="Xóa tài khoản"
-        variant="danger"
-      />
+      {/* Modal Kiểm Tra Phụ Thuộc Dữ Liệu & Xác Nhận Xóa Tài Khoản */}
+      <Modal
+        isOpen={!!deletingUser}
+        onClose={() => {
+          if (!isDeletingUser) {
+            setDeletingUser(null);
+            setCanDeleteInfo(null);
+          }
+        }}
+        title="Xác Nhận Xử Lý Tài Khoản Người Dùng"
+        maxWidth="md"
+      >
+        {isCheckingCanDelete ? (
+          <div className="py-8 flex flex-col items-center justify-center space-y-3">
+            <RefreshCw className="w-8 h-8 text-indigo-600 animate-spin" />
+            <p className="text-sm font-medium text-slate-600 dark:text-slate-300">
+              Đang phân tích ràng buộc dữ liệu (đơn hàng, phiếu kho, bảng giá)...
+            </p>
+          </div>
+        ) : canDeleteInfo?.can_delete ? (
+          <div className="space-y-4">
+            <div className="flex items-start gap-3 p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60">
+              <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+              <div>
+                <h4 className="text-sm font-semibold text-emerald-900 dark:text-emerald-200">
+                  Tài khoản độc lập - Đủ điều kiện xóa vĩnh viễn
+                </h4>
+                <p className="text-xs text-emerald-700 dark:text-emerald-300 mt-1 leading-relaxed">
+                  Tài khoản <strong>{deletingUser?.name}</strong> ({deletingUser?.email}) chưa phát sinh bất kỳ đơn hàng, phiếu nhập/xuất kho hay bảng giá nào (tài khoản tạo nhầm hoặc mới khởi tạo). Có thể xóa vĩnh viễn an toàn khỏi cơ sở dữ liệu.
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-xs text-slate-600 dark:text-slate-400">
+              <p className="font-semibold text-slate-800 dark:text-slate-200 mb-1">Cảnh báo:</p>
+              <p>Hành động này sẽ xóa hoàn toàn thông tin người dùng khỏi CSDL. Thao tác này không thể hoàn tác.</p>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setDeletingUser(null);
+                  setCanDeleteInfo(null);
+                }}
+                disabled={isDeletingUser}
+              >
+                Hủy bỏ
+              </Button>
+              <Button
+                variant="danger"
+                onClick={handleConfirmDelete}
+                isLoading={isDeletingUser}
+                leftIcon={<Trash2 className="w-4 h-4" />}
+              >
+                Xóa vĩnh viễn khỏi CSDL
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60">
+              <ShieldAlert className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+              <div>
+                <h4 className="text-sm font-semibold text-amber-900 dark:text-amber-200">
+                  Không thể xóa vĩnh viễn (Phát hiện dữ liệu phụ thuộc)
+                </h4>
+                <p className="text-xs text-amber-800 dark:text-amber-300 mt-1 leading-relaxed">
+                  Tài khoản <strong>{deletingUser?.name}</strong> đã phát sinh dữ liệu nghiệp vụ trong hệ thống. Để bảo đảm toàn vẹn dữ liệu kế toán và lịch sử giao dịch, hệ thống chặn xóa cứng tài khoản này.
+                </p>
+              </div>
+            </div>
+
+            {/* Chi tiết các ràng buộc phát hiện */}
+            <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-2">
+              <div className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                Dữ liệu ràng buộc ghi nhận:
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="flex items-center justify-between p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800">
+                  <span className="text-slate-500">Đơn hàng bán:</span>
+                  <span className="font-bold text-slate-800 dark:text-slate-200">
+                    {canDeleteInfo?.dependencies?.orders_count || 0} đơn
+                  </span>
+                </div>
+                <div className="flex items-center justify-between p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800">
+                  <span className="text-slate-500">Phiếu nhập/xuất kho:</span>
+                  <span className="font-bold text-slate-800 dark:text-slate-200">
+                    {canDeleteInfo?.dependencies?.stock_receipts_count || 0} phiếu
+                  </span>
+                </div>
+                <div className="flex items-center justify-between p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800">
+                  <span className="text-slate-500">Bảng giá phân phối:</span>
+                  <span className="font-bold text-slate-800 dark:text-slate-200">
+                    {canDeleteInfo?.dependencies?.price_lists_count || 0} bảng giá
+                  </span>
+                </div>
+                <div className="flex items-center justify-between p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800">
+                  <span className="text-slate-500">Nhật ký thao tác:</span>
+                  <span className="font-bold text-slate-800 dark:text-slate-200">
+                    {canDeleteInfo?.dependencies?.audit_logs_count || 0} bản ghi
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900/50 text-xs text-indigo-800 dark:text-indigo-300">
+              <span className="font-semibold">Giải pháp khuyến nghị: </span>
+              Chuyển sang <strong>Khóa tài khoản</strong> để lập tức thu hồi quyền đăng nhập mà không làm ảnh hưởng tính toàn vẹn dữ liệu lịch sử.
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setDeletingUser(null);
+                  setCanDeleteInfo(null);
+                }}
+              >
+                Đóng
+              </Button>
+              <Button
+                variant="warning"
+                onClick={handleSwitchFromDeleteToLock}
+                leftIcon={<Lock className="w-4 h-4" />}
+              >
+                Chuyển sang Khóa tài khoản
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
     </PageContainer>
   );
 };

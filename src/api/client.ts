@@ -17,6 +17,10 @@ apiClient.interceptors.request.use(
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    // Tự động xóa Content-Type để Axios và trình duyệt tự động đính kèm multipart/form-data cùng boundary chuẩn
+    if (config.data instanceof FormData && config.headers) {
+      delete config.headers['Content-Type'];
+    }
     return config;
   },
   (error) => Promise.reject(error)
@@ -59,8 +63,8 @@ apiClient.interceptors.response.use(
       return Promise.reject(enhancedError);
     }
 
-    //kiểm tra netwwork localhost hoặc trong lan
-    const networkError = new Error('Không thể kết nối đến máy chủ Backend (Port 8000). Vui lòng kiểm tra file run.bat.');
+    // Kiểm tra kết nối mạng hoặc server không phản hồi
+    const networkError = new Error('Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối mạng hoặc thử lại sau.');
     (networkError as any).status = 503;
     return Promise.reject(networkError);
   }

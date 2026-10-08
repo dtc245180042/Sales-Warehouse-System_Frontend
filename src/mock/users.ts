@@ -4,7 +4,7 @@ export const initialUsers: User[] = [
   {
     id: 'USR-001',
     name: 'Quản Trị Viên Hệ Thống',
-    email: 'admin',
+    email: 'admin@khovanpro.vn',
     password: 'admin@1234',
     role: 'Admin',
     roles: ['Admin'],
@@ -22,7 +22,7 @@ export const initialUsers: User[] = [
   {
     id: 'USR-002',
     name: 'Quản Lý Kinh Doanh (Trần Văn Quản)',
-    email: 'salesmanager',
+    email: 'salesmanager@khovanpro.vn',
     password: 'sales@1234',
     role: 'SalesManager',
     roles: ['SalesManager'],
@@ -40,7 +40,7 @@ export const initialUsers: User[] = [
   {
     id: 'USR-003',
     name: 'Nhân Viên Kinh Doanh (Lê Thị Thị Trường)',
-    email: 'salesstaff',
+    email: 'salesstaff@khovanpro.vn',
     password: 'staff@1234',
     role: 'SalesStaff',
     roles: ['SalesStaff'],
@@ -58,7 +58,7 @@ export const initialUsers: User[] = [
   {
     id: 'USR-004',
     name: 'Quản Lý Kho Vận (Phạm Kho Trưởng)',
-    email: 'whmanager',
+    email: 'whmanager@khovanpro.vn',
     password: 'wh@1234',
     role: 'WarehouseManager',
     roles: ['WarehouseManager'],
@@ -76,7 +76,7 @@ export const initialUsers: User[] = [
   {
     id: 'USR-005',
     name: 'Thủ Kho (Nguyễn Nhập Xuất)',
-    email: 'whstaff',
+    email: 'whstaff@khovanpro.vn',
     password: 'staff@1234',
     role: 'WarehouseStaff',
     roles: ['WarehouseStaff'],
@@ -94,7 +94,7 @@ export const initialUsers: User[] = [
   {
     id: 'USR-006',
     name: 'Kế Toán Trưởng (Hoàng Sổ Sách)',
-    email: 'accountant',
+    email: 'accountant@khovanpro.vn',
     password: 'acc@1234',
     role: 'Accountant',
     roles: ['Accountant'],
@@ -112,7 +112,7 @@ export const initialUsers: User[] = [
   {
     id: 'USR-007',
     name: 'Ban Giám Đốc (Vũ Điều Hành)',
-    email: 'director',
+    email: 'director@khovanpro.vn',
     password: 'director@1234',
     role: 'Director',
     roles: ['Director'],
@@ -130,7 +130,7 @@ export const initialUsers: User[] = [
   {
     id: 'USR-008',
     name: 'Tài Khoản Thử Nghiệm Manager (Cũ)',
-    email: 'manager',
+    email: 'manager@khovanpro.vn',
     password: 'manager@1234',
     role: 'Manager',
     roles: ['Manager'],
@@ -148,7 +148,7 @@ export const initialUsers: User[] = [
   {
     id: 'USR-009',
     name: 'Tài Khoản Thử Nghiệm Staff (Cũ)',
-    email: 'staff',
+    email: 'staff@khovanpro.vn',
     password: 'staff@1234',
     role: 'Staff',
     roles: ['Staff'],

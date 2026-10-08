@@ -25,21 +25,38 @@ import { formatCurrency, formatDate } from '../../utils/formatters';
 import { orderService } from '../../services/orderService';
 import { Order, OrderStatus } from '../../types/Order';
 import { useToast } from '../../contexts/ToastContext';
+import { useAuth } from '../../contexts/AuthContext';
+
+import { customerLockService } from '../../services/customerLockService';
 
 export const OrderDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { showToast } = useToast();
+  const { user } = useAuth();
 
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
+  const [isCustomerLocked, setIsCustomerLocked] = useState(false);
 
   const loadOrder = async () => {
     if (!id) return;
     try {
       const data = await orderService.getById(id);
-      if (data) setOrder(data);
+      if (data) {
+        setOrder(data);
+        if (data.customerIsLocked) {
+          setIsCustomerLocked(true);
+        } else if (data.customerId) {
+          try {
+            const lockStatus = await customerLockService.getStatus(data.customerId);
+            if (lockStatus?.isLocked) {
+              setIsCustomerLocked(true);
+            }
+          } catch {}
+        }
+      }
     } finally {
       setLoading(false);
     }
@@ -133,6 +150,28 @@ export const OrderDetail: React.FC = () => {
         </div>
       }
     >
+      {/* Banner Cảnh báo đại lý bị khoá giao dịch (SC-228 Subtask 6) */}
+      {(order.customerIsLocked || isCustomerLocked) && (
+        <div
+          id="order-customer-locked-alert"
+          className="mb-6 p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-100 flex items-start gap-3.5 shadow-sm"
+        >
+          <AlertCircle className="w-6 h-6 text-amber-600 shrink-0 mt-0.5" />
+          <div className="flex-1 text-xs sm:text-sm">
+            <h4 className="font-bold text-amber-900 dark:text-amber-100 flex items-center gap-2">
+              ⚠️ CẢNH BÁO: ĐẠI LÝ ĐANG BỊ KHOÁ GIAO DỊCH
+              <span className="text-xs px-2 py-0.5 rounded-full bg-amber-200 dark:bg-amber-900/60 font-semibold text-amber-800 dark:text-amber-200">
+                Đơn dở vẫn được xử lý tiếp
+              </span>
+            </h4>
+            <p className="mt-1 text-amber-800 dark:text-amber-200">
+              {order.customerLockWarning ||
+                `Đại lý '${order.customerName}' hiện đang bị khoá giao dịch. Theo quy định SC-228, đơn hàng đã tạo này vẫn được phép tiếp tục đóng gói, giao hàng hoặc hoàn tất, nhưng không thể tạo đơn mới.`}
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Order Status Timeline Tracker */}
       {order.status !== 'cancelled' ? (
         <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-card mb-6">
@@ -252,6 +291,38 @@ export const OrderDetail: React.FC = () => {
 
         {/* Right: Customer & Financials (1 col) */}
         <div className="space-y-6">
+          {/* Creator / Staff info (SCRUM-362, SCRUM-364, SCRUM-367) */}
+          <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-card space-y-3">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+              <User className="w-4 h-4 text-indigo-500" />
+              Người Lập Đơn Hàng
+            </h3>
+            <div className="flex items-center gap-3.5 pt-1">
+              <img
+                src={
+                  user && (user.name === order.staffName || String(user.id) === String(order.staffId)) && user.avatar
+                    ? user.avatar
+                    : `https://ui-avatars.com/api/?name=${encodeURIComponent(order.staffName)}&background=6366f1&color=fff&size=128`
+                }
+                alt={order.staffName}
+                className="w-12 h-12 rounded-full object-cover ring-2 ring-indigo-500/30 shadow-md shrink-0"
+              />
+              <div>
+                <p className="text-sm font-bold text-slate-900 dark:text-white">
+                  {order.staffName}
+                </p>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <span className="text-xs text-indigo-600 dark:text-indigo-400 font-medium">
+                    Nhân viên bán hàng
+                  </span>
+                  <span className="text-[11px] text-slate-400 font-mono">
+                    ({order.staffId})
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Customer info */}
           <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-card space-y-3">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
