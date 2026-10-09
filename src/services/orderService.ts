@@ -3,7 +3,8 @@ import {
   OrderStatus,
   OrderCalculateRequest,
   OrderCalculateResponse,
-  ProductSearchForOrder
+  ProductSearchForOrder,
+  PurchaseHistorySuggestionResponse,
 } from '../types/Order';
 import { initialOrders } from '../mock/orders';
 import { getStorageItem, setStorageItem } from './storage';
@@ -370,5 +371,135 @@ export const orderService = {
       setStorageItem(STORAGE_KEY, [...orders]);
       return orders[index];
     }
+  },
+
+  // SCRUM-236 (S4-04): Lấy gợi ý mặt hàng từ lịch sử mua hàng 3 tháng gần nhất
+  getPurchaseHistorySuggestions: async (
+    customerId: string,
+    windowDays: number = 90
+  ): Promise<PurchaseHistorySuggestionResponse> => {
+    const res = await apiClient.get(`/orders/suggestions/${encodeURIComponent(customerId)}?window_days=${windowDays}`);
+    const d = res.data;
+    return {
+      customerId: String(d.customerId || d.customer_id || customerId),
+      customerName: d.customerName || d.customer_name || '',
+      timeWindowDays: d.timeWindowDays ?? d.time_window_days ?? windowDays,
+      totalOrdersInWindow: d.totalOrdersInWindow ?? d.total_orders_in_window ?? 0,
+      hasPurchaseHistory: Boolean(d.hasPurchaseHistory ?? d.has_purchase_history),
+      items: (d.items || []).map((i: any) => ({
+        productId: String(i.productId || i.product_id),
+        sku: i.sku || undefined,
+        name: i.name,
+        unit: i.unit || 'cái',
+        category: i.category || 'Khác',
+        categoryId: i.categoryId ?? i.category_id ?? undefined,
+        avgQuantity: Number(i.avgQuantity ?? i.avg_quantity ?? 1),
+        totalQuantity: Number(i.totalQuantity ?? i.total_quantity ?? 0),
+        orderCount: Number(i.orderCount ?? i.order_count ?? 0),
+        lastQuantity: Number(i.lastQuantity ?? i.last_quantity ?? 1),
+        lastPurchasedAt: i.lastPurchasedAt || i.last_purchased_at || undefined,
+        lastPrice: Number(i.lastPrice ?? i.last_price ?? 0),
+        currentPrice: Number(i.currentPrice ?? i.current_price ?? 0),
+        stock: Number(i.stock ?? 0),
+      })),
+      groups: (d.groups || []).map((g: any) => ({
+        category: g.category,
+        categoryId: g.categoryId ?? g.category_id ?? undefined,
+        itemCount: Number(g.itemCount ?? g.item_count ?? (g.items?.length || 0)),
+        totalSuggestedQuantity: Number(g.totalSuggestedQuantity ?? g.total_suggested_quantity ?? 0),
+        items: (g.items || []).map((i: any) => ({
+          productId: String(i.productId || i.product_id),
+          sku: i.sku || undefined,
+          name: i.name,
+          unit: i.unit || 'cái',
+          category: i.category || g.category || 'Khác',
+          categoryId: i.categoryId ?? i.category_id ?? undefined,
+          avgQuantity: Number(i.avgQuantity ?? i.avg_quantity ?? 1),
+          totalQuantity: Number(i.totalQuantity ?? i.total_quantity ?? 0),
+          orderCount: Number(i.orderCount ?? i.order_count ?? 0),
+          lastQuantity: Number(i.lastQuantity ?? i.last_quantity ?? 1),
+          lastPurchasedAt: i.lastPurchasedAt || i.last_purchased_at || undefined,
+          lastPrice: Number(i.lastPrice ?? i.last_price ?? 0),
+          currentPrice: Number(i.currentPrice ?? i.current_price ?? 0),
+          stock: Number(i.stock ?? 0),
+        })),
+      })),
+      lastOrder: d.lastOrder || d.last_order ? {
+        orderId: String((d.lastOrder || d.last_order).orderId || (d.lastOrder || d.last_order).order_id),
+        code: (d.lastOrder || d.last_order).code,
+        createdAt: (d.lastOrder || d.last_order).createdAt || (d.lastOrder || d.last_order).created_at,
+        total: Number((d.lastOrder || d.last_order).total || 0),
+        items: ((d.lastOrder || d.last_order).items || []).map((it: any) => ({
+          productId: String(it.productId || it.product_id),
+          sku: it.sku || undefined,
+          name: it.name,
+          unit: it.unit || 'cái',
+          quantity: Number(it.quantity || 1),
+          price: Number(it.price || 0),
+        })),
+      } : undefined,
+    };
+  },
+
+  // Quy tắc chống trùng dòng khi thêm sản phẩm/nhóm hàng từ lịch sử mua
+  mergeSuggestionItems: async (
+    currentItems: any[],
+    itemsToAdd: any[],
+    strategy: 'merge' | 'replace_qty' = 'merge'
+  ) => {
+    try {
+      const res = await apiClient.post('/orders/suggestions/merge-items', {
+        current_items: currentItems.map((i) => ({
+          product_id: i.productId || i.product_id,
+          sku: i.sku,
+          name: i.name,
+          unit: i.unit || 'cái',
+          price: i.price,
+          quantity: i.quantity,
+          discount: i.discount || 0,
+          subtotal: i.subtotal || (i.price * i.quantity),
+        })),
+        items_to_add: itemsToAdd.map((i) => ({
+          product_id: i.productId || i.product_id,
+          sku: i.sku,
+          name: i.name,
+          unit: i.unit || 'cái',
+          price: i.price,
+          quantity: i.quantity,
+          discount: i.discount || 0,
+          subtotal: i.subtotal || (i.price * i.quantity),
+        })),
+        strategy,
+      });
+      return res.data;
+    } catch {
+      const copy = [...currentItems];
+      const indexMap = new Map(copy.map((itm, idx) => [String(itm.productId), idx]));
+      let mergedCount = 0;
+      let addedCount = 0;
+
+      for (const addItm of itemsToAdd) {
+        const pid = String(addItm.productId);
+        if (indexMap.has(pid)) {
+          const idx = indexMap.get(pid)!;
+          if (strategy === 'replace_qty') {
+            copy[idx].quantity = addItm.quantity;
+          } else {
+            copy[idx].quantity += addItm.quantity;
+          }
+          copy[idx].subtotal = copy[idx].price * copy[idx].quantity - (copy[idx].discount || 0);
+          mergedCount++;
+        } else {
+          copy.unshift({
+            ...addItm,
+            subtotal: addItm.price * addItm.quantity - (addItm.discount || 0),
+          });
+          indexMap.set(pid, 0);
+          addedCount++;
+        }
+      }
+      return { items: copy, merged_count: mergedCount, added_count: addedCount };
+    }
   }
 };
+

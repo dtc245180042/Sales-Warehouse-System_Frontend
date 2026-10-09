@@ -91,3 +91,58 @@ export interface ProductSearchForOrder {
   packaging_spec?: string;
   available_units: string[];
 }
+
+// SCRUM-236 (S4-04): Gợi ý lịch sử mua hàng 3 tháng gần nhất
+export interface PurchaseHistoryItemSuggestion {
+  productId: string;
+  sku?: string;
+  name: string;
+  unit: string;
+  category?: string;
+  categoryId?: number;
+  avgQuantity: number;
+  totalQuantity: number;
+  orderCount: number;
+  lastQuantity: number;
+  lastPurchasedAt?: string;
+  lastPrice: number;
+  currentPrice: number;
+  stock: number;
+}
+
+export interface PurchaseHistoryGroupSuggestion {
+  category: string;
+  categoryId?: number;
+  itemCount: number;
+  totalSuggestedQuantity: number;
+  items: PurchaseHistoryItemSuggestion[];
+}
+
+export interface LastOrderItemSummary {
+  productId: string;
+  sku?: string;
+  name: string;
+  unit: string;
+  quantity: number;
+  price: number;
+}
+
+export interface LastOrderSummary {
+  orderId: string;
+  code: string;
+  createdAt?: string;
+  total: number;
+  items: LastOrderItemSummary[];
+}
+
+export interface PurchaseHistorySuggestionResponse {
+  customerId: string;
+  customerName: string;
+  timeWindowDays: number;
+  totalOrdersInWindow: number;
+  hasPurchaseHistory: boolean;
+  items: PurchaseHistoryItemSuggestion[];
+  groups: PurchaseHistoryGroupSuggestion[];
+  lastOrder?: LastOrderSummary;
+}
+
