@@ -32,6 +32,8 @@ import { ProductCreate } from '../pages/products/ProductCreate';
 import { ProductEdit } from '../pages/products/ProductEdit';
 import { ProductUnitPage } from '../pages/products/ProductUnitPage';
 
+import { MobileOrderCreate } from '../pages/sales/MobileOrderCreate';
+
 // All 7 business roles allowed in Sprint 1 backoffice
 const ALL_BACKOFFICE_ROLES: UserRole[] = [
   'Admin',
@@ -135,6 +137,16 @@ export const AppRoutes: React.FC = () => {
           element={
             <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
               <SupplierDetail />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Tạo đơn hàng Mobile 360px - SCRUM-474 (Sprint 3) */}
+        <Route
+          path="/sales/mobile-order"
+          element={
+            <ProtectedRoute allowedRoles={['SalesStaff', 'SalesManager', 'Admin']}>
+              <MobileOrderCreate />
             </ProtectedRoute>
           }
         />
