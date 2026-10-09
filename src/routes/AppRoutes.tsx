@@ -35,6 +35,7 @@ import { CustomerDetail } from '../pages/customers/CustomerDetail';
 import { POS } from '../pages/sales/POS';
 import { Orders } from '../pages/sales/Orders';
 import { OrderDetail } from '../pages/sales/OrderDetail';
+import { CreateOrder } from '../pages/orders/CreateOrder';
 
 // Sprint 2 Pages - Activity Log (SCRUM-212)
 import ActivityLogPage from '../pages/activitylog/ActivityLogPage';
@@ -224,6 +225,14 @@ export const AppRoutes: React.FC = () => {
           element={
             <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
               <Orders />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/orders/create"
+          element={
+            <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
+              <CreateOrder />
             </ProtectedRoute>
           }
         />
