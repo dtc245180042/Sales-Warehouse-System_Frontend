@@ -34,6 +34,10 @@ export const CustomerList: React.FC = () => {
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [formData, setFormData] = useState({
     name: '',
+    taxCode: '',
+    customerGroup: 'Đại lý cấp 1',
+    region: 'Miền Nam',
+    assigneeId: '',
     phone: '',
     email: '',
     address: '',
@@ -61,7 +65,7 @@ export const CustomerList: React.FC = () => {
 
   const handleOpenCreate = () => {
     setEditingCustomer(null);
-    setFormData({ name: '', phone: '', email: '', address: '', status: 'active' });
+    setFormData({ name: '', taxCode: '', customerGroup: 'Đại lý cấp 1', region: 'Miền Nam', assigneeId: '', phone: '', email: '', address: '', status: 'active' });
     setIsModalOpen(true);
   };
 
@@ -69,6 +73,10 @@ export const CustomerList: React.FC = () => {
     setEditingCustomer(c);
     setFormData({
       name: c.name,
+      taxCode: c.taxCode || '',
+      customerGroup: c.customerGroup || 'Đại lý cấp 1',
+      region: c.region || 'Miền Nam',
+      assigneeId: c.assigneeId || '',
       phone: c.phone,
       email: c.email,
       address: c.address,
@@ -101,6 +109,12 @@ export const CustomerList: React.FC = () => {
 
   const handleDelete = async () => {
     if (!deleteId) return;
+    const customerToDelete = customers.find(c => c.id === deleteId);
+    if (customerToDelete && customerToDelete.totalOrders > 0) {
+      showToast('Không thể xóa đại lý đã phát sinh giao dịch. Vui lòng chuyển sang Tạm ngưng.', 'error');
+      setDeleteId(null);
+      return;
+    }
     try {
       await customerService.delete(deleteId);
       showToast('Đã xóa khách hàng', 'success');
@@ -137,12 +151,24 @@ export const CustomerList: React.FC = () => {
     },
     {
       key: 'phone',
-      header: 'Liên Hệ',
+      header: 'Liên Hệ & MST',
       sortable: true,
       render: (c) => (
         <div className="text-xs space-y-0.5">
           <div className="font-semibold text-slate-800 dark:text-slate-200">{c.phone}</div>
           <div className="text-slate-400">{c.email}</div>
+          {c.taxCode && <div className="text-slate-500 font-mono mt-1">MST: {c.taxCode}</div>}
+        </div>
+      ),
+    },
+    {
+      key: 'customerGroup',
+      header: 'Phân Loại',
+      sortable: true,
+      render: (c) => (
+        <div className="text-xs space-y-0.5">
+          <Badge variant="neutral" size="sm">{c.customerGroup || 'N/A'}</Badge>
+          <div className="text-slate-500 mt-1">{c.region || 'Chưa phân vùng'}</div>
         </div>
       ),
     },
@@ -200,8 +226,9 @@ export const CustomerList: React.FC = () => {
           </button>
           <button
             onClick={() => setDeleteId(c.id)}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40"
-            title="Xóa"
+            disabled={c.totalOrders > 0}
+            className={`p-1.5 rounded-lg ${c.totalOrders > 0 ? 'text-slate-300 cursor-not-allowed' : 'text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40'}`}
+            title={c.totalOrders > 0 ? "Không thể xóa đại lý đã có giao dịch" : "Xóa"}
           >
             <Trash2 className="w-4 h-4" />
           </button>
@@ -246,18 +273,32 @@ export const CustomerList: React.FC = () => {
         maxWidth="md"
       >
         <form onSubmit={handleSave} className="space-y-4">
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-              Họ và tên / Tên công ty *
-            </label>
-            <input
-              type="text"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              placeholder="Nguyễn Văn A / Công ty ABC"
-              className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm focus:ring-2 focus:ring-indigo-500"
-              required
-            />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                Họ và tên / Tên công ty *
+              </label>
+              <input
+                type="text"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="Nguyễn Văn A / Công ty ABC"
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm focus:ring-2 focus:ring-indigo-500"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                Mã số thuế
+              </label>
+              <input
+                type="text"
+                value={formData.taxCode}
+                onChange={(e) => setFormData({ ...formData, taxCode: e.target.value })}
+                placeholder="Ví dụ: 0312345678"
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -285,6 +326,38 @@ export const CustomerList: React.FC = () => {
                 placeholder="customer@domain.com"
                 className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm focus:ring-2 focus:ring-indigo-500"
               />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                Nhóm khách hàng
+              </label>
+              <select
+                value={formData.customerGroup}
+                onChange={(e) => setFormData({ ...formData, customerGroup: e.target.value })}
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm focus:ring-2 focus:ring-indigo-500"
+              >
+                <option value="Đại lý cấp 1">Đại lý cấp 1</option>
+                <option value="Đại lý cấp 2">Đại lý cấp 2</option>
+                <option value="Khách lẻ">Khách lẻ</option>
+                <option value="Dự án">Dự án</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                Khu vực
+              </label>
+              <select
+                value={formData.region}
+                onChange={(e) => setFormData({ ...formData, region: e.target.value })}
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm focus:ring-2 focus:ring-indigo-500"
+              >
+                <option value="Miền Bắc">Miền Bắc</option>
+                <option value="Miền Trung">Miền Trung</option>
+                <option value="Miền Nam">Miền Nam</option>
+              </select>
             </div>
           </div>
 
