@@ -27,6 +27,10 @@ export const CustomerList: React.FC = () => {
   const { showToast } = useToast();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [search, setSearch] = useState('');
+  const [filterRegion, setFilterRegion] = useState('');
+  const [filterGroup, setFilterGroup] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
+  // assignee is simple text or id for now, we can just use text match or id match.
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
   // Add/Edit modal state
@@ -55,13 +59,19 @@ export const CustomerList: React.FC = () => {
 
   const filteredCustomers = useMemo(() => {
     return customers.filter(
-      (c) =>
-        c.name.toLowerCase().includes(search.toLowerCase()) ||
-        c.phone.includes(search) ||
-        c.email.toLowerCase().includes(search.toLowerCase()) ||
-        c.code.toLowerCase().includes(search.toLowerCase())
+      (c) => {
+        const matchSearch =
+          c.name.toLowerCase().includes(search.toLowerCase()) ||
+          c.phone.includes(search) ||
+          c.email.toLowerCase().includes(search.toLowerCase()) ||
+          c.code.toLowerCase().includes(search.toLowerCase());
+        const matchRegion = filterRegion === '' || c.region === filterRegion;
+        const matchGroup = filterGroup === '' || c.customerGroup === filterGroup;
+        const matchStatus = filterStatus === '' || c.status === filterStatus;
+        return matchSearch && matchRegion && matchGroup && matchStatus;
+      }
     );
-  }, [customers, search]);
+  }, [customers, search, filterRegion, filterGroup, filterStatus]);
 
   const handleOpenCreate = () => {
     setEditingCustomer(null);
@@ -252,15 +262,47 @@ export const CustomerList: React.FC = () => {
         columns={columns}
         keyExtractor={(c) => c.id}
         filterComponent={
-          <div className="relative flex-1 max-w-md">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Tìm theo tên, số điện thoại, email, mã KH..."
-              className="w-full pl-9 pr-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs sm:text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
+          <div className="flex flex-col sm:flex-row gap-2 w-full max-w-4xl">
+            <div className="relative flex-1">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Tìm theo tên, số điện thoại, email, mã KH..."
+                className="w-full pl-9 pr-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs sm:text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+            <select
+              value={filterRegion}
+              onChange={(e) => setFilterRegion(e.target.value)}
+              className="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs sm:text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            >
+              <option value="">Tất cả khu vực</option>
+              <option value="Miền Bắc">Miền Bắc</option>
+              <option value="Miền Trung">Miền Trung</option>
+              <option value="Miền Nam">Miền Nam</option>
+            </select>
+            <select
+              value={filterGroup}
+              onChange={(e) => setFilterGroup(e.target.value)}
+              className="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs sm:text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            >
+              <option value="">Tất cả nhóm KH</option>
+              <option value="Đại lý cấp 1">Đại lý cấp 1</option>
+              <option value="Đại lý cấp 2">Đại lý cấp 2</option>
+              <option value="Khách lẻ">Khách lẻ</option>
+              <option value="Dự án">Dự án</option>
+            </select>
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+              className="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs sm:text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            >
+              <option value="">Tất cả trạng thái</option>
+              <option value="active">Hoạt động</option>
+              <option value="inactive">Tạm ngưng</option>
+            </select>
           </div>
         }
       />
