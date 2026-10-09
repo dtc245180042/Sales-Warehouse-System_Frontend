@@ -33,6 +33,7 @@ import { ProductEdit } from '../pages/products/ProductEdit';
 import { ProductUnitPage } from '../pages/products/ProductUnitPage';
 
 import { MobileOrderCreate } from '../pages/sales/MobileOrderCreate';
+import { DiscountPolicies } from '../pages/sales/DiscountPolicies';
 
 // All 7 business roles allowed in Sprint 1 backoffice
 const ALL_BACKOFFICE_ROLES: UserRole[] = [
@@ -147,6 +148,16 @@ export const AppRoutes: React.FC = () => {
           element={
             <ProtectedRoute allowedRoles={['SalesStaff', 'SalesManager', 'Admin']}>
               <MobileOrderCreate />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Chính sách chiết khấu - S3-01 */}
+        <Route
+          path="/sales/discount-policies"
+          element={
+            <ProtectedRoute allowedRoles={['SalesManager', 'Admin', 'Director']}>
+              <DiscountPolicies />
             </ProtectedRoute>
           }
         />

@@ -22,6 +22,7 @@ import { EmptyState } from '../../components/common/EmptyState';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 import { productService } from '../../services/productService';
 import { Product } from '../../types/Product';
+import { Modal } from '../../components/common/Modal';
 
 export const ProductDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -29,6 +30,7 @@ export const ProductDetail: React.FC = () => {
 
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -68,6 +70,13 @@ export const ProductDetail: React.FC = () => {
     ((product.salePrice - product.costPrice) / product.salePrice) * 100
   );
 
+  // Mock price history data (S3-02)
+  const priceHistory = [
+    { id: 1, oldPrice: product.salePrice - 1500000, newPrice: product.salePrice, updatedBy: 'Quản Lý Kinh Doanh (Trần Văn Quản)', updatedAt: '2026-09-20 10:30' },
+    { id: 2, oldPrice: product.salePrice - 2000000, newPrice: product.salePrice - 1500000, updatedBy: 'Quản Trị Viên Hệ Thống', updatedAt: '2026-08-15 14:20' },
+    { id: 3, oldPrice: product.salePrice - 2500000, newPrice: product.salePrice - 2000000, updatedBy: 'Quản Lý Kinh Doanh (Trần Văn Quản)', updatedAt: '2025-11-10 09:00' },
+  ];
+
   return (
     <PageContainer
       title={product.name}
@@ -84,6 +93,9 @@ export const ProductDetail: React.FC = () => {
               Nhập hàng mã này
             </Button>
           </Link>
+          <Button variant="secondary" size="sm" onClick={() => setIsHistoryModalOpen(true)} leftIcon={<History className="w-4 h-4" />}>
+            Lịch sử giá
+          </Button>
           <Link to={`/products/${product.id}/edit`}>
             <Button variant="primary" size="sm" leftIcon={<Edit className="w-4 h-4" />}>
               Chỉnh sửa
@@ -241,6 +253,45 @@ export const ProductDetail: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* S3-02: Price History Modal */}
+      <Modal
+        isOpen={isHistoryModalOpen}
+        onClose={() => setIsHistoryModalOpen(false)}
+        title={`Lịch Sử Thay Đổi Giá - ${product.sku}`}
+        maxWidth="2xl"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-slate-500">
+            Dữ liệu lịch sử giá được hệ thống ghi nhận tự động và <strong className="text-rose-500">không thể sửa xóa</strong> để đảm bảo tính minh bạch giải trình với đại lý.
+          </p>
+          <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
+            <table className="w-full text-left text-sm whitespace-nowrap">
+              <thead className="bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+                <tr>
+                  <th className="px-4 py-3 font-semibold">Thời điểm áp dụng</th>
+                  <th className="px-4 py-3 font-semibold text-right">Giá cũ</th>
+                  <th className="px-4 py-3 font-semibold text-right">Giá mới</th>
+                  <th className="px-4 py-3 font-semibold">Người sửa</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
+                {priceHistory.map(row => (
+                  <tr key={row.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                    <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{row.updatedAt}</td>
+                    <td className="px-4 py-3 text-right font-medium text-slate-500 line-through">{formatCurrency(row.oldPrice)}</td>
+                    <td className="px-4 py-3 text-right font-bold text-indigo-600 dark:text-indigo-400">{formatCurrency(row.newPrice)}</td>
+                    <td className="px-4 py-3 text-slate-800 dark:text-slate-200">{row.updatedBy}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="flex justify-end pt-3">
+            <Button variant="secondary" onClick={() => setIsHistoryModalOpen(false)}>Đóng lại</Button>
+          </div>
+        </div>
+      </Modal>
     </PageContainer>
   );
 };

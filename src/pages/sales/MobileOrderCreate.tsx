@@ -35,7 +35,7 @@ export const MobileOrderCreate: React.FC = () => {
   
   // Cart
   const [cart, setCart] = useState<OrderItem[]>([]);
-  const [discountAmount, setDiscountAmount] = useState<number>(0);
+  // We will auto-calculate discountAmount instead of letting user enter it manually (S3-01)
   
   // Search Products Modal
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
@@ -54,7 +54,6 @@ export const MobileOrderCreate: React.FC = () => {
         setDeliveryPoint(parsed.deliveryPoint || '');
         setExpectedDate(parsed.expectedDate || '');
         setCart(parsed.cart || []);
-        setDiscountAmount(parsed.discountAmount || 0);
         showToast('Đã tải lại đơn nháp', 'info');
       } catch (e) {
         console.error('Failed to parse draft', e);
@@ -133,8 +132,7 @@ export const MobileOrderCreate: React.FC = () => {
       selectedCustomerId,
       deliveryPoint,
       expectedDate,
-      cart,
-      discountAmount
+      cart
     };
     localStorage.setItem('mobile_order_draft', JSON.stringify(draft));
     showToast('Đã lưu nháp', 'success');
@@ -157,11 +155,19 @@ export const MobileOrderCreate: React.FC = () => {
       setCart([]);
       setSelectedCustomerId('');
       setDeliveryPoint('');
-      setDiscountAmount(0);
     }, 500);
   };
 
+  const totalQuantity = cart.reduce((sum, item) => sum + item.quantity, 0);
   const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  
+  // Auto-calculate discount based on S3-01 policy
+  let discountPercent = 0;
+  if (totalQuantity >= 100) discountPercent = 15;
+  else if (totalQuantity >= 50) discountPercent = 10;
+  else if (totalQuantity >= 10) discountPercent = 5;
+
+  const discountAmount = (subtotal * discountPercent) / 100;
   const total = Math.max(0, subtotal - discountAmount);
 
   return (
@@ -284,14 +290,10 @@ export const MobileOrderCreate: React.FC = () => {
             <span className="font-semibold text-slate-900 dark:text-white">{formatCurrency(subtotal)}</span>
           </div>
           <div className="flex justify-between items-center text-slate-600 dark:text-slate-400">
-            <span>Chiết khấu (VNĐ):</span>
-            <input 
-              type="number" 
-              value={discountAmount || ''} 
-              onChange={e => setDiscountAmount(Number(e.target.value))}
-              placeholder="0"
-              className="w-24 px-2 py-1 text-right text-xs bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md outline-none focus:ring-1 focus:ring-indigo-500 text-rose-600 font-semibold"
-            />
+            <span>Chiết khấu tự động ({discountPercent}%):</span>
+            <span className="text-right text-xs bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md outline-none text-rose-600 font-semibold px-2 py-1">
+              - {formatCurrency(discountAmount)}
+            </span>
           </div>
           <div className="flex justify-between pt-2 border-t border-slate-200 dark:border-slate-700 font-bold">
             <span className="text-slate-900 dark:text-white">Khách phải trả:</span>
