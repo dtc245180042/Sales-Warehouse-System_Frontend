@@ -14,12 +14,23 @@ export const agentService = {
     return agents.find((a) => a.id === id || a.code === id);
   },
 
-  create: async (data: Omit<Agent, 'id' | 'code' | 'createdAt' | 'totalOrders' | 'totalSpent' | 'outstandingDebt'>): Promise<Agent> => {
+  create: async (
+    data: Omit<Agent, 'id' | 'createdAt' | 'totalOrders' | 'totalSpent' | 'outstandingDebt'> & { code?: string }
+  ): Promise<Agent> => {
     const agents = getStorageItem<Agent[]>(STORAGE_KEY, initialAgents);
+    const cleanCode = (data.code && data.code.trim())
+      ? data.code.trim().toUpperCase()
+      : `DL-${1000 + agents.length + 1}`;
+
+    const existing = agents.find((a) => a.code.trim().toUpperCase() === cleanCode);
+    if (existing) {
+      throw new Error(`Mã đại lý "${cleanCode}" đã tồn tại trên hệ thống. Vui lòng nhập mã khác.`);
+    }
+
     const newAgent: Agent = {
       ...data,
       id: `AGT-${String(agents.length + 1).padStart(3, '0')}`,
-      code: `DL-${1000 + agents.length + 1}`,
+      code: cleanCode,
       totalOrders: 0,
       totalSpent: 0,
       outstandingDebt: 0,
@@ -33,6 +44,18 @@ export const agentService = {
     const agents = getStorageItem<Agent[]>(STORAGE_KEY, initialAgents);
     const index = agents.findIndex((a) => a.id === id);
     if (index === -1) throw new Error('Không tìm thấy đại lý');
+
+    if (data.code) {
+      const cleanCode = data.code.trim().toUpperCase();
+      const existing = agents.find(
+        (a) => a.id !== id && a.code.trim().toUpperCase() === cleanCode
+      );
+      if (existing) {
+        throw new Error(`Mã đại lý "${cleanCode}" đã được sử dụng bởi đại lý khác.`);
+      }
+      data.code = cleanCode;
+    }
+
     const updated = { ...agents[index], ...data };
     agents[index] = updated;
     setStorageItem(STORAGE_KEY, [...agents]);
@@ -41,7 +64,17 @@ export const agentService = {
 
   delete: async (id: string): Promise<boolean> => {
     const agents = getStorageItem<Agent[]>(STORAGE_KEY, initialAgents);
+    const target = agents.find((a) => a.id === id);
+    if (target && (target.totalOrders > 0 || target.totalSpent > 0)) {
+      throw new Error(
+        `Đại lý "${target.name}" (${target.code}) đã phát sinh ${target.totalOrders} đơn hàng, không thể xóa để bảo toàn dữ liệu giao dịch. Vui lòng chuyển sang Ngừng giao dịch.`
+      );
+    }
     setStorageItem(STORAGE_KEY, agents.filter((a) => a.id !== id));
     return true;
+  },
+
+  deactivate: async (id: string): Promise<Agent> => {
+    return agentService.update(id, { status: 'inactive' });
   },
 };

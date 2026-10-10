@@ -12,7 +12,9 @@ import {
   Edit,
   Sparkles,
   RefreshCw,
+  History,
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { Button } from '../common/Button';
 import {
   PriceList,
@@ -237,6 +239,7 @@ export const PriceListDetailModal: React.FC<PriceListDetailModalProps> = ({
                     <th className="py-2.5 px-3 text-right">Giá bán đại lý</th>
                     <th className="py-2.5 px-3 text-center">Chiết khấu</th>
                     <th className="py-2.5 px-3 text-center">Trạng thái sàn</th>
+                    <th className="py-2.5 px-3 text-center">Lịch sử giá</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -280,6 +283,16 @@ export const PriceListDetailModal: React.FC<PriceListDetailModalProps> = ({
                               Hợp lệ
                             </span>
                           )}
+                        </td>
+                        <td className="py-2.5 px-3 text-center">
+                          <Link
+                            to={`/products/${it.product_id}/price-history`}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold text-indigo-600 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/50 dark:text-indigo-400 dark:hover:bg-indigo-900/50 transition-colors"
+                            title="Xem lịch sử điều chỉnh giá của sản phẩm này"
+                          >
+                            <History className="w-3 h-3" />
+                            <span>Lịch sử</span>
+                          </Link>
                         </td>
                       </tr>
                     );

@@ -23,7 +23,9 @@ import {
   ChevronRight,
   X,
   Users,
+  History,
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { PageContainer } from '../../components/layout/PageContainer';
 import { Button } from '../../components/common/Button';
 import { useAuth } from '../../contexts/AuthContext';
@@ -326,6 +328,18 @@ export const PriceListManagement: React.FC = () => {
                 <span>{totalPendingCount} chờ duyệt</span>
               </button>
             )}
+
+            <Link to="/products/price-history">
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 py-1.5 text-xs border-indigo-200 dark:border-indigo-800 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40"
+                leftIcon={<History className="w-3.5 h-3.5" />}
+                title="Tra cứu lịch sử điều chỉnh giá sản phẩm"
+              >
+                Lịch sử giá
+              </Button>
+            </Link>
 
             <button
               type="button"

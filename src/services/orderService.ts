@@ -129,7 +129,7 @@ export const orderService = {
     }
   },
 
-  updateStatus: async (id: string, status: OrderStatus): Promise<Order> => {
+  updateStatus: async (id: string, status: OrderStatus, note?: string, performedBy?: string): Promise<Order> => {
     try {
       const res = await apiClient.patch(`/orders/${encodeURIComponent(id)}/status`, { status });
       const updated = mapApiOrder(res.data);
@@ -146,10 +146,24 @@ export const orderService = {
       const index = orders.findIndex((o) => o.id === id || o.code === id);
       if (index === -1) throw new Error('Không tìm thấy đơn hàng');
 
+      const nowStr = new Date().toISOString().replace('T', ' ').slice(0, 16);
+      const prevTimeline = orders[index].timeline || [];
+      const updatedTimeline = [
+        ...prevTimeline,
+        {
+          status,
+          label: status,
+          timestamp: nowStr,
+          performedBy: performedBy || 'Nhân viên kinh doanh',
+          note: note || `Chuyển sang trạng thái ${status}`,
+        },
+      ];
+
       const updated = {
         ...orders[index],
         status,
-        updatedAt: new Date().toISOString().replace('T', ' ').slice(0, 16),
+        timeline: updatedTimeline,
+        updatedAt: nowStr,
       };
       orders[index] = updated;
       setStorageItem(STORAGE_KEY, [...orders]);
@@ -185,9 +199,9 @@ export const orderService = {
     }
   },
 
-  cancelOrder: async (id: string): Promise<Order> => {
+  cancelOrder: async (id: string, reason?: string, cancelledBy?: string): Promise<Order> => {
     try {
-      const res = await apiClient.post(`/orders/${encodeURIComponent(id)}/cancel`);
+      const res = await apiClient.post(`/orders/${encodeURIComponent(id)}/cancel`, { reason });
       const updated = mapApiOrder(res.data);
       const orders = getStorageItem<Order[]>(STORAGE_KEY, initialOrders);
       const idx = orders.findIndex((o) => o.id === id || o.code === id);
@@ -200,9 +214,14 @@ export const orderService = {
       console.warn('[orderService] Backend error, cancelling locally:', err);
       const orders = getStorageItem<Order[]>(STORAGE_KEY, initialOrders);
       const index = orders.findIndex((o) => o.id === id || o.code === id);
-      if (index === -1) throw new Error('Không tìm thấy đơn hàng');
+      const currentStatus = orders[index].status;
+      if (currentStatus === 'shipping' || currentStatus === 'completed' || currentStatus === 'closed') {
+        const statusLabel =
+          currentStatus === 'shipping' ? 'Đã xuất kho' : currentStatus === 'completed' ? 'Đã giao' : 'Đóng';
+        throw new Error(`Đơn hàng đang ở trạng thái "${statusLabel}", hàng đã xuất kho nên không thể hủy.`);
+      }
 
-      if (orders[index].status !== 'cancelled') {
+      if (currentStatus !== 'cancelled') {
         for (const item of orders[index].items) {
           try {
             await productService.updateStock(item.productId, item.quantity);
@@ -212,8 +231,26 @@ export const orderService = {
         }
       }
 
+      const nowStr = new Date().toISOString().replace('T', ' ').slice(0, 16);
+      const cancelNote = reason || 'Khách hàng yêu cầu hủy đơn hàng';
+      const prevTimeline = orders[index].timeline || [];
+      const updatedTimeline = [
+        ...prevTimeline,
+        {
+          status: 'cancelled' as OrderStatus,
+          label: 'Đã hủy',
+          timestamp: nowStr,
+          performedBy: cancelledBy || 'Nhân viên kinh doanh',
+          note: cancelNote,
+        },
+      ];
+
       orders[index].status = 'cancelled';
-      orders[index].updatedAt = new Date().toISOString().replace('T', ' ').slice(0, 16);
+      orders[index].cancelledReason = cancelNote;
+      orders[index].cancelledAt = nowStr;
+      orders[index].cancelledBy = cancelledBy || 'Nhân viên kinh doanh';
+      orders[index].timeline = updatedTimeline;
+      orders[index].updatedAt = nowStr;
       setStorageItem(STORAGE_KEY, [...orders]);
       return orders[index];
     }

@@ -21,6 +21,7 @@ import {
   Store,
   Receipt,
   PlusCircle,
+  History,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { UserRole } from '../../types/User';
@@ -250,6 +251,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
               title: 'Nhóm hàng & Ngành hàng',
               path: '/categories',
               icon: <FolderTree className="w-3.5 h-3.5" />,
+              allowedRoles: [
+                'Admin',
+                'SalesManager',
+                'SalesStaff',
+                'WarehouseManager',
+                'WarehouseStaff',
+                'Director',
+                'Manager',
+                'Staff',
+              ],
+            },
+            {
+              title: 'Lịch sử thay đổi giá',
+              path: '/products/price-history',
+              icon: <History className="w-3.5 h-3.5" />,
               allowedRoles: [
                 'Admin',
                 'SalesManager',

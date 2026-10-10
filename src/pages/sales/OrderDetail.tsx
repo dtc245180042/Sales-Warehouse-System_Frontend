@@ -18,9 +18,11 @@ import {
 import { PageContainer } from '../../components/layout/PageContainer';
 import { Button } from '../../components/common/Button';
 import { Badge } from '../../components/common/Badge';
+import { Modal } from '../../components/common/Modal';
 import { ConfirmDialog } from '../../components/common/ConfirmDialog';
 import { Loading } from '../../components/common/Loading';
 import { EmptyState } from '../../components/common/EmptyState';
+import { OrderLifecycleTimeline } from '../../components/sales/OrderLifecycleTimeline';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 import { orderService } from '../../services/orderService';
 import { Order, OrderStatus } from '../../types/Order';
@@ -36,6 +38,7 @@ export const OrderDetail: React.FC = () => {
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState('Khách hàng đổi ý / không nhận hàng');
 
   const loadOrder = async () => {
     if (!id) return;
@@ -51,26 +54,26 @@ export const OrderDetail: React.FC = () => {
     loadOrder();
   }, [id]);
 
-  const handleUpdateStatus = async (nextStatus: OrderStatus) => {
+  const handleUpdateStatus = async (nextStatus: OrderStatus, note?: string) => {
     if (!order) return;
     try {
-      const updated = await orderService.updateStatus(order.id, nextStatus);
+      const updated = await orderService.updateStatus(order.id, nextStatus, note, user?.name);
       setOrder(updated);
-      showToast(`Đã chuyển trạng thái đơn hàng sang "${nextStatus}"`, 'success');
+      showToast(`Đã chuyển khâu đơn hàng sang "${nextStatus}" thành công`, 'success');
     } catch {
-      showToast('Lỗi cập nhật trạng thái', 'error');
+      showToast('Lỗi cập nhật trạng thái đơn hàng', 'error');
     }
   };
 
   const handleCancel = async () => {
     if (!order) return;
     try {
-      const updated = await orderService.cancelOrder(order.id);
+      const updated = await orderService.cancelOrder(order.id, cancelReason, user?.name || 'Nhân viên');
       setOrder(updated);
-      showToast('Đã hủy đơn hàng thành công', 'success');
+      showToast('Đã hủy đơn hàng và hoàn lại số lượng tồn kho thành công', 'success');
       setIsCancelModalOpen(false);
-    } catch {
-      showToast('Lỗi khi hủy đơn hàng', 'error');
+    } catch (err: any) {
+      showToast(err?.message || 'Lỗi khi hủy đơn hàng', 'error');
     }
   };
 
@@ -85,15 +88,6 @@ export const OrderDetail: React.FC = () => {
       />
     );
   }
-
-  const steps: { key: OrderStatus; label: string; icon: any }[] = [
-    { key: 'pending', label: 'Chờ xử lý', icon: Clock },
-    { key: 'confirmed', label: 'Đã xác nhận', icon: CheckCircle2 },
-    { key: 'shipping', label: 'Đang giao hàng', icon: Truck },
-    { key: 'completed', label: 'Đã giao thành công', icon: CheckCircle2 },
-  ];
-
-  const currentStepIndex = steps.findIndex((s) => s.key === order.status);
 
   return (
     <PageContainer
@@ -122,7 +116,7 @@ export const OrderDetail: React.FC = () => {
           >
             Xuất PDF
           </Button>
-          {order.status !== 'cancelled' && order.status !== 'completed' && (
+          {!['shipping', 'completed', 'closed', 'cancelled'].includes(order.status) && (
             <Button
               variant="danger"
               size="sm"
@@ -135,84 +129,12 @@ export const OrderDetail: React.FC = () => {
         </div>
       }
     >
-      {/* Order Status Timeline Tracker */}
-      {order.status !== 'cancelled' ? (
-        <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-card mb-6">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-6">
-            Tiến Trình Đơn Hàng
-          </h3>
-          <div className="relative flex items-center justify-between max-w-3xl mx-auto">
-            {/* Background line */}
-            <div className="absolute top-1/2 left-0 right-0 h-1 bg-slate-200 dark:bg-slate-700 -translate-y-1/2 z-0" />
-            {steps.map((step, idx) => {
-              const isPast = idx <= currentStepIndex;
-              const isCurrent = idx === currentStepIndex;
-              const Icon = step.icon;
-
-              return (
-                <div key={step.key} className="relative z-10 flex flex-col items-center">
-                  <div
-                    className={`w-10 h-10 rounded-full flex items-center justify-center transition-all shadow-md ${
-                      isPast
-                        ? 'bg-indigo-600 text-white ring-4 ring-indigo-100 dark:ring-indigo-950'
-                        : 'bg-slate-100 dark:bg-slate-800 text-slate-400'
-                    }`}
-                  >
-                    <Icon className="w-5 h-5" />
-                  </div>
-                  <span
-                    className={`text-xs mt-2 font-bold whitespace-nowrap ${
-                      isCurrent
-                        ? 'text-indigo-600 dark:text-indigo-400'
-                        : isPast
-                        ? 'text-slate-800 dark:text-slate-200'
-                        : 'text-slate-400'
-                    }`}
-                  >
-                    {step.label}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Quick status change buttons */}
-          <div className="flex items-center justify-center gap-3 mt-6 pt-4 border-t border-slate-100 dark:border-slate-800">
-            {order.status === 'pending' && (
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={() => handleUpdateStatus('confirmed')}
-              >
-                Xác nhận đơn hàng
-              </Button>
-            )}
-            {order.status === 'confirmed' && (
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={() => handleUpdateStatus('shipping')}
-              >
-                Bắt đầu giao hàng
-              </Button>
-            )}
-            {order.status === 'shipping' && (
-              <Button
-                variant="success"
-                size="sm"
-                onClick={() => handleUpdateStatus('completed')}
-              >
-                Xác nhận đã giao thành công
-              </Button>
-            )}
-          </div>
-        </div>
-      ) : (
-        <div className="p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 mb-6 flex items-center gap-3 text-rose-700 dark:text-rose-300 text-sm font-semibold">
-          <AlertCircle className="w-5 h-5 shrink-0" />
-          <span>Đơn hàng này đã bị hủy bỏ. Sản phẩm đã được hoàn trả lại kho lưu trữ.</span>
-        </div>
-      )}
+      {/* SC-238: Hiển thị trực quan Timeline vòng đời đơn hàng và nhánh Hủy */}
+      <OrderLifecycleTimeline
+        order={order}
+        onUpdateStatus={handleUpdateStatus}
+        onRequestCancel={() => setIsCancelModalOpen(true)}
+      />
 
       {/* Main Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -348,15 +270,50 @@ export const OrderDetail: React.FC = () => {
         </div>
       </div>
 
-      <ConfirmDialog
+      {/* Modal Hủy Đơn Hàng (kèm nhập lý do cho nhánh Hủy SC-238) */}
+      <Modal
         isOpen={isCancelModalOpen}
         onClose={() => setIsCancelModalOpen(false)}
-        onConfirm={handleCancel}
-        title="Xác nhận hủy đơn hàng"
-        message="Bạn có chắc chắn muốn hủy đơn hàng này? Toàn bộ số lượng sản phẩm sẽ được hoàn trả về tồn kho."
-        confirmText="Hủy đơn"
-        variant="danger"
-      />
+        title="Xác Nhận Hủy Đơn Hàng"
+        maxWidth="md"
+      >
+        <div className="space-y-4">
+          <div className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-rose-800 dark:text-rose-200 text-xs">
+            <p className="font-bold">Lưu ý khi hủy đơn hàng:</p>
+            <p className="mt-1">
+              Đơn hàng sẽ chuyển sang nhánh <span className="font-black">ĐÃ HỦY</span>, toàn bộ sản phẩm trong đơn sẽ được tự động hoàn trả lại số lượng tồn kho.
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+              Lý do hủy đơn hàng *
+            </label>
+            <textarea
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+              placeholder="Nhập lý do chi tiết (VD: Khách đổi ý, hết hàng trong kho, sai thông tin giao hàng...)"
+              rows={3}
+              className="w-full px-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-rose-500"
+              required
+            />
+          </div>
+
+          <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-slate-800">
+            <Button variant="secondary" size="sm" onClick={() => setIsCancelModalOpen(false)}>
+              Quay lại
+            </Button>
+            <Button
+              variant="danger"
+              size="sm"
+              onClick={handleCancel}
+              disabled={!cancelReason.trim()}
+            >
+              Xác nhận hủy đơn
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </PageContainer>
   );
 };
