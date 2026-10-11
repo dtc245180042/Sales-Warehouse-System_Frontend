@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -296,6 +296,85 @@ export const Sidebar: React.FC<SidebarProps> = ({
       ],
     },
     {
+      heading: 'KHO VẬN & TỒN KHO',
+      items: [
+        {
+          title: 'Tổng quan tồn kho',
+          path: '/inventory',
+          icon: <Package className="w-5 h-5" />,
+          allowedRoles: [
+            'Admin',
+            'WarehouseManager',
+            'WarehouseStaff',
+            'SalesManager',
+            'Director',
+            'Manager',
+            'Staff',
+          ],
+        },
+        {
+          title: 'Quản lý kho hàng',
+          path: '/inventory/warehouses',
+          icon: <Building2 className="w-5 h-5" />,
+          allowedRoles: [
+            'Admin',
+            'WarehouseManager',
+            'Director',
+            'Manager',
+          ],
+        },
+        {
+          title: 'Định mức tồn (Min-Stock)',
+          path: '/inventory/min-stock',
+          icon: <Scale className="w-5 h-5" />,
+          allowedRoles: [
+            'Admin',
+            'WarehouseManager',
+            'Director',
+            'Manager',
+          ],
+        },
+        {
+          title: 'Nhập kho',
+          path: '/inventory/stock-in',
+          icon: <PlusCircle className="w-5 h-5" />,
+          allowedRoles: [
+            'Admin',
+            'WarehouseManager',
+            'WarehouseStaff',
+            'Director',
+            'Manager',
+          ],
+        },
+        {
+          title: 'Xuất kho',
+          path: '/inventory/stock-out',
+          icon: <Boxes className="w-5 h-5" />,
+          allowedRoles: [
+            'Admin',
+            'WarehouseManager',
+            'WarehouseStaff',
+            'Director',
+            'Manager',
+          ],
+        },
+        {
+          title: 'Lịch sử xuất nhập',
+          path: '/inventory/history',
+          icon: <History className="w-5 h-5" />,
+          allowedRoles: [
+            'Admin',
+            'WarehouseManager',
+            'WarehouseStaff',
+            'SalesManager',
+            'Director',
+            'Manager',
+            'Staff',
+          ],
+        },
+      ],
+    },
+    {
       heading: 'BÁO CÁO & THỐNG KÊ',
       items: [
         {
@@ -373,6 +452,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
       ],
     },
   ];
+
+  const allTopLevelPaths = useMemo(() => {
+    const paths: string[] = [];
+    menuSections.forEach((sec) => {
+      sec.items.forEach((item) => {
+        if (item.path) paths.push(item.path);
+        if (item.submenu) item.submenu.forEach((sub) => paths.push(sub.path));
+      });
+    });
+    return paths;
+  }, [menuSections]);
 
   const sidebarContent = (
     <div className="flex flex-col h-full bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 transition-all duration-300">
@@ -470,14 +560,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   );
                 }
 
+                const isItemActive = isSubmenuItemActive(
+                  location.pathname,
+                  item.path!,
+                  allTopLevelPaths
+                );
+                const shouldEnd = allTopLevelPaths.some(
+                  (p) => p !== item.path && p.startsWith(item.path! + '/')
+                );
+
                 return (
                   <NavLink
                     key={itemIdx}
                     to={item.path!}
+                    end={shouldEnd}
                     onClick={onMobileClose}
-                    className={({ isActive }) =>
+                    className={() =>
                       `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all outline-none focus:outline-none ${
-                        isActive
+                        isItemActive
                           ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/25'
                           : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60'
                       }`

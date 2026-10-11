@@ -1,5 +1,5 @@
-import { InventoryHistoryRecord, StockInReceipt, StockOutReceipt } from '../types/Inventory';
-import { initialStockInReceipts, initialStockOutReceipts, initialInventoryHistory } from '../mock/inventory';
+import { InventoryHistoryRecord, MinStockConfig, StockInReceipt, StockOutReceipt } from '../types/Inventory';
+import { initialStockInReceipts, initialStockOutReceipts, initialInventoryHistory, initialMinStockConfigs } from '../mock/inventory';
 import { getStorageItem, setStorageItem } from './storage';
 import { productService } from './productService';
 import { apiClient } from '../api/client';
@@ -8,6 +8,7 @@ const KEYS = {
   STOCK_IN: 'kv_stock_in_receipts',
   STOCK_OUT: 'kv_stock_out_receipts',
   HISTORY: 'kv_inventory_history',
+  MIN_STOCK: 'kv_min_stock_configs',
 };
 
 function mapApiStockIn(r: any): StockInReceipt {
@@ -254,5 +255,78 @@ export const inventoryService = {
       console.warn('[inventoryService] Backend error, fallback to storage:', err);
     }
     return getStorageItem<InventoryHistoryRecord[]>(KEYS.HISTORY, initialInventoryHistory);
-  }
+  },
+
+  // SCRUM-601: Khai báo / Chỉnh sửa mức tồn tối thiểu theo SKU & Kho
+  getMinStockConfigs: async (warehouseId?: string): Promise<MinStockConfig[]> => {
+    const list = getStorageItem<MinStockConfig[]>(KEYS.MIN_STOCK, initialMinStockConfigs);
+    if (!warehouseId || warehouseId === 'all') return list;
+    return list.filter((item) => item.warehouseId === warehouseId);
+  },
+
+  saveMinStockConfig: async (
+    config: Omit<MinStockConfig, 'id' | 'updatedAt'> & { id?: string }
+  ): Promise<MinStockConfig> => {
+    const list = getStorageItem<MinStockConfig[]>(KEYS.MIN_STOCK, initialMinStockConfigs);
+    const existingIndex = list.findIndex(
+      (item) => item.productId === config.productId && item.warehouseId === config.warehouseId
+    );
+
+    const now = new Date().toISOString().split('T')[0];
+    if (existingIndex !== -1) {
+      const updated: MinStockConfig = {
+        ...list[existingIndex],
+        ...config,
+        updatedAt: now,
+      };
+      list[existingIndex] = updated;
+      setStorageItem(KEYS.MIN_STOCK, list);
+      return updated;
+    }
+
+    const newConfig: MinStockConfig = {
+      ...config,
+      id: config.id || `MIN-${Date.now()}`,
+      updatedAt: now,
+    };
+    const updatedList = [newConfig, ...list];
+    setStorageItem(KEYS.MIN_STOCK, updatedList);
+    return newConfig;
+  },
+
+  bulkSaveMinStockConfigs: async (configs: Partial<MinStockConfig>[]): Promise<MinStockConfig[]> => {
+    const list = getStorageItem<MinStockConfig[]>(KEYS.MIN_STOCK, initialMinStockConfigs);
+    const now = new Date().toISOString().split('T')[0];
+
+    const updatedList = [...list];
+    for (const cfg of configs) {
+      if (!cfg.productId || !cfg.warehouseId) continue;
+      const index = updatedList.findIndex(
+        (i) => i.productId === cfg.productId && i.warehouseId === cfg.warehouseId
+      );
+      if (index !== -1) {
+        updatedList[index] = {
+          ...updatedList[index],
+          ...cfg,
+          updatedAt: now,
+        };
+      } else {
+        updatedList.push({
+          id: cfg.id || `MIN-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+          productId: cfg.productId,
+          sku: cfg.sku || '',
+          productName: cfg.productName || '',
+          warehouseId: cfg.warehouseId,
+          warehouseName: cfg.warehouseName || '',
+          minStock: cfg.minStock ?? 10,
+          currentStock: cfg.currentStock ?? 0,
+          updatedAt: now,
+          updatedBy: cfg.updatedBy || 'Quản lý kho',
+        });
+      }
+    }
+
+    setStorageItem(KEYS.MIN_STOCK, updatedList);
+    return updatedList;
+  },
 };
