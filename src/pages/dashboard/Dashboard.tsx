@@ -15,6 +15,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { formatDate } from '../../utils/formatters';
 import { getRoleDisplayName } from '../../utils/roleUtils';
 import { ChangePasswordModal } from '../../components/common/ChangePasswordModal';
+import { LowStockWarningWidget } from '../../components/inventory/LowStockWarningWidget';
 
 export const Dashboard: React.FC = () => {
   const { user, role } = useAuth();
@@ -100,6 +101,9 @@ export const Dashboard: React.FC = () => {
             </div>
           </div>
         </div>
+
+        {/* Widget Cảnh Báo Tồn Kho Dưới Ngưỡng (SCRUM-604) */}
+        <LowStockWarningWidget maxItems={5} />
       </div>
 
       {/* Modal Đổi mật khẩu (SCRUM-201) */}

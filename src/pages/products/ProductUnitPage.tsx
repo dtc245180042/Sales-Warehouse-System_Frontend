@@ -612,9 +612,20 @@ export const ProductUnitPage: React.FC = () => {
 
   const handleAddOrUpdateUnit = (data: Omit<UnitConversion, 'id'>) => {
     if (!unitConfig) return;
+    const cleanUnitName = data.unitName.trim();
+    const isDuplicate = unitConfig.units.some(
+      (u) =>
+        (!editingUnit || u.id !== editingUnit.id) &&
+        u.unitName.trim().toLowerCase() === cleanUnitName.toLowerCase()
+    );
+    if (isDuplicate) {
+      showToast(`Đơn vị tính "${cleanUnitName}" đã tồn tại cho sản phẩm này.`, 'warning');
+      return;
+    }
+
     if (editingUnit) {
       const updated = unitConfig.units.map((u) =>
-        u.id === editingUnit.id ? { ...u, ...data } : u
+        u.id === editingUnit.id ? { ...u, ...data, unitName: cleanUnitName } : u
       );
       setUnitConfig({ ...unitConfig, units: updated });
     } else {

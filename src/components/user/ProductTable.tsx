@@ -56,17 +56,16 @@ export const ProductTable: React.FC<ProductTableProps> = ({ products }) => {
               return (
                 <tr key={p.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
                   <td className="py-3 px-4">
-                      <div className="min-w-0">
-                        <Link
-                          to={`/user/products/${p.id}`}
-                          className="font-bold text-slate-900 dark:text-white hover:text-indigo-600 line-clamp-1"
-                        >
-                          {p.name}
-                        </Link>
-                        <span className="text-[11px] text-slate-400 block sm:hidden font-mono mt-0.5">
-                          {p.code}
-                        </span>
-                      </div>
+                    <div className="min-w-0">
+                      <Link
+                        to={`/user/products/${p.id}`}
+                        className="font-bold text-slate-900 dark:text-white hover:text-indigo-600 line-clamp-1"
+                      >
+                        {p.name}
+                      </Link>
+                      <span className="text-[11px] text-slate-400 block sm:hidden font-mono mt-0.5">
+                        {p.code}
+                      </span>
                     </div>
                   </td>
                   <td className="py-3 px-4 font-mono text-slate-500 font-semibold">{p.code}</td>

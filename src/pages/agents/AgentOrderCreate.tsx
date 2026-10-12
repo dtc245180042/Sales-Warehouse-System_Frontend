@@ -215,6 +215,7 @@ export const AgentOrderCreate: React.FC = () => {
             const fallbackProd: Product = matched || {
               id: it.productId,
               sku: it.sku,
+              barcode: '',
               name: it.name,
               salePrice: it.price,
               costPrice: 0,
@@ -223,6 +224,9 @@ export const AgentOrderCreate: React.FC = () => {
               unit: 'Cái',
               image: '',
               category: 'Chung',
+              supplierId: '',
+              supplierName: '',
+              description: '',
               status: 'active',
               createdAt: '',
               updatedAt: '',

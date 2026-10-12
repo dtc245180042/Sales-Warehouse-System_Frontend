@@ -1,4 +1,13 @@
-export type OrderStatus = 'pending' | 'confirmed' | 'shipping' | 'completed' | 'cancelled';
+export type OrderStatus =
+  | 'draft'          // Nháp
+  | 'pending'        // Chờ duyệt
+  | 'confirmed'      // Đã duyệt
+  | 'preparing'      // Đang soạn hàng
+  | 'shipping'       // Đã xuất
+  | 'completed'      // Đã giao
+  | 'closed'         // Đóng
+  | 'cancelled';     // Đã hủy
+
 export type PaymentMethod = 'cash' | 'transfer' | 'card';
 export type PaymentStatus = 'paid' | 'unpaid' | 'partial';
 
@@ -12,6 +21,15 @@ export interface OrderItem {
   subtotal: number;
 }
 
+export interface OrderTimelineEvent {
+  status: OrderStatus;
+  label: string;
+  timestamp: string;
+  performedBy?: string;
+  role?: string;
+  note?: string;
+}
+
 export interface Order {
   id: string;
   code: string;
@@ -19,6 +37,9 @@ export interface Order {
   customerName: string;
   customerPhone: string;
   customerAddress?: string;
+  agentId?: string;
+  agentName?: string;
+  region?: string;
   items: OrderItem[];
   subtotal: number;
   discount: number;
@@ -32,6 +53,12 @@ export interface Order {
   staffId: string;
   staffName: string;
   note?: string;
+  timeline?: OrderTimelineEvent[];
+  cancelledReason?: string;
+  cancelledAt?: string;
+  cancelledBy?: string;
+  closedAt?: string;
+  closedBy?: string;
   createdAt: string;
   updatedAt: string;
 }

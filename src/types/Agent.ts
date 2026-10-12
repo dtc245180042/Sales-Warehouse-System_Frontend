@@ -24,4 +24,6 @@ export interface Agent {
   status: AgentStatus;
   taxCode?: string;                // Mã số thuế
   contactPerson?: string;          // Người liên hệ chính
+  defaultWarehouseId?: string;     // Kho phục vụ mặc định (SCRUM-538)
+  defaultWarehouseName?: string;   // Tên kho phục vụ mặc định
 }

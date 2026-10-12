@@ -19,12 +19,16 @@ import {
   DollarSign,
   AlertCircle,
   FileSpreadsheet,
+  Lock,
+  ShieldAlert,
 } from 'lucide-react';
 import { PageContainer } from '../../components/layout/PageContainer';
 import { Button } from '../../components/common/Button';
 import { Badge } from '../../components/common/Badge';
 import { Modal } from '../../components/common/Modal';
 import { ConfirmDialog } from '../../components/common/ConfirmDialog';
+import { AgentDetailModal } from '../../components/agents/AgentDetailModal';
+import { AgentCannotDeleteModal } from '../../components/agents/AgentCannotDeleteModal';
 import { formatCurrency } from '../../utils/formatters';
 import { exportToCSV } from '../../utils/csvExporter';
 import { agentService } from '../../services/agentService';
@@ -94,9 +98,12 @@ export const AgentList: React.FC = () => {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingAgent, setEditingAgent] = useState<Agent | null>(null);
+  const [selectedDetailAgent, setSelectedDetailAgent] = useState<Agent | null>(null);
+  const [blockedDeleteAgent, setBlockedDeleteAgent] = useState<Agent | null>(null);
 
   // Form state
   const [formData, setFormData] = useState({
+    code: '',
     name: '',
     phone: '',
     email: '',
@@ -284,6 +291,7 @@ export const AgentList: React.FC = () => {
   const handleOpenCreate = () => {
     setEditingAgent(null);
     setFormData({
+      code: `DL-${1000 + agents.length + 1}`,
       name: '',
       phone: '',
       email: '',
@@ -304,6 +312,7 @@ export const AgentList: React.FC = () => {
   const handleOpenEdit = (a: Agent) => {
     setEditingAgent(a);
     setFormData({
+      code: a.code,
       name: a.name,
       phone: a.phone,
       email: a.email,
@@ -337,8 +346,27 @@ export const AgentList: React.FC = () => {
       }
       setIsModalOpen(false);
       loadAgents();
+    } catch (err: any) {
+      showToast(err?.message || 'Có lỗi xảy ra, vui lòng thử lại', 'error');
+    }
+  };
+
+  const handleRequestDelete = (agent: Agent) => {
+    // SC-224 / SCRUM-435: Vô hiệu hoá thao tác xoá với đại lý đã phát sinh giao dịch
+    if (agent.totalOrders > 0 || agent.totalSpent > 0) {
+      setBlockedDeleteAgent(agent);
+    } else {
+      setDeleteId(agent.id);
+    }
+  };
+
+  const handleDeactivate = async (agent: Agent) => {
+    try {
+      await agentService.deactivate(agent.id);
+      showToast(`Đã chuyển đại lý "${agent.name}" sang trạng thái Ngừng giao dịch`, 'success');
+      loadAgents();
     } catch {
-      showToast('Có lỗi xảy ra, vui lòng thử lại', 'error');
+      showToast('Lỗi khi cập nhật trạng thái đại lý', 'error');
     }
   };
 
@@ -349,8 +377,8 @@ export const AgentList: React.FC = () => {
       showToast('Đã xóa đại lý khỏi hệ thống', 'success');
       setDeleteId(null);
       loadAgents();
-    } catch {
-      showToast('Lỗi khi xóa đại lý', 'error');
+    } catch (err: any) {
+      showToast(err?.message || 'Lỗi khi xóa đại lý', 'error');
     }
   };
 
@@ -681,6 +709,14 @@ export const AgentList: React.FC = () => {
                   </a>
 
                   <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedDetailAgent(agent)}
+                      className="p-2 text-slate-400 hover:text-indigo-600 bg-slate-100 dark:bg-slate-800 rounded-xl transition"
+                      title="Xem chi tiết hồ sơ"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                    </button>
                     <Link
                       to={`/agents/orders/new?agent=${agent.id}`}
                       className="flex items-center gap-1 px-3 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-sm transition"
@@ -689,16 +725,24 @@ export const AgentList: React.FC = () => {
                       <span>Tạo đơn</span>
                     </Link>
                     <button
+                      type="button"
                       onClick={() => handleOpenEdit(agent)}
                       className="p-2 text-slate-400 hover:text-amber-600 bg-slate-100 dark:bg-slate-800 rounded-xl transition"
+                      title="Chỉnh sửa hồ sơ"
                     >
                       <Edit className="w-3.5 h-3.5" />
                     </button>
                     <button
-                      onClick={() => setDeleteId(agent.id)}
-                      className="p-2 text-slate-400 hover:text-rose-600 bg-slate-100 dark:bg-slate-800 rounded-xl transition"
+                      type="button"
+                      onClick={() => handleRequestDelete(agent)}
+                      className={`p-2 rounded-xl transition ${
+                        agent.totalOrders > 0
+                          ? 'text-amber-500 bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100'
+                          : 'text-slate-400 hover:text-rose-600 bg-slate-100 dark:bg-slate-800'
+                      }`}
+                      title={agent.totalOrders > 0 ? 'Đã phát sinh giao dịch - Bấm để xem lý do không thể xóa' : 'Xóa đại lý'}
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
+                      {agent.totalOrders > 0 ? <Lock className="w-3.5 h-3.5" /> : <Trash2 className="w-3.5 h-3.5" />}
                     </button>
                   </div>
                 </div>
@@ -854,6 +898,15 @@ export const AgentList: React.FC = () => {
                       {/* Thao tác */}
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
+                          {/* Nút Xem chi tiết hồ sơ đại lý */}
+                          <button
+                            type="button"
+                            onClick={() => setSelectedDetailAgent(agent)}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                            title="Xem chi tiết hồ sơ"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
                           {/* Nút Tạo đơn hàng đại lý nhanh */}
                           <Link
                             to={`/agents/orders/new?agent=${agent.id}`}
@@ -863,18 +916,24 @@ export const AgentList: React.FC = () => {
                             <ShoppingBag className="w-4 h-4" />
                           </Link>
                           <button
+                            type="button"
                             onClick={() => handleOpenEdit(agent)}
                             className="p-1.5 rounded-lg text-slate-400 hover:text-amber-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                            title="Chỉnh sửa"
+                            title="Chỉnh sửa hồ sơ"
                           >
                             <Edit className="w-4 h-4" />
                           </button>
                           <button
-                            onClick={() => setDeleteId(agent.id)}
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
-                            title="Xóa"
+                            type="button"
+                            onClick={() => handleRequestDelete(agent)}
+                            className={`p-1.5 rounded-lg transition-colors ${
+                              agent.totalOrders > 0
+                                ? 'text-amber-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/40'
+                                : 'text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40'
+                            }`}
+                            title={agent.totalOrders > 0 ? 'Đã phát sinh giao dịch - Bấm để xem cảnh báo & ngừng giao dịch' : 'Xóa đại lý'}
                           >
-                            <Trash2 className="w-4 h-4" />
+                            {agent.totalOrders > 0 ? <Lock className="w-4 h-4" /> : <Trash2 className="w-4 h-4" />}
                           </button>
                         </div>
                       </td>
@@ -982,6 +1041,33 @@ export const AgentList: React.FC = () => {
       >
         <form onSubmit={handleSave} className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                Mã đại lý {editingAgent && '(Cố định)'}
+              </label>
+              <input
+                type="text"
+                value={formData.code}
+                onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+                placeholder="VD: DL-1012"
+                readOnly={!!editingAgent}
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm font-mono focus:ring-2 focus:ring-indigo-500 outline-none read-only:opacity-70"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                Mã số thuế (MST)
+              </label>
+              <input
+                type="text"
+                value={formData.taxCode}
+                onChange={(e) => setFormData({ ...formData, taxCode: e.target.value })}
+                placeholder="VD: 0301234567"
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+              />
+            </div>
+
             <div className="sm:col-span-2">
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                 Tên đại lý / Công ty *
@@ -1038,26 +1124,29 @@ export const AgentList: React.FC = () => {
 
             <div>
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                Mã số thuế
+                Nhóm khách hàng
               </label>
-              <input
-                type="text"
-                value={formData.taxCode}
-                onChange={(e) => setFormData({ ...formData, taxCode: e.target.value })}
-                placeholder="0300000000"
+              <select
+                value={formData.customerGroup}
+                onChange={(e) => setFormData({ ...formData, customerGroup: e.target.value as AgentGroup })}
                 className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-              />
+              >
+                <option value="platinum">Platinum (Hạng Kim Cương)</option>
+                <option value="gold">Gold (Hạng Vàng)</option>
+                <option value="silver">Silver (Hạng Bạc)</option>
+                <option value="standard">Standard (Tiêu chuẩn)</option>
+              </select>
             </div>
 
             <div className="sm:col-span-2">
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                Địa chỉ
+                Địa chỉ chi tiết
               </label>
               <input
                 type="text"
                 value={formData.address}
                 onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                placeholder="Số nhà, đường, phường, quận..."
+                placeholder="Số nhà, tên đường, phường..."
                 className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
               />
             </div>
@@ -1071,6 +1160,19 @@ export const AgentList: React.FC = () => {
                 value={formData.province}
                 onChange={(e) => setFormData({ ...formData, province: e.target.value })}
                 placeholder="TP. Hồ Chí Minh"
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                Quận / Huyện
+              </label>
+              <input
+                type="text"
+                value={formData.district}
+                onChange={(e) => setFormData({ ...formData, district: e.target.value })}
+                placeholder="Quận 1 / Cầu Giấy..."
                 className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
               />
             </div>
@@ -1092,23 +1194,7 @@ export const AgentList: React.FC = () => {
 
             <div>
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                Nhóm khách hàng
-              </label>
-              <select
-                value={formData.customerGroup}
-                onChange={(e) => setFormData({ ...formData, customerGroup: e.target.value as AgentGroup })}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-              >
-                <option value="platinum">Platinum</option>
-                <option value="gold">Gold</option>
-                <option value="silver">Silver</option>
-                <option value="standard">Standard</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                Người phụ trách
+                Người phụ trách (Sales)
               </label>
               <select
                 value={formData.assignedStaffId}
@@ -1128,9 +1214,9 @@ export const AgentList: React.FC = () => {
               </select>
             </div>
 
-            <div>
+            <div className="sm:col-span-2">
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                Trạng thái
+                Trạng thái hoạt động
               </label>
               <select
                 value={formData.status}
@@ -1138,8 +1224,8 @@ export const AgentList: React.FC = () => {
                 className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
               >
                 <option value="active">Đang hoạt động</option>
-                <option value="inactive">Tạm ngưng</option>
-                <option value="pending">Chờ duyệt</option>
+                <option value="inactive">Ngừng giao dịch / Tạm ngưng</option>
+                <option value="pending">Chờ duyệt hồ sơ</option>
               </select>
             </div>
           </div>
@@ -1155,13 +1241,30 @@ export const AgentList: React.FC = () => {
         </form>
       </Modal>
 
-      {/* ── Confirm xóa ── */}
+      {/* ── Modal Chi tiết đại lý (SCRUM-432) ── */}
+      <AgentDetailModal
+        isOpen={!!selectedDetailAgent}
+        onClose={() => setSelectedDetailAgent(null)}
+        agent={selectedDetailAgent}
+        onEdit={handleOpenEdit}
+        onDeactivate={handleDeactivate}
+      />
+
+      {/* ── Modal Cảnh báo & Vô hiệu hoá xoá đại lý có giao dịch (SCRUM-435) ── */}
+      <AgentCannotDeleteModal
+        isOpen={!!blockedDeleteAgent}
+        onClose={() => setBlockedDeleteAgent(null)}
+        agent={blockedDeleteAgent}
+        onDeactivate={handleDeactivate}
+      />
+
+      {/* ── Confirm xóa (chỉ hiển thị khi đại lý chưa có giao dịch) ── */}
       <ConfirmDialog
         isOpen={!!deleteId}
         onClose={() => setDeleteId(null)}
         onConfirm={handleDelete}
         title="Xác nhận xóa đại lý"
-        message="Bạn có chắc chắn muốn xóa đại lý này khỏi hệ thống? Thao tác này không thể hoàn tác."
+        message="Đại lý này chưa phát sinh giao dịch nào. Bạn có chắc chắn muốn xóa đại lý này khỏi hệ thống? Thao tác này không thể hoàn tác."
         confirmText="Xóa đại lý"
         variant="danger"
       />

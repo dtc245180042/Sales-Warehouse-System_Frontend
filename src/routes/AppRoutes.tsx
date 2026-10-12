@@ -38,11 +38,20 @@ import { ProductCreate } from '../pages/products/ProductCreate';
 import { ProductEdit } from '../pages/products/ProductEdit';
 import { ProductUnitPage } from '../pages/products/ProductUnitPage';
 import { ProductImportPage } from '../pages/products/ProductImportPage';
+import { ProductPriceHistoryPage } from '../pages/products/ProductPriceHistory';
 
 // Report Pages (Báo cáo bán hàng theo ngành hàng & Doanh thu)
 import { SalesReport } from '../pages/reports/SalesReport';
 import { RevenueReport } from '../pages/reports/RevenueReport';
 import { InventoryReport } from '../pages/reports/InventoryReport';
+
+// Inventory & Warehouse Pages (SCRUM-537, SCRUM-538, SCRUM-599, SCRUM-601)
+import { InventoryOverview } from '../pages/inventory/InventoryOverview';
+import { WarehouseListPage } from '../pages/inventory/WarehouseListPage';
+import { MinStockConfigPage } from '../pages/inventory/MinStockConfigPage';
+import { StockIn } from '../pages/inventory/StockIn';
+import { StockOut } from '../pages/inventory/StockOut';
+import { InventoryHistory } from '../pages/inventory/InventoryHistory';
 
 // Agent & Sales Pages (SCRUM-229, SCRUM-230, SCRUM-347)
 import { AgentList } from '../pages/agents/AgentList';
@@ -291,6 +300,22 @@ export const AppRoutes: React.FC = () => {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/products/price-history"
+          element={
+            <ProtectedRoute allowedRoles={['Admin', 'SalesManager', 'SalesStaff', 'WarehouseManager', 'WarehouseStaff', 'Director', 'Manager', 'Staff']}>
+              <ProductPriceHistoryPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/products/:id/price-history"
+          element={
+            <ProtectedRoute allowedRoles={['Admin', 'SalesManager', 'SalesStaff', 'WarehouseManager', 'WarehouseStaff', 'Director', 'Manager', 'Staff']}>
+              <ProductPriceHistoryPage />
+            </ProtectedRoute>
+          }
+        />
 
         {/* ============================================================ */}
         {/* BÁO CÁO & THỐNG KÊ DOANH SỐ THEO NGÀNH HÀNG                  */}
@@ -316,6 +341,58 @@ export const AppRoutes: React.FC = () => {
           element={
             <ProtectedRoute allowedRoles={['Admin', 'WarehouseManager', 'WarehouseStaff', 'Director', 'Manager']}>
               <InventoryReport />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* ============================================================ */}
+        {/* KHO VẬN & TỒN KHO (SCRUM-537, SCRUM-538, SCRUM-599, SCRUM-601)*/}
+        {/* ============================================================ */}
+        <Route
+          path="/inventory"
+          element={
+            <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
+              <InventoryOverview />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/inventory/warehouses"
+          element={
+            <ProtectedRoute allowedRoles={['Admin', 'WarehouseManager', 'Director', 'Manager']}>
+              <WarehouseListPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/inventory/min-stock"
+          element={
+            <ProtectedRoute allowedRoles={['Admin', 'WarehouseManager', 'Director', 'Manager']}>
+              <MinStockConfigPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/inventory/stock-in"
+          element={
+            <ProtectedRoute allowedRoles={['Admin', 'WarehouseManager', 'WarehouseStaff', 'Director', 'Manager']}>
+              <StockIn />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/inventory/stock-out"
+          element={
+            <ProtectedRoute allowedRoles={['Admin', 'WarehouseManager', 'WarehouseStaff', 'Director', 'Manager']}>
+              <StockOut />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/inventory/history"
+          element={
+            <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
+              <InventoryHistory />
             </ProtectedRoute>
           }
         />

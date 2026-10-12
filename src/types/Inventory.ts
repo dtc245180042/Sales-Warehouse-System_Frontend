@@ -87,3 +87,16 @@ export interface InventoryHistoryRecord {
   date: string;
   note: string;
 }
+
+export interface MinStockConfig {
+  id: string;
+  productId: string;
+  sku: string;
+  productName: string;
+  warehouseId: string;
+  warehouseName: string;
+  minStock: number;
+  currentStock?: number;
+  updatedAt: string;
+  updatedBy: string;
+}

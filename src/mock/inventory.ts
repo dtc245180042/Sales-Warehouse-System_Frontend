@@ -1,4 +1,4 @@
-import { InventoryHistoryRecord, StockInReceipt, StockOutReceipt } from '../types/Inventory';
+import { InventoryHistoryRecord, MinStockConfig, StockInReceipt, StockOutReceipt } from '../types/Inventory';
 
 export const initialStockInReceipts: StockInReceipt[] = [
   {
@@ -160,5 +160,56 @@ export const initialInventoryHistory: InventoryHistoryRecord[] = [
     performer: 'Đặng Tuấn Anh',
     date: '2026-09-30 15:45',
     note: 'Chuyển sang Kho Showroom Quận 1',
+  },
+];
+
+export const initialMinStockConfigs: MinStockConfig[] = [
+  {
+    id: 'MIN-001',
+    productId: 'PRD-001',
+    sku: 'IP15P-128-TI',
+    productName: 'iPhone 15 Pro 128GB Titan Tự Nhiên',
+    warehouseId: 'WH-001',
+    warehouseName: 'Kho Tổng Hà Nội',
+    minStock: 10,
+    currentStock: 25,
+    updatedAt: '2026-09-15',
+    updatedBy: 'Admin',
+  },
+  {
+    id: 'MIN-002',
+    productId: 'PRD-002',
+    sku: 'SS-S24U-256-GR',
+    productName: 'Samsung Galaxy S24 Ultra 256GB Xám Titan',
+    warehouseId: 'WH-001',
+    warehouseName: 'Kho Tổng Hà Nội',
+    minStock: 15,
+    currentStock: 4,
+    updatedAt: '2026-09-15',
+    updatedBy: 'Admin',
+  },
+  {
+    id: 'MIN-003',
+    productId: 'PRD-007',
+    sku: 'UGR-65W-GAN',
+    productName: 'Củ Sạc Nhanh Ugreen GaN 65W Nexode',
+    warehouseId: 'WH-002',
+    warehouseName: 'Kho Miền Nam - TP.HCM',
+    minStock: 20,
+    currentStock: 0,
+    updatedAt: '2026-09-20',
+    updatedBy: 'Admin',
+  },
+  {
+    id: 'MIN-004',
+    productId: 'PRD-006',
+    sku: 'AP-PRO-2-USBC',
+    productName: 'Tai nghe Apple AirPods Pro 2 MagSafe (USB-C)',
+    warehouseId: 'WH-001',
+    warehouseName: 'Kho Tổng Hà Nội',
+    minStock: 12,
+    currentStock: 46,
+    updatedAt: '2026-09-22',
+    updatedBy: 'Phạm Văn Kho',
   },
 ];

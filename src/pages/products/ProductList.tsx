@@ -12,6 +12,7 @@ import {
   RefreshCw,
   X,
   Layers,
+  History,
 } from 'lucide-react';
 import { PageContainer } from '../../components/layout/PageContainer';
 import { DataTable, Column } from '../../components/common/DataTable';
@@ -499,6 +500,13 @@ export const ProductList: React.FC = () => {
             title="Xem chi tiết"
           >
             <Eye className="w-4 h-4" />
+          </Link>
+          <Link
+            to={`/products/${p.id}/price-history`}
+            className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            title="Lịch sử thay đổi giá"
+          >
+            <History className="w-4 h-4" />
           </Link>
           <Link
             to={`/products/${p.id}/edit`}

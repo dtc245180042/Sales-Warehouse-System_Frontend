@@ -2,6 +2,7 @@ import { Product } from '../types/Product';
 import { initialProducts } from '../mock/products';
 import { getStorageItem, setStorageItem } from './storage';
 import { apiClient } from '../api/client';
+import { priceHistoryService } from './priceHistoryService';
 
 const STORAGE_KEY = 'kv_products';
 
@@ -227,13 +228,34 @@ export const productService = {
       const index = products.findIndex((p) => String(p.id).trim() === strId);
       if (index === -1) throw new Error('Không tìm thấy sản phẩm');
 
+      const oldProd = products[index];
       const updatedProduct = {
-        ...products[index],
+        ...oldProd,
         ...data,
         updatedAt: new Date().toISOString().split('T')[0],
       };
       products[index] = updatedProduct;
       setStorageItem(STORAGE_KEY, [...products]);
+
+      if (
+        (data.salePrice !== undefined && Number(data.salePrice) !== oldProd.salePrice) ||
+        (data.costPrice !== undefined && Number(data.costPrice) !== oldProd.costPrice)
+      ) {
+        priceHistoryService
+          .recordPriceChange({
+            productId: oldProd.id,
+            productSku: oldProd.sku,
+            productName: oldProd.name,
+            oldSalePrice: oldProd.salePrice,
+            newSalePrice: data.salePrice !== undefined ? Number(data.salePrice) : oldProd.salePrice,
+            oldCostPrice: oldProd.costPrice,
+            newCostPrice: data.costPrice !== undefined ? Number(data.costPrice) : oldProd.costPrice,
+            changedBy: (data as any).updatedBy || 'Quản lý kinh doanh',
+            reason: (data as any).priceChangeReason || 'Cập nhật giá từ màn hình chi tiết sản phẩm',
+          })
+          .catch(() => {});
+      }
+
       return updatedProduct;
     }
   },
