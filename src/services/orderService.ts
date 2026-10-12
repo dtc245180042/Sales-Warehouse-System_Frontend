@@ -185,10 +185,13 @@ export const orderService = {
     }
   },
 
-  cancelOrder: async (id: string): Promise<Order> => {
+  cancelOrder: async (id: string, reason?: string): Promise<Order> => {
+    const effectiveReason = reason?.trim() || 'Hủy đơn hàng theo yêu cầu';
     try {
-      const res = await apiClient.post(`/orders/${encodeURIComponent(id)}/cancel`);
-      const updated = mapApiOrder(res.data);
+      const res = await apiClient.post(`/orders/${encodeURIComponent(id)}/cancel`, {
+        reason: effectiveReason,
+      });
+      const updated = mapApiOrder(res.data.order || res.data);
       const orders = getStorageItem<Order[]>(STORAGE_KEY, initialOrders);
       const idx = orders.findIndex((o) => o.id === id || o.code === id);
       if (idx !== -1) {
@@ -213,9 +216,79 @@ export const orderService = {
       }
 
       orders[index].status = 'cancelled';
+      orders[index].note = orders[index].note
+        ? `${orders[index].note} [Lý do hủy: ${effectiveReason}]`
+        : `[Lý do hủy: ${effectiveReason}]`;
       orders[index].updatedAt = new Date().toISOString().replace('T', ' ').slice(0, 16);
       setStorageItem(STORAGE_KEY, [...orders]);
       return orders[index];
     }
-  }
+  },
+
+  // S4-09: Sao chép đơn hàng cũ thành đơn nháp mới
+  copyOrder: async (orderId: string): Promise<{ order: Order; warnings: string[]; message: string }> => {
+    const res = await apiClient.post(`/orders/${encodeURIComponent(orderId)}/copy`);
+    const mappedOrder = mapApiOrder(res.data.order || res.data);
+    const orders = getStorageItem<Order[]>(STORAGE_KEY, initialOrders);
+    setStorageItem(STORAGE_KEY, [mappedOrder, ...orders]);
+    return {
+      order: mappedOrder,
+      warnings: res.data.warnings || [],
+      message: res.data.message || 'Sao chép đơn thành công!',
+    };
+  },
+
+  // S4-04: Lấy gợi ý sản phẩm từ lịch sử mua hàng 90 ngày
+  getSuggestions: async (customerId: string, windowDays: number = 90): Promise<any> => {
+    try {
+      const res = await apiClient.get(
+        `/orders/suggestions/${encodeURIComponent(customerId)}?window_days=${windowDays}`
+      );
+      return res.data;
+    } catch (err) {
+      console.warn('[orderService] Failed to load suggestions from backend:', err);
+      return {
+        customer_id: customerId,
+        window_days: windowDays,
+        total_past_orders: 0,
+        suggested_products: [],
+        categories_purchased: [],
+      };
+    }
+  },
+
+  // S4-02: Kiểm tra hồ sơ hạn mức công nợ thời gian thực của đại lý
+  getCreditSummary: async (customerId: string): Promise<any> => {
+    try {
+      const res = await apiClient.get(`/customers/${encodeURIComponent(customerId)}/credit-summary`);
+      return res.data;
+    } catch (err) {
+      console.warn('[orderService] Failed to load credit summary:', err);
+      return null;
+    }
+  },
+
+  // S4-05: Lấy chi tiết thông tin phê duyệt ngoại lệ của đơn hàng
+  getApprovalDetail: async (orderId: string): Promise<any> => {
+    try {
+      const res = await apiClient.get(`/order-approvals/${encodeURIComponent(orderId)}`);
+      return res.data;
+    } catch (err) {
+      console.warn('[orderService] Failed to load approval detail:', err);
+      return null;
+    }
+  },
+
+  // S4-05: Thao tác duyệt đơn ngoại lệ (Approve, Reject, Return) của Quản lý kinh doanh
+  processApprovalAction: async (
+    orderId: string,
+    action: 'approve' | 'reject' | 'return',
+    comment?: string
+  ): Promise<any> => {
+    const res = await apiClient.post(`/order-approvals/${encodeURIComponent(orderId)}/action`, {
+      action,
+      comment: comment?.trim() || undefined,
+    });
+    return res.data;
+  },
 };

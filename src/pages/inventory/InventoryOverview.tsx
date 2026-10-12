@@ -105,7 +105,6 @@ export const InventoryOverview: React.FC = () => {
         productId: p.id,
         sku: p.sku,
         name: p.name,
-        image: p.image,
         category: p.category,
         warehouse: index % 2 === 0 ? 'Kho Tổng TP. HCM' : 'Kho Tổng Hà Nội',
         initialStock,
@@ -171,20 +170,7 @@ export const InventoryOverview: React.FC = () => {
       sortable: true,
       className: 'min-w-[200px]',
       render: (item) => (
-        <div className="flex items-center gap-2.5">
-          {item.image ? (
-            <img
-              src={item.image}
-              alt={item.name}
-              className="w-9 h-9 rounded-lg object-cover bg-slate-100 dark:bg-slate-800 shrink-0"
-              onError={(e) => { e.currentTarget.style.display = 'none'; }}
-            />
-          ) : (
-            <div className="w-9 h-9 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 flex items-center justify-center shrink-0">
-              <Package className="w-4 h-4" />
-            </div>
-          )}
-          <div className="truncate">
+        <div className="truncate">
             <Link
               to={`/products/${item.productId}`}
               className="font-bold text-slate-800 dark:text-slate-200 hover:text-indigo-600 truncate block"
