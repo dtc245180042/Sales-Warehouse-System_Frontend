@@ -833,15 +833,17 @@ export const AgentList: React.FC = () => {
 
                       {/* Công nợ */}
                       <td className="px-4 py-3 text-right">
-                        <span
-                          className={`text-sm font-bold ${
+                        <Link
+                          to={`/agents/${agent.id}/debts`}
+                          className={`text-sm font-bold hover:underline ${
                             agent.outstandingDebt > 0
                               ? 'text-rose-600 dark:text-rose-400'
                               : 'text-emerald-600 dark:text-emerald-400'
                           }`}
+                          title="Xem chi tiết công nợ & hoá đơn đại lý"
                         >
                           {agent.outstandingDebt > 0 ? formatCurrency(agent.outstandingDebt) : '—'}
-                        </span>
+                        </Link>
                       </td>
 
                       {/* Trạng thái */}
@@ -854,6 +856,14 @@ export const AgentList: React.FC = () => {
                       {/* Thao tác */}
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
+                          {/* Nút Xem công nợ & hoá đơn đại lý (SCRUM-757) */}
+                          <Link
+                            to={`/agents/${agent.id}/debts`}
+                            className="p-1.5 rounded-lg text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors"
+                            title="Xem công nợ & hoá đơn đã phát hành"
+                          >
+                            <DollarSign className="w-4 h-4" />
+                          </Link>
                           {/* Nút Tạo đơn hàng đại lý nhanh */}
                           <Link
                             to={`/agents/orders/new?agent=${agent.id}`}

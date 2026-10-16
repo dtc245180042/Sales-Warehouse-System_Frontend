@@ -19,6 +19,7 @@ export interface Agent {
   totalOrders: number;
   totalSpent: number;
   outstandingDebt: number;         // Công nợ tồn
+  creditLimit?: number;            // Hạn mức công nợ được cấp (SCRUM-757)
   lastOrderDate?: string;
   createdAt: string;
   status: AgentStatus;

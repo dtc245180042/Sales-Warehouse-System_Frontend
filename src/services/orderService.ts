@@ -20,6 +20,9 @@ function mapApiOrder(o: any): Order {
       name: itm.name || '',
       price: Number(itm.price || 0),
       quantity: Number(itm.quantity || 1),
+      deliveredQuantity: itm.deliveredQuantity !== undefined ? Number(itm.deliveredQuantity) : undefined,
+      shortageReason: itm.shortageReason || undefined,
+      unit: itm.unit || 'Cái',
       discount: Number(itm.discount || 0),
       subtotal: Number(itm.subtotal || 0),
     })),
@@ -35,6 +38,8 @@ function mapApiOrder(o: any): Order {
     staffId: o.staffId || o.staff_id || '',
     staffName: o.staffName || o.staff_name || '',
     note: o.note || undefined,
+    hasShortage: o.hasShortage ?? (o.items || []).some((it: any) => it.deliveredQuantity !== undefined && it.deliveredQuantity < it.quantity),
+    shortageResolution: o.shortageResolution || undefined,
     createdAt: o.createdAt || (o.created_at ? o.created_at.replace('T', ' ').slice(0, 16) : new Date().toISOString().replace('T', ' ').slice(0, 16)),
     updatedAt: o.updatedAt || (o.updated_at ? o.updated_at.replace('T', ' ').slice(0, 16) : new Date().toISOString().replace('T', ' ').slice(0, 16)),
   };
@@ -52,7 +57,14 @@ export const orderService = {
     } catch (err) {
       console.warn('[orderService] Backend error, fallback to storage:', err);
     }
-    return getStorageItem<Order[]>(STORAGE_KEY, initialOrders);
+    const stored = getStorageItem<Order[]>(STORAGE_KEY, initialOrders);
+    const hasAgentOrders = stored.some((o) => o.id.startsWith('ORD-AGT-'));
+    if (!hasAgentOrders) {
+      const merged = [...stored, ...initialOrders.filter((o) => o.id.startsWith('ORD-AGT-'))];
+      setStorageItem(STORAGE_KEY, merged);
+      return merged;
+    }
+    return stored;
   },
 
   getById: async (id: string): Promise<Order | undefined> => {
@@ -217,5 +229,50 @@ export const orderService = {
       setStorageItem(STORAGE_KEY, [...orders]);
       return orders[index];
     }
-  }
+  },
+
+  /**
+   * Cập nhật số lượng thực giao theo từng dòng hàng và lý do giao thiếu (SCRUM-696)
+   */
+  updateItemDeliveryQuantities: async (
+    orderId: string,
+    itemUpdates: { productId: string; deliveredQuantity: number; shortageReason?: string }[],
+    resolutionNote?: string
+  ): Promise<Order> => {
+    const orders = getStorageItem<Order[]>(STORAGE_KEY, initialOrders);
+    const index = orders.findIndex((o) => o.id === orderId || o.code === orderId);
+    if (index === -1) throw new Error('Không tìm thấy đơn hàng');
+
+    const currentOrder = orders[index];
+    const updateMap = new Map(itemUpdates.map((u) => [u.productId, u]));
+
+    let hasShortage = false;
+    const updatedItems = currentOrder.items.map((it) => {
+      const update = updateMap.get(it.productId);
+      if (update) {
+        const deliveredQty = Math.max(0, update.deliveredQuantity);
+        if (deliveredQty < it.quantity) {
+          hasShortage = true;
+        }
+        return {
+          ...it,
+          deliveredQuantity: deliveredQty,
+          shortageReason: deliveredQty < it.quantity ? (update.shortageReason || 'Chưa ghi nhận lý do') : undefined,
+        };
+      }
+      return it;
+    });
+
+    const updatedOrder: Order = {
+      ...currentOrder,
+      items: updatedItems,
+      hasShortage,
+      shortageResolution: hasShortage ? (resolutionNote || currentOrder.shortageResolution) : undefined,
+      updatedAt: new Date().toISOString().replace('T', ' ').slice(0, 16),
+    };
+
+    orders[index] = updatedOrder;
+    setStorageItem(STORAGE_KEY, [...orders]);
+    return updatedOrder;
+  },
 };

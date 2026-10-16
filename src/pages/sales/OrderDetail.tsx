@@ -5,25 +5,31 @@ import {
   Printer,
   FileDown,
   Ban,
-  CheckCircle2,
-  Clock,
-  Truck,
   CreditCard,
   User,
   MapPin,
   Phone,
-  Calendar,
-  AlertCircle,
+  Truck,
+  ExternalLink,
+  FileText,
 } from 'lucide-react';
 import { PageContainer } from '../../components/layout/PageContainer';
 import { Button } from '../../components/common/Button';
-import { Badge } from '../../components/common/Badge';
 import { ConfirmDialog } from '../../components/common/ConfirmDialog';
 import { Loading } from '../../components/common/Loading';
 import { EmptyState } from '../../components/common/EmptyState';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 import { orderService } from '../../services/orderService';
-import { Order, OrderStatus } from '../../types/Order';
+import { deliveryTrackingService } from '../../services/deliveryTrackingService';
+import { debtInvoiceService } from '../../services/debtInvoiceService';
+import { Order } from '../../types/Order';
+import { DeliveryMilestoneKey, DeliveryTrackingDetails } from '../../types/DeliveryTracking';
+import { DebtInvoice } from '../../types/DebtInvoice';
+import { DeliveryTimeline } from '../../components/delivery/DeliveryTimeline';
+import { DeliveryTrackingCard } from '../../components/delivery/DeliveryTrackingCard';
+import { OrderDeliveryItemsTable } from '../../components/delivery/OrderDeliveryItemsTable';
+import { UpdateItemDeliveryQuantityModal } from '../../components/delivery/UpdateItemDeliveryQuantityModal';
+import { InvoiceDetailModal } from '../../components/debts/InvoiceDetailModal';
 import { useToast } from '../../contexts/ToastContext';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -34,31 +40,64 @@ export const OrderDetail: React.FC = () => {
   const { user } = useAuth();
 
   const [order, setOrder] = useState<Order | null>(null);
+  const [tracking, setTracking] = useState<DeliveryTrackingDetails | null>(null);
+  const [invoice, setInvoice] = useState<DebtInvoice | null>(null);
   const [loading, setLoading] = useState(true);
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
+  const [isEditQuantityModalOpen, setIsEditQuantityModalOpen] = useState(false);
+  const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
 
-  const loadOrder = async () => {
+  const loadData = async () => {
     if (!id) return;
     try {
-      const data = await orderService.getById(id);
-      if (data) setOrder(data);
+      setLoading(true);
+      const [orderData, trackingData] = await Promise.all([
+        orderService.getById(id),
+        deliveryTrackingService.getByOrderId(id),
+      ]);
+      if (orderData) {
+        setOrder(orderData);
+        const inv = debtInvoiceService.getById(orderData.id) || debtInvoiceService.getById(orderData.code);
+        if (inv) setInvoice(inv);
+      }
+      if (trackingData) setTracking(trackingData);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadOrder();
+    loadData();
   }, [id]);
 
-  const handleUpdateStatus = async (nextStatus: OrderStatus) => {
+  const handleAdvanceMilestone = async (nextMilestone: DeliveryMilestoneKey) => {
+    if (!id) return;
+    try {
+      const updated = await deliveryTrackingService.updateMilestone(id, nextMilestone);
+      setTracking(updated);
+      const refreshed = await orderService.getById(id);
+      if (refreshed) setOrder(refreshed);
+      showToast(`Đã chuyển mốc giao hàng: ${nextMilestone}`, 'success');
+    } catch {
+      showToast('Lỗi cập nhật tiến trình giao hàng', 'error');
+    }
+  };
+
+  const handleSaveItemDeliveryQuantities = async (
+    updates: { productId: string; deliveredQuantity: number; shortageReason?: string }[],
+    resolutionNote: string
+  ) => {
     if (!order) return;
     try {
-      const updated = await orderService.updateStatus(order.id, nextStatus);
+      const updated = await orderService.updateItemDeliveryQuantities(
+        order.id,
+        updates,
+        resolutionNote
+      );
       setOrder(updated);
-      showToast(`Đã chuyển trạng thái đơn hàng sang "${nextStatus}"`, 'success');
+      showToast('Đã lưu số lượng thực giao theo dòng hàng thành công', 'success');
     } catch {
-      showToast('Lỗi cập nhật trạng thái', 'error');
+      showToast('Lỗi cập nhật số lượng thực giao', 'error');
     }
   };
 
@@ -69,6 +108,11 @@ export const OrderDetail: React.FC = () => {
       setOrder(updated);
       showToast('Đã hủy đơn hàng thành công', 'success');
       setIsCancelModalOpen(false);
+      // Reload tracking to reflect cancellation
+      if (id) {
+        const trackingData = await deliveryTrackingService.getByOrderId(id);
+        if (trackingData) setTracking(trackingData);
+      }
     } catch {
       showToast('Lỗi khi hủy đơn hàng', 'error');
     }
@@ -86,15 +130,6 @@ export const OrderDetail: React.FC = () => {
     );
   }
 
-  const steps: { key: OrderStatus; label: string; icon: any }[] = [
-    { key: 'pending', label: 'Chờ xử lý', icon: Clock },
-    { key: 'confirmed', label: 'Đã xác nhận', icon: CheckCircle2 },
-    { key: 'shipping', label: 'Đang giao hàng', icon: Truck },
-    { key: 'completed', label: 'Đã giao thành công', icon: CheckCircle2 },
-  ];
-
-  const currentStepIndex = steps.findIndex((s) => s.key === order.status);
-
   return (
     <PageContainer
       title={`Chi Tiết Đơn Hàng: ${order.code}`}
@@ -106,6 +141,27 @@ export const OrderDetail: React.FC = () => {
               Danh sách
             </Button>
           </Link>
+          <Link to={`/orders/${order.id}/delivery`}>
+            <Button
+              variant="outline"
+              size="sm"
+              leftIcon={<Truck className="w-4 h-4 text-indigo-600" />}
+              className="text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800 hover:bg-indigo-50"
+            >
+              Hành trình giao hàng
+            </Button>
+          </Link>
+          {invoice && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsInvoiceModalOpen(true)}
+              leftIcon={<FileText className="w-4 h-4 text-emerald-600" />}
+              className="text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800 hover:bg-emerald-50"
+            >
+              Hóa đơn VAT ({invoice.invoiceNumber})
+            </Button>
+          )}
           <Button
             variant="outline"
             size="sm"
@@ -135,125 +191,51 @@ export const OrderDetail: React.FC = () => {
         </div>
       }
     >
-      {/* Order Status Timeline Tracker */}
-      {order.status !== 'cancelled' ? (
-        <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-card mb-6">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-6">
-            Tiến Trình Đơn Hàng
-          </h3>
-          <div className="relative flex items-center justify-between max-w-3xl mx-auto">
-            {/* Background line */}
-            <div className="absolute top-1/2 left-0 right-0 h-1 bg-slate-200 dark:bg-slate-700 -translate-y-1/2 z-0" />
-            {steps.map((step, idx) => {
-              const isPast = idx <= currentStepIndex;
-              const isCurrent = idx === currentStepIndex;
-              const Icon = step.icon;
-
-              return (
-                <div key={step.key} className="relative z-10 flex flex-col items-center">
-                  <div
-                    className={`w-10 h-10 rounded-full flex items-center justify-center transition-all shadow-md ${
-                      isPast
-                        ? 'bg-indigo-600 text-white ring-4 ring-indigo-100 dark:ring-indigo-950'
-                        : 'bg-slate-100 dark:bg-slate-800 text-slate-400'
-                    }`}
-                  >
-                    <Icon className="w-5 h-5" />
-                  </div>
-                  <span
-                    className={`text-xs mt-2 font-bold whitespace-nowrap ${
-                      isCurrent
-                        ? 'text-indigo-600 dark:text-indigo-400'
-                        : isPast
-                        ? 'text-slate-800 dark:text-slate-200'
-                        : 'text-slate-400'
-                    }`}
-                  >
-                    {step.label}
-                  </span>
-                </div>
-              );
-            })}
+      {/* Order Delivery Status Timeline Tracker - SCRUM-695: 5 Mốc Giao Hàng */}
+      {tracking && (
+        <div className="mb-6 space-y-3">
+          <DeliveryTimeline
+            milestones={tracking.milestones}
+            currentMilestone={tracking.currentMilestone}
+            isCancelled={order.status === 'cancelled'}
+            cancelledReason="Đơn hàng này đã bị hủy bỏ. Toàn bộ tiến trình giao nhận đã dừng lại."
+            variant="stepper"
+            canManage={order.status !== 'cancelled'}
+            onAdvanceMilestone={handleAdvanceMilestone}
+          />
+          <div className="flex items-center justify-end">
+            <Link
+              to={`/orders/${order.id}/delivery`}
+              className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1"
+            >
+              <span>Xem toàn bộ nhật ký giao nhận & chi tiết vận đơn</span>
+              <ExternalLink className="w-3.5 h-3.5" />
+            </Link>
           </div>
-
-          {/* Quick status change buttons */}
-          <div className="flex items-center justify-center gap-3 mt-6 pt-4 border-t border-slate-100 dark:border-slate-800">
-            {order.status === 'pending' && (
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={() => handleUpdateStatus('confirmed')}
-              >
-                Xác nhận đơn hàng
-              </Button>
-            )}
-            {order.status === 'confirmed' && (
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={() => handleUpdateStatus('shipping')}
-              >
-                Bắt đầu giao hàng
-              </Button>
-            )}
-            {order.status === 'shipping' && (
-              <Button
-                variant="success"
-                size="sm"
-                onClick={() => handleUpdateStatus('completed')}
-              >
-                Xác nhận đã giao thành công
-              </Button>
-            )}
-          </div>
-        </div>
-      ) : (
-        <div className="p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 mb-6 flex items-center gap-3 text-rose-700 dark:text-rose-300 text-sm font-semibold">
-          <AlertCircle className="w-5 h-5 shrink-0" />
-          <span>Đơn hàng này đã bị hủy bỏ. Sản phẩm đã được hoàn trả lại kho lưu trữ.</span>
         </div>
       )}
 
       {/* Main Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left: Products in Order (2 cols) */}
+        {/* Left: Products & Delivery Item Quantities (SCRUM-696) (2 cols) */}
         <div className="lg:col-span-2 space-y-6">
-          <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-card">
-            <h3 className="text-base font-bold text-slate-900 dark:text-white mb-4">
-              Danh Sách Sản Phẩm Đã Mua
-            </h3>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs sm:text-sm">
-                <thead>
-                  <tr className="border-b border-slate-100 dark:border-slate-800 text-slate-400 font-semibold">
-                    <th className="pb-3">Sản phẩm</th>
-                    <th className="pb-3 text-center">Đơn giá</th>
-                    <th className="pb-3 text-center">Số lượng</th>
-                    <th className="pb-3 text-right">Thành tiền</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {order.items.map((it, idx) => (
-                    <tr key={idx}>
-                      <td className="py-3">
-                        <p className="font-bold text-slate-900 dark:text-slate-100">{it.name}</p>
-                        <span className="text-[11px] text-slate-400 font-mono">SKU: {it.sku}</span>
-                      </td>
-                      <td className="py-3 text-center font-medium">{formatCurrency(it.price)}</td>
-                      <td className="py-3 text-center font-bold">{it.quantity}</td>
-                      <td className="py-3 text-right font-black text-slate-900 dark:text-white">
-                        {formatCurrency(it.subtotal)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          <OrderDeliveryItemsTable
+            items={order.items}
+            orderTotal={order.total}
+            hasShortage={order.hasShortage}
+            shortageResolution={order.shortageResolution}
+            canEdit={order.status !== 'cancelled'}
+            onOpenEditModal={() => setIsEditQuantityModalOpen(true)}
+          />
         </div>
 
-        {/* Right: Customer & Financials (1 col) */}
+        {/* Right: Delivery Info, Customer & Financials (1 col) */}
         <div className="space-y-6">
+          {/* Thông tin giao nhận & vận chuyển (SCRUM-695) */}
+          {tracking && (
+            <DeliveryTrackingCard tracking={tracking} showViewTrackingLink={true} />
+          )}
+
           {/* Creator / Staff info (SCRUM-362, SCRUM-364, SCRUM-367) */}
           <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-card space-y-3">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
@@ -290,7 +272,7 @@ export const OrderDetail: React.FC = () => {
           <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-card space-y-3">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
               <User className="w-4 h-4 text-indigo-500" />
-              Thông Tin Khách Hàng
+              Thông Tin Đại Lý / Khách Hàng
             </h3>
             <div>
               <p className="text-sm font-bold text-slate-900 dark:text-white">{order.customerName}</p>
@@ -347,6 +329,22 @@ export const OrderDetail: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Modal cập nhật số lượng thực giao (SCRUM-696) */}
+      <UpdateItemDeliveryQuantityModal
+        isOpen={isEditQuantityModalOpen}
+        onClose={() => setIsEditQuantityModalOpen(false)}
+        items={order.items}
+        currentResolution={order.shortageResolution}
+        onSave={handleSaveItemDeliveryQuantities}
+      />
+
+      {/* Modal xem chi tiết & tải lại hoá đơn điện tử (SCRUM-755) */}
+      <InvoiceDetailModal
+        isOpen={isInvoiceModalOpen}
+        onClose={() => setIsInvoiceModalOpen(false)}
+        invoice={invoice}
+      />
 
       <ConfirmDialog
         isOpen={isCancelModalOpen}

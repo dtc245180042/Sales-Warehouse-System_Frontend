@@ -46,9 +46,12 @@ import { InventoryReport } from '../pages/reports/InventoryReport';
 // Agent & Sales Pages (SCRUM-229, SCRUM-230, SCRUM-347)
 import { AgentList } from '../pages/agents/AgentList';
 import { AgentOrderCreate } from '../pages/agents/AgentOrderCreate';
+import { AgentDebtManagementPage } from '../pages/agents/AgentDebtManagementPage';
 import { POS } from '../pages/sales/POS';
 import { Orders } from '../pages/sales/Orders';
 import { OrderDetail } from '../pages/sales/OrderDetail';
+import { OrderDeliveryTrackingPage } from '../pages/sales/OrderDeliveryTrackingPage';
+import { PendingApprovalOrders } from '../pages/sales/PendingApprovalOrders';
 
 // All 7 business roles allowed in Sprint 1 & 2 backoffice
 const ALL_BACKOFFICE_ROLES: UserRole[] = [
@@ -328,6 +331,31 @@ export const AppRoutes: React.FC = () => {
             </ProtectedRoute>
           }
         />
+        {/* Quản lý công nợ & hoá đơn đã phát hành của đại lý (SCRUM-755 / SCRUM-268) */}
+        <Route
+          path="/agents/debts"
+          element={
+            <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
+              <AgentDebtManagementPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/agents/:id/debts"
+          element={
+            <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
+              <AgentDebtManagementPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/debts"
+          element={
+            <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
+              <AgentDebtManagementPage />
+            </ProtectedRoute>
+          }
+        />
 
         {/* ============================================================ */}
         {/* BÁN HÀNG & POS (SCRUM-347 / SCRUM-486)                       */}
@@ -364,6 +392,24 @@ export const AppRoutes: React.FC = () => {
             </ProtectedRoute>
           }
         />
+        {/* Duyệt đơn hàng vi phạm chính sách (SCRUM-237 / SCRUM-563) */}
+        <Route
+          path="/sales/orders/approvals"
+          element={
+            <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
+              <PendingApprovalOrders />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/orders/approvals"
+          element={
+            <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
+              <PendingApprovalOrders />
+            </ProtectedRoute>
+          }
+        />
+
         <Route
           path="/sales/orders/:id"
           element={
@@ -377,6 +423,47 @@ export const AppRoutes: React.FC = () => {
           element={
             <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
               <OrderDetail />
+            </ProtectedRoute>
+          }
+        />
+        {/* Theo dõi trạng thái giao hàng của đơn với timeline các mốc (SCRUM-695 / SCRUM-260) */}
+        <Route
+          path="/sales/delivery-tracking"
+          element={
+            <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
+              <OrderDeliveryTrackingPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/delivery-tracking"
+          element={
+            <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
+              <OrderDeliveryTrackingPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/sales/orders/:id/delivery"
+          element={
+            <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
+              <OrderDeliveryTrackingPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/orders/:id/delivery"
+          element={
+            <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
+              <OrderDeliveryTrackingPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/delivery-tracking/:id"
+          element={
+            <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
+              <OrderDeliveryTrackingPage />
             </ProtectedRoute>
           }
         />

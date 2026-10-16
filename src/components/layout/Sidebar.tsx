@@ -21,6 +21,8 @@ import {
   Store,
   Receipt,
   PlusCircle,
+  ShieldAlert,
+  Truck,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { UserRole } from '../../types/User';
@@ -148,6 +150,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 'Staff',
               ],
             },
+            {
+              title: 'Công nợ & Hoá đơn',
+              path: '/agents/debts',
+              icon: <Receipt className="w-3.5 h-3.5" />,
+              allowedRoles: [
+                'Admin',
+                'SalesManager',
+                'SalesStaff',
+                'Accountant',
+                'Director',
+                'Manager',
+                'Staff',
+                'User',
+              ],
+            },
           ],
         },
         {
@@ -193,6 +210,36 @@ export const Sidebar: React.FC<SidebarProps> = ({
             'Admin',
             'SalesManager',
             'SalesStaff',
+            'Accountant',
+            'Director',
+            'Manager',
+            'Staff',
+          ],
+        },
+        {
+          title: 'Duyệt đơn vi phạm',
+          path: '/sales/orders/approvals',
+          icon: <ShieldAlert className="w-5 h-5" />,
+          allowedRoles: [
+            'Admin',
+            'SalesManager',
+            'SalesStaff',
+            'Accountant',
+            'Director',
+            'Manager',
+            'Staff',
+          ],
+        },
+        {
+          title: 'Theo dõi giao hàng',
+          path: '/sales/delivery-tracking',
+          icon: <Truck className="w-5 h-5" />,
+          allowedRoles: [
+            'Admin',
+            'SalesManager',
+            'SalesStaff',
+            'WarehouseManager',
+            'WarehouseStaff',
             'Accountant',
             'Director',
             'Manager',

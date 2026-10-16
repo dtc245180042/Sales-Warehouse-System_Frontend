@@ -8,6 +8,8 @@ import {
   Download,
   Calendar,
   CreditCard,
+  ShieldAlert,
+  Truck,
 } from 'lucide-react';
 import { PageContainer } from '../../components/layout/PageContainer';
 import { DataTable, Column } from '../../components/common/DataTable';
@@ -179,9 +181,16 @@ export const Orders: React.FC = () => {
       render: (o) => {
         const conf = statusConfigs[o.status] || { label: o.status, variant: 'neutral' };
         return (
-          <Badge variant={conf.variant as any} size="sm" dot>
-            {conf.label}
-          </Badge>
+          <div className="flex flex-col gap-1 items-start">
+            <Badge variant={conf.variant as any} size="sm" dot>
+              {conf.label}
+            </Badge>
+            {o.hasShortage && (
+              <span className="inline-block text-[10px] font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800/80 px-1.5 py-0.5 rounded">
+                Giao thiếu
+              </span>
+            )}
+          </div>
         );
       },
     },
@@ -224,6 +233,13 @@ export const Orders: React.FC = () => {
           >
             <Eye className="w-4 h-4" />
           </Link>
+          <Link
+            to={`/orders/${o.id}/delivery`}
+            className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors"
+            title="Theo dõi trạng thái giao hàng (Timeline)"
+          >
+            <Truck className="w-4 h-4" />
+          </Link>
           {o.status !== 'cancelled' && o.status !== 'completed' && (
             <button
               onClick={() => setCancelOrderId(o.id)}
@@ -252,6 +268,16 @@ export const Orders: React.FC = () => {
           >
             Xuất Excel/CSV
           </Button>
+          <Link to="/sales/orders/approvals">
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100"
+              leftIcon={<ShieldAlert className="w-4 h-4 text-amber-600" />}
+            >
+              Đơn chờ duyệt vi phạm
+            </Button>
+          </Link>
           <Link to="/sales/pos">
             <Button variant="primary" size="sm" leftIcon={<ShoppingCart className="w-4 h-4" />}>
               Mở quầy POS bán hàng

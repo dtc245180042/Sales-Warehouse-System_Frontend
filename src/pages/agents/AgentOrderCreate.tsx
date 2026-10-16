@@ -37,6 +37,7 @@ import {
 } from '../../services/volumeDiscountService';
 import { VolumeDiscountPolicyModal } from '../../components/sales/VolumeDiscountPolicyModal';
 import { DraftOrdersModal } from '../../components/agents/DraftOrdersModal';
+import { RecentPurchaseHistory } from '../../components/agents/RecentPurchaseHistory';
 
 // Re-export để đảm bảo tương thích với các module khác
 export type { DiscountTier };
@@ -292,32 +293,69 @@ export const AgentOrderCreate: React.FC = () => {
       .slice(0, 10);
   }, [products, productSearch]);
 
-  // ── Thêm sản phẩm vào giỏ hàng ──
+  // Map các sản phẩm đã có trong giỏ hàng để hiển thị trên thẻ lịch sử
+  const cartLineProductIds = useMemo(() => {
+    const map: { [productId: string]: number } = {};
+    cart.forEach((l) => {
+      map[l.productId] = l.quantity;
+    });
+    return map;
+  }, [cart]);
+
+  // ── Thêm sản phẩm vào giỏ hàng (Hỗ trợ nhập đơn nhanh theo số lượng chỉ định / SCRUM-236) ──
   const addToCart = useCallback(
-    (product: Product) => {
+    (product: Product, quantityToAdd: number = 1) => {
       if (product.stock <= 0) {
         showToast(`${product.name} đã hết hàng trong kho`, 'error');
         return;
       }
+      const safeQty = Math.max(1, quantityToAdd);
       setCart((prev) => {
         const idx = prev.findIndex((l) => l.productId === product.id);
         if (idx >= 0) {
-          const newQty = prev[idx].quantity + 1;
+          const newQty = prev[idx].quantity + safeQty;
           if (newQty > product.stock) {
-            showToast(`Chỉ còn ${product.stock} sản phẩm khả dụng`, 'warning');
-            return prev;
+            showToast(`Chỉ còn ${product.stock} sản phẩm khả dụng (đã có ${prev[idx].quantity} trong giỏ)`, 'warning');
+            const cappedQty = product.stock;
+            const updated = [...prev];
+            updated[idx] = calculateCartLine(product, cappedQty, activeTiers);
+            return updated;
           }
           const updated = [...prev];
           updated[idx] = calculateCartLine(product, newQty, activeTiers);
           return updated;
         }
-        return [...prev, calculateCartLine(product, 1, activeTiers)];
+        const initialQty = Math.min(safeQty, product.stock);
+        return [...prev, calculateCartLine(product, initialQty, activeTiers)];
       });
       setProductSearch('');
       setShowProductDropdown(false);
-      showToast(`Đã thêm ${product.name} vào giỏ`, 'info');
+      showToast(`Đã thêm ${safeQty} ${product.name} vào giỏ`, 'info');
     },
     [activeTiers, showToast]
+  );
+
+  // ── Thêm nhiều sản phẩm cùng lúc (Dành cho chức năng "Nhập tất cả theo số lượng TB" - SCRUM-236) ──
+  const addMultipleToCart = useCallback(
+    (items: { product: Product; quantity: number }[]) => {
+      setCart((prev) => {
+        let updated = [...prev];
+        items.forEach(({ product, quantity }) => {
+          if (product.stock <= 0) return;
+          const idx = updated.findIndex((l) => l.productId === product.id);
+          const safeQty = Math.max(1, quantity);
+          if (idx >= 0) {
+            const newQty = Math.min(product.stock, updated[idx].quantity + safeQty);
+            updated[idx] = calculateCartLine(product, newQty, activeTiers);
+          } else {
+            const initialQty = Math.min(product.stock, safeQty);
+            updated.push(calculateCartLine(product, initialQty, activeTiers));
+          }
+        });
+        return updated;
+      });
+    },
+    [activeTiers]
   );
 
   // ── Cập nhật số lượng (+ / - hoặc nhập tay) ──
@@ -646,6 +684,19 @@ export const AgentOrderCreate: React.FC = () => {
             </div>
           )}
         </section>
+
+        {/* ── Khu vực: Lịch sử mua hàng gần đây & Số lượng bình quân (SCRUM-236 / SCRUM-515 / SCRUM-522) ── */}
+        <RecentPurchaseHistory
+          agentId={selectedAgentId}
+          agentName={selectedAgent?.name}
+          agentCode={selectedAgent?.code}
+          assignedStaffId={selectedAgent?.assignedStaffId}
+          assignedStaffName={selectedAgent?.assignedStaffName}
+          allProducts={products}
+          onAddToCart={addToCart}
+          onAddMultipleToCart={addMultipleToCart}
+          cartLineProductIds={cartLineProductIds}
+        />
 
         {/* ── Card 2: Thông tin giao hàng (SCRUM-474) ── */}
         <section className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-3.5 sm:p-4 shadow-sm space-y-3">
