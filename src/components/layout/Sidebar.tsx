@@ -23,6 +23,7 @@ import {
   PlusCircle,
   ShoppingCart,
   History,
+  Route as RouteIcon,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { UserRole } from '../../types/User';
@@ -323,6 +324,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
             'Manager',
             'Staff',
           ],
+        },
+        {
+          title: 'Phân tuyến & Điều xe',
+          path: '/inventory/routing',
+          icon: <RouteIcon className="w-5 h-5" />,
+          allowedRoles: ALL_ROLES,
         },
       ],
     },
