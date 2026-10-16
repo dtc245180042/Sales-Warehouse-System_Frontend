@@ -328,4 +328,111 @@ export const orderService = {
     });
     return res.data;
   },
+
+  updateDraft: async (id: string, data: any): Promise<Order> => {
+    try {
+      const res = await apiClient.put(`/orders/${encodeURIComponent(id)}/draft`, data);
+      return mapApiOrder(res.data.order || res.data);
+    } catch (err) {
+      console.warn('[orderService] Backend error, updating draft locally:', err);
+      const orders = getStorageItem<Order[]>(STORAGE_KEY, initialOrders);
+      const idx = orders.findIndex((o) => o.id === id || o.code === id);
+      if (idx !== -1) {
+        orders[idx] = { ...orders[idx], ...data, updatedAt: new Date().toISOString() };
+        setStorageItem(STORAGE_KEY, [...orders]);
+        return orders[idx];
+      }
+      throw new Error('Draft not found');
+    }
+  },
+
+  submitDraft: async (id: string): Promise<Order> => {
+    try {
+      const res = await apiClient.post(`/orders/${encodeURIComponent(id)}/submit`);
+      return mapApiOrder(res.data.order || res.data);
+    } catch (err) {
+      console.warn('[orderService] Backend error, submitting draft locally:', err);
+      const orders = getStorageItem<Order[]>(STORAGE_KEY, initialOrders);
+      const idx = orders.findIndex((o) => o.id === id || o.code === id);
+      if (idx !== -1) {
+        orders[idx] = { ...orders[idx], status: 'pending', updatedAt: new Date().toISOString() };
+        setStorageItem(STORAGE_KEY, [...orders]);
+        return orders[idx];
+      }
+      throw new Error('Draft not found');
+    }
+  },
+
+  getDrafts: async (): Promise<Order[]> => {
+    const all = await orderService.getAll();
+    return all.filter((o) => o.status === 'draft');
+  },
+
+  getPurchaseHistorySuggestions: async (customerId: string, windowDays: number = 90): Promise<any> => {
+    try {
+      const res = await apiClient.get(
+        `/orders/suggestions/${encodeURIComponent(customerId)}?window_days=${windowDays}`
+      );
+      return res.data;
+    } catch {
+      return {
+        customerId,
+        windowDays,
+        items: [],
+        groups: [],
+      };
+    }
+  },
+
+  searchProductsForOrder: async (query: string): Promise<any[]> => {
+    try {
+      const res = await apiClient.get(`/products?search=${encodeURIComponent(query)}`);
+      if (Array.isArray(res.data)) {
+        return res.data.map((p: any) => ({
+          id: p.id,
+          sku: p.sku,
+          name: p.name,
+          unit: p.unit || 'cái',
+          price: Number(p.salePrice || p.price || 0),
+          stock: Number(p.stock || 0),
+          availableUnits: [p.unit || 'cái', 'hộp', 'thùng'],
+          category: p.category,
+        }));
+      }
+    } catch {
+      // fallback
+    }
+    const all = await productService.getAll();
+    return all
+      .filter((p) => p.name.toLowerCase().includes(query.toLowerCase()) || p.sku.toLowerCase().includes(query.toLowerCase()))
+      .map((p) => ({
+        id: p.id,
+        sku: p.sku,
+        name: p.name,
+        unit: p.unit || 'cái',
+        price: p.salePrice,
+        stock: p.stock,
+        availableUnits: [p.unit || 'cái', 'hộp', 'thùng'],
+        category: p.category,
+      }));
+  },
+
+  calculate: async (params: { customer_id: string; items: any[] }): Promise<any> => {
+    try {
+      const res = await apiClient.post('/orders/calculate', params);
+      return res.data;
+    } catch {
+      const subtotal = params.items.reduce((s, itm) => s + Number(itm.price || 0) * Number(itm.quantity || 1), 0);
+      return {
+        subtotal,
+        discount: 0,
+        total: subtotal,
+        items: params.items.map((i) => ({
+          product_id: i.product_id,
+          subtotal: Number(i.price || 0) * Number(i.quantity || 1),
+          discount_amount: 0,
+        })),
+      };
+    }
+  },
 };

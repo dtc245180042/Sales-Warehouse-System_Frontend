@@ -23,6 +23,9 @@ import {
   PlusCircle,
   ShoppingCart,
   History,
+  Truck,
+  DollarSign,
+  FileText,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { UserRole } from '../../types/User';
@@ -322,6 +325,54 @@ export const Sidebar: React.FC<SidebarProps> = ({
             'Director',
             'Manager',
             'Staff',
+          ],
+        },
+        {
+          title: 'Theo dõi chuyến giao',
+          path: '/delivery',
+          icon: <Truck className="w-5 h-5" />,
+          allowedRoles: [
+            'Admin',
+            'WarehouseManager',
+            'WarehouseStaff',
+            'Director',
+            'Manager',
+          ],
+        },
+      ],
+    },
+    {
+      heading: 'TÀI CHÍNH & KẾ TOÁN',
+      items: [
+        {
+          title: 'Khoản thu theo tuyến',
+          path: '/accounting/collection',
+          icon: <DollarSign className="w-5 h-5" />,
+          allowedRoles: [
+            'Admin',
+            'SalesManager',
+            'SalesStaff',
+            'Accountant',
+            'Director',
+            'Manager',
+          ],
+        },
+        {
+          title: 'Xác nhận khoản thu',
+          path: '/accounting/collection/confirm',
+          icon: <Receipt className="w-5 h-5" />,
+          allowedRoles: ['Admin', 'Accountant', 'Director', 'Manager'],
+        },
+        {
+          title: 'Đối chiếu công nợ',
+          path: '/accounting/reconciliation',
+          icon: <FileText className="w-5 h-5" />,
+          allowedRoles: [
+            'Admin',
+            'SalesManager',
+            'Accountant',
+            'Director',
+            'Manager',
           ],
         },
       ],

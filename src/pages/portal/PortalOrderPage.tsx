@@ -18,6 +18,7 @@ import {
   MapPin,
   Clock,
   LogOut,
+  FileText,
 } from 'lucide-react';
 const generateUUID = (): string => {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -255,6 +256,13 @@ export const PortalOrderPage: React.FC = () => {
           >
             <Package className="w-4 h-4" />
             <span>Theo Dõi Đơn Hàng Của Tôi</span>
+          </button>
+          <button
+            onClick={() => navigate('/portal/reconciliation')}
+            className="flex items-center gap-2 py-3 px-4 text-xs font-semibold border-b-2 border-transparent text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 transition"
+          >
+            <FileText className="w-4 h-4" />
+            <span>Đối Chiếu Công Nợ</span>
           </button>
         </div>
       </header>

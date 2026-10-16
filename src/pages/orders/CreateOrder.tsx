@@ -179,7 +179,7 @@ export const CreateOrder: React.FC = () => {
           });
 
           // Delivery details
-          if (draft.deliveryAddressId) setSelectedAddressId(draft.deliveryAddressId);
+          if (draft.deliveryAddressId) setSelectedAddressId(Number(draft.deliveryAddressId));
           if (draft.deliveryAddress) setCustomAddress(draft.deliveryAddress);
           if (draft.deliveryReceiverName) setReceiverName(draft.deliveryReceiverName);
           if (draft.deliveryPhone) setReceiverPhone(draft.deliveryPhone);
@@ -363,7 +363,7 @@ export const CreateOrder: React.FC = () => {
         setItems((prev) =>
           prev.map((item) => {
             const resItem = res.items.find(
-              (ri) => String(ri.product_id) === String(item.productId)
+              (ri: any) => String(ri.product_id) === String(item.productId)
             );
             if (resItem) {
               return {
@@ -522,7 +522,7 @@ export const CreateOrder: React.FC = () => {
     let addedCount = 0;
     let mergedCount = 0;
 
-    suggestionsData.lastOrder.items.forEach((it) => {
+    suggestionsData.lastOrder.items.forEach((it: any) => {
       const existingIndex = updated.findIndex((i) => String(i.productId) === String(it.productId));
       if (existingIndex !== -1) {
         updated[existingIndex].quantity += it.quantity;
@@ -578,13 +578,15 @@ export const CreateOrder: React.FC = () => {
       })),
       subtotal: calculatedSubtotal,
       discount: calculatedDiscount,
+      tax: 0,
       total: calculatedTotal,
       paidAmount: 0,
+      changeAmount: 0,
       paymentMethod: 'transfer' as const,
       paymentStatus: 'unpaid' as const,
       status: status,
       staffId: user?.id ? String(user.id) : '1',
-      staffName: user?.username || user?.fullName || 'Nhân viên kinh doanh',
+      staffName: (user as any)?.username || user?.fullName || user?.name || 'Nhân viên kinh doanh',
       note: note.trim() || undefined,
       deliveryAddressId: selectedAddressId,
       deliveryAddressName: selectedAddr?.name,
@@ -733,7 +735,7 @@ export const CreateOrder: React.FC = () => {
     const c = customers.find((cust) => cust.id === draft.customerId || cust.code === draft.customerId);
     if (c) setSelectedCustomer(c);
 
-    if (draft.deliveryAddressId) setSelectedAddressId(draft.deliveryAddressId);
+    if (draft.deliveryAddressId) setSelectedAddressId(Number(draft.deliveryAddressId));
     if (draft.deliveryAddress) setCustomAddress(draft.deliveryAddress);
     if (draft.deliveryReceiverName) setReceiverName(draft.deliveryReceiverName);
     if (draft.deliveryPhone) setReceiverPhone(draft.deliveryPhone);
@@ -1177,7 +1179,7 @@ export const CreateOrder: React.FC = () => {
                         >
                           Tất cả ({suggestionsData.items.length})
                         </button>
-                        {suggestionsData.groups.map((grp) => (
+                        {suggestionsData.groups.map((grp: any) => (
                           <button
                             key={grp.category}
                             type="button"
@@ -1197,8 +1199,8 @@ export const CreateOrder: React.FC = () => {
                     {/* Danh sách các nhóm hàng (Groups) */}
                     <div className="space-y-3">
                       {suggestionsData.groups
-                        .filter((grp) => selectedCategoryTab === 'all' || selectedCategoryTab === grp.category)
-                        .map((group) => (
+                        .filter((grp: any) => selectedCategoryTab === 'all' || selectedCategoryTab === grp.category)
+                        .map((group: any) => (
                           <div
                             key={group.category}
                             className="bg-white/95 dark:bg-slate-800/90 border border-indigo-100/90 dark:border-slate-700/80 rounded-xl p-3 shadow-xs space-y-2.5"
@@ -1228,7 +1230,7 @@ export const CreateOrder: React.FC = () => {
 
                             {/* Danh sách các món trong nhóm */}
                             <div className="grid grid-cols-1 gap-2">
-                              {group.items.map((item) => {
+                              {group.items.map((item: any) => {
                                 const inCartItem = items.find(
                                   (i) => String(i.productId) === String(item.productId)
                                 );

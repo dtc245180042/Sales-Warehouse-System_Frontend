@@ -19,6 +19,7 @@ export interface Agent {
   totalOrders: number;
   totalSpent: number;
   outstandingDebt: number;         // Công nợ tồn
+  creditLimit?: number;            // Hạn mức tín dụng
   lastOrderDate?: string;
   createdAt: string;
   status: AgentStatus;

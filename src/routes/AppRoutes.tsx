@@ -64,6 +64,18 @@ import { POS } from '../pages/sales/POS';
 import { Orders } from '../pages/sales/Orders';
 import { OrderDetail } from '../pages/sales/OrderDetail';
 
+// Giao hàng & Theo dõi chuyến (SCRUM-258: 680, 681, 685)
+import { DeliveryListPage } from '../pages/delivery/DeliveryListPage';
+import { DeliveryDetailPage } from '../pages/delivery/DeliveryDetailPage';
+
+// Khoản thu theo tuyến & Xác nhận (SCRUM-266: 740, 741)
+import { CollectionReceiptPage } from '../pages/accounting/CollectionReceiptPage';
+import { CollectionConfirmPage } from '../pages/accounting/CollectionConfirmPage';
+
+// Biên bản đối chiếu công nợ (SCRUM-267: 747, 749, 750)
+import { DebtReconciliationPage } from '../pages/accounting/DebtReconciliationPage';
+import { PortalReconciliationPage } from '../pages/portal/PortalReconciliationPage';
+
 // All 7 business roles allowed in Sprint 1 & 2 backoffice
 const ALL_BACKOFFICE_ROLES: UserRole[] = [
   'Admin',
@@ -472,6 +484,58 @@ export const AppRoutes: React.FC = () => {
             </ProtectedRoute>
           }
         />
+
+        {/* ============================================================ */}
+        {/* GIAO HÀNG & THEO DÕI CHUYẾN (SCRUM-258: 680, 681, 685)      */}
+        {/* ============================================================ */}
+        <Route
+          path="/delivery"
+          element={
+            <ProtectedRoute allowedRoles={['WarehouseManager', 'WarehouseStaff', 'Admin', 'Director', 'Manager']}>
+              <DeliveryListPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/delivery/:id"
+          element={
+            <ProtectedRoute allowedRoles={['WarehouseManager', 'WarehouseStaff', 'Admin', 'Director', 'Manager']}>
+              <DeliveryDetailPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* ============================================================ */}
+        {/* KẾ TOÁN & KHOẢN THU THEO TUYẾN (SCRUM-266: 740, 741)         */}
+        {/* ============================================================ */}
+        <Route
+          path="/accounting/collection"
+          element={
+            <ProtectedRoute allowedRoles={['SalesStaff', 'SalesManager', 'Accountant', 'Admin', 'Director', 'Manager']}>
+              <CollectionReceiptPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/accounting/collection/confirm"
+          element={
+            <ProtectedRoute allowedRoles={['Accountant', 'Admin', 'Director', 'Manager']}>
+              <CollectionConfirmPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* ============================================================ */}
+        {/* ĐỐI CHIẾU CÔNG NỢ (SCRUM-267: 747, 749)                      */}
+        {/* ============================================================ */}
+        <Route
+          path="/accounting/reconciliation"
+          element={
+            <ProtectedRoute allowedRoles={['SalesManager', 'Accountant', 'Admin', 'Director', 'Manager']}>
+              <DebtReconciliationPage />
+            </ProtectedRoute>
+          }
+        />
       </Route>
 
       {/* Cổng Đại lý tự đặt hàng B2B 24/7 Mobile & Desktop (S4-10, SCRUM-242) */}
@@ -495,6 +559,15 @@ export const AppRoutes: React.FC = () => {
       <Route
         path="/portal"
         element={<Navigate to="/portal/orders" replace />}
+      />
+      {/* Cổng Đại lý đối chiếu công nợ (SCRUM-267: 750) */}
+      <Route
+        path="/portal/reconciliation"
+        element={
+          <ProtectedRoute allowedRoles={['Customer', 'User', 'Admin']}>
+            <PortalReconciliationPage />
+          </ProtectedRoute>
+        }
       />
 
       {/* Fallback 404 Route - SCRUM-204 */}
