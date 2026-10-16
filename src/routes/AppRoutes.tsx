@@ -57,6 +57,9 @@ import { InventoryHistory } from '../pages/inventory/InventoryHistory';
 import { PortalOrderPage } from '../pages/portal/PortalOrderPage';
 import { PortalOrdersPage } from '../pages/portal/PortalOrdersPage';
 
+// Stock Dispatch & Delivery Confirmation (S6-08 / SC-259)
+import { StockDispatchListPage } from '../pages/inventory/StockDispatchListPage';
+
 // Agent & Sales Pages (SCRUM-229, SCRUM-230, SCRUM-347)
 import { AgentList } from '../pages/agents/AgentList';
 import { AgentOrderCreate } from '../pages/agents/AgentOrderCreate';
@@ -469,6 +472,15 @@ export const AppRoutes: React.FC = () => {
           element={
             <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
               <OrderDetail />
+            </ProtectedRoute>
+          }
+        />
+        {/* S6-08 / SC-259: Phiếu xuất kho & Xác nhận giao hàng */}
+        <Route
+          path="/inventory/dispatches"
+          element={
+            <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
+              <StockDispatchListPage />
             </ProtectedRoute>
           }
         />

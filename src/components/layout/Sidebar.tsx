@@ -23,6 +23,7 @@ import {
   PlusCircle,
   ShoppingCart,
   History,
+  Truck,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { UserRole } from '../../types/User';
@@ -308,6 +309,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
             'WarehouseStaff',
             'Director',
             'Manager',
+          ],
+        },
+        {
+          title: 'Phiếu xuất kho điều phối',
+          path: '/inventory/dispatches',
+          icon: <Truck className="w-5 h-5" />,
+          allowedRoles: [
+            'Admin',
+            'WarehouseManager',
+            'WarehouseStaff',
+            'SalesManager',
+            'Director',
+            'Manager',
+            'Staff',
           ],
         },
         {
