@@ -47,6 +47,8 @@ import { InventoryReport } from '../pages/reports/InventoryReport';
 
 // Inventory & Warehouse Pages (SCRUM-537, SCRUM-538, SCRUM-599, SCRUM-601)
 import { InventoryOverview } from '../pages/inventory/InventoryOverview';
+import { PickingListsPage } from '../pages/inventory/PickingListsPage';
+import { PickingDetailPage } from '../pages/inventory/PickingDetailPage';
 import { WarehouseListPage } from '../pages/inventory/WarehouseListPage';
 import { MinStockConfigPage } from '../pages/inventory/MinStockConfigPage';
 import { StockIn } from '../pages/inventory/StockIn';
@@ -391,6 +393,14 @@ export const AppRoutes: React.FC = () => {
               <StockOut />
             </ProtectedRoute>
           }
+        />
+        <Route
+          path="/inventory/picking-lists"
+          element={<ProtectedRoute allowedRoles={['Admin', 'WarehouseManager', 'WarehouseStaff']}><PickingListsPage /></ProtectedRoute>}
+        />
+        <Route
+          path="/inventory/picking-lists/:id"
+          element={<ProtectedRoute allowedRoles={['Admin', 'WarehouseManager', 'WarehouseStaff']}><PickingDetailPage /></ProtectedRoute>}
         />
         <Route
           path="/inventory/history"
