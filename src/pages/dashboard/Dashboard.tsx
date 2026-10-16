@@ -7,6 +7,7 @@ import {
   KeyRound,
   CheckCircle2,
   Users2,
+  TrendingUp,
 } from 'lucide-react';
 import { PageContainer } from '../../components/layout/PageContainer';
 import { Badge } from '../../components/common/Badge';
@@ -15,7 +16,6 @@ import { useAuth } from '../../contexts/AuthContext';
 import { formatDate } from '../../utils/formatters';
 import { getRoleDisplayName } from '../../utils/roleUtils';
 import { ChangePasswordModal } from '../../components/common/ChangePasswordModal';
-import { LowStockWarningWidget } from '../../components/inventory/LowStockWarningWidget';
 
 export const Dashboard: React.FC = () => {
   const { user, role } = useAuth();
@@ -28,14 +28,24 @@ export const Dashboard: React.FC = () => {
       subtitle={`Chào mừng ${user?.name || 'bạn'} quay trở lại hệ thống OMS Pro`}
       actions={
         <div className="flex items-center gap-2.5">
-          {role === 'Admin' && (
+          {['Admin', 'SalesManager', 'Director', 'Manager'].includes(role) && (
             <Button
               variant="primary"
+              size="sm"
+              leftIcon={<TrendingUp className="w-4 h-4" />}
+              onClick={() => navigate('/executive-dashboard')}
+            >
+              Dashboard Điều hành
+            </Button>
+          )}
+          {role === 'Admin' && (
+            <Button
+              variant="outline"
               size="sm"
               leftIcon={<Users2 className="w-4 h-4" />}
               onClick={() => navigate('/users')}
             >
-              Quản lý người dùng & phân quyền
+              Quản lý người dùng
             </Button>
           )}
           <Button
@@ -101,9 +111,6 @@ export const Dashboard: React.FC = () => {
             </div>
           </div>
         </div>
-
-        {/* Widget Cảnh Báo Tồn Kho Dưới Ngưỡng (SCRUM-604) */}
-        <LowStockWarningWidget maxItems={5} />
       </div>
 
       {/* Modal Đổi mật khẩu (SCRUM-201) */}

@@ -16,6 +16,7 @@ import { ErrorBoundary } from '../components/common/ErrorBoundary';
 
 // Core Dashboard & Management Pages (Sprint 1: SCRUM-198, SCRUM-201, SCRUM-202, SCRUM-205, SCRUM-206, SCRUM-207)
 import { Dashboard } from '../pages/dashboard/Dashboard';
+import { ExecutiveDashboardPage } from '../pages/dashboard/ExecutiveDashboardPage';
 import { UserManagement } from '../pages/users/UserManagement';
 import { UserImportPage } from '../pages/users/UserImportPage';
 import { Settings } from '../pages/settings/Settings';
@@ -24,9 +25,21 @@ import { PriceListManagement } from '../pages/sales/PriceListManagement';
 import { VolumeDiscountManagementPage } from '../pages/sales/VolumeDiscountManagementPage';
 import { CategoryManagement } from '../pages/categories/CategoryManagement';
 
+// Orders & Field Sales (SCRUM-230, S3-09)
+import { CreateOrder } from '../pages/orders/CreateOrder';
+
 // Supplier Management Pages (SCRUM-217)
 import { SupplierList } from '../pages/suppliers/SupplierList';
 import { SupplierDetail } from '../pages/suppliers/SupplierDetail';
+
+// Customer & Agency Pages (Sprint 3: SC-224, SC-228, SC-229)
+import { CustomerList } from '../pages/customers/CustomerList';
+import { CustomerDetail } from '../pages/customers/CustomerDetail';
+
+// Sales & Order Pages (SC-228, SC-230)
+import { POS } from '../pages/sales/POS';
+import { Orders } from '../pages/sales/Orders';
+import { OrderDetail } from '../pages/sales/OrderDetail';
 
 // Sprint 2 Pages - Activity Log (SCRUM-212)
 import ActivityLogPage from '../pages/activitylog/ActivityLogPage';
@@ -38,31 +51,54 @@ import { ProductCreate } from '../pages/products/ProductCreate';
 import { ProductEdit } from '../pages/products/ProductEdit';
 import { ProductUnitPage } from '../pages/products/ProductUnitPage';
 import { ProductImportPage } from '../pages/products/ProductImportPage';
-import { ProductPriceHistoryPage } from '../pages/products/ProductPriceHistory';
+import { PriceHistoryPage } from '../pages/products/PriceHistoryPage';
 
 // Report Pages (Báo cáo bán hàng theo ngành hàng & Doanh thu)
 import { SalesReport } from '../pages/reports/SalesReport';
 import { RevenueReport } from '../pages/reports/RevenueReport';
 import { InventoryReport } from '../pages/reports/InventoryReport';
+import { SalesMultiDimReport } from '../pages/reports/SalesMultiDimReport';
+import { InventoryTurnoverReport } from '../pages/reports/InventoryTurnoverReport';
 
-// Inventory & Warehouse Pages (SCRUM-537, SCRUM-538, SCRUM-599, SCRUM-601)
+// Inventory & Stock Ledger & Stock Take Pages
 import { InventoryOverview } from '../pages/inventory/InventoryOverview';
-import { WarehouseListPage } from '../pages/inventory/WarehouseListPage';
-import { MinStockConfigPage } from '../pages/inventory/MinStockConfigPage';
 import { StockIn } from '../pages/inventory/StockIn';
 import { StockOut } from '../pages/inventory/StockOut';
 import { InventoryHistory } from '../pages/inventory/InventoryHistory';
+import { StockTakeList } from '../pages/inventory/StockTakeList';
+import { StockTakeCreate } from '../pages/inventory/StockTakeCreate';
+import { StockTakeDetail } from '../pages/inventory/StockTakeDetail';
 
-// Portal B2B Pages (S4-10, S5-01 / SCRUM-243)
+// Cổng Đại Lý B2B (S4-10, SCRUM-242 & S5-01, SCRUM-243)
 import { PortalOrderPage } from '../pages/portal/PortalOrderPage';
 import { PortalOrdersPage } from '../pages/portal/PortalOrdersPage';
 
-// Agent & Sales Pages (SCRUM-229, SCRUM-230, SCRUM-347)
-import { AgentList } from '../pages/agents/AgentList';
-import { AgentOrderCreate } from '../pages/agents/AgentOrderCreate';
-import { POS } from '../pages/sales/POS';
-import { Orders } from '../pages/sales/Orders';
-import { OrderDetail } from '../pages/sales/OrderDetail';
+// Kho & Chuyển kho nội bộ (S5-07, EP-05, SCRUM-574, SCRUM-576, SCRUM-577, SCRUM-578)
+import { StockTransferList } from '../pages/inventory/StockTransferList';
+import { StockTransferCreate } from '../pages/inventory/StockTransferCreate';
+import { StockTransferDetail } from '../pages/inventory/StockTransferDetail';
+
+// Quản lý lô hàng & Xuất kho điều phối
+import { LotManagementPage } from '../pages/inventory/LotManagementPage';
+import { StockDispatchListPage } from '../pages/inventory/StockDispatchListPage';
+import { BackorderListPage } from '../pages/inventory/BackorderListPage';
+
+// Hóa đơn VAT & Phiếu thu công nợ
+import { InvoiceListPage } from '../pages/invoices/InvoiceListPage';
+import { PaymentListPage } from '../pages/payments/PaymentListPage';
+
+// Trả hàng & Giảm nợ
+import { ReturnListPage } from '../pages/returns/ReturnListPage';
+import { CreditNoteListPage } from '../pages/credit-notes/CreditNoteListPage';
+
+// Điều chỉnh tồn kho & Duyệt phiếu (SCRUM-274: SCRUM-790, SCRUM-794)
+import { StockAdjustList } from '../pages/inventory/StockAdjustList';
+import { StockAdjustCreate } from '../pages/inventory/StockAdjustCreate';
+import { StockAdjustDetail } from '../pages/inventory/StockAdjustDetail';
+
+// Quản lý chỉ tiêu doanh số & Tiến độ (SCRUM-275: SCRUM-802, SCRUM-803, SCRUM-805)
+import { SalesTargetManagement } from '../pages/sales/SalesTargetManagement';
+import { SalesTargetProgress } from '../pages/sales/SalesTargetProgress';
 
 // All 7 business roles allowed in Sprint 1 & 2 backoffice
 const ALL_BACKOFFICE_ROLES: UserRole[] = [
@@ -131,6 +167,24 @@ export const AppRoutes: React.FC = () => {
           element={
             <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
               <Dashboard />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Dashboard Điều Hành Bán Hàng & Kho (SC-276 / S8-05) */}
+        <Route
+          path="/executive-dashboard"
+          element={
+            <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
+              <ExecutiveDashboardPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard/executive"
+          element={
+            <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
+              <ExecutiveDashboardPage />
             </ProtectedRoute>
           }
         />
@@ -215,6 +269,58 @@ export const AppRoutes: React.FC = () => {
           }
         />
 
+        {/* Quản lý Khách hàng & Đại lý (SC-224, SC-228, SC-229) */}
+        <Route
+          path="/customers"
+          element={
+            <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
+              <CustomerList />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/customers/:id"
+          element={
+            <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
+              <CustomerDetail />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Tạo đơn hiện trường Mobile 360px (SCRUM-230, S3-09) */}
+        <Route
+          path="/orders/create"
+          element={
+            <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
+              <CreateOrder />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/sales/pos"
+          element={
+            <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
+              <POS />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/orders"
+          element={
+            <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
+              <Orders />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/orders/:id"
+          element={
+            <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
+              <OrderDetail />
+            </ProtectedRoute>
+          }
+        />
+
         {/* Hồ sơ cá nhân - Xem và cập nhật họ tên, SĐT Việt Nam - Mọi vai trò (SCRUM-210, SCRUM-361) */}
         <Route
           path="/profile"
@@ -281,6 +387,14 @@ export const AppRoutes: React.FC = () => {
           }
         />
         <Route
+          path="/products/price-history"
+          element={
+            <ProtectedRoute allowedRoles={['Admin', 'SalesManager', 'SalesStaff', 'Accountant', 'Director', 'Manager']}>
+              <PriceHistoryPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/products/import"
           element={
             <ProtectedRoute allowedRoles={['Admin', 'SalesManager', 'Director', 'Manager']}>
@@ -304,19 +418,71 @@ export const AppRoutes: React.FC = () => {
             </ProtectedRoute>
           }
         />
+
+        {/* ============================================================ */}
+        {/* KHO & CHUYỂN KHO NỘI BỘ (S5-07, EP-05, SCRUM-574 - 578)       */}
+        {/* ============================================================ */}
         <Route
-          path="/products/price-history"
+          path="/inventory"
           element={
-            <ProtectedRoute allowedRoles={['Admin', 'SalesManager', 'SalesStaff', 'WarehouseManager', 'WarehouseStaff', 'Director', 'Manager', 'Staff']}>
-              <ProductPriceHistoryPage />
+            <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
+              <InventoryOverview />
             </ProtectedRoute>
           }
         />
         <Route
-          path="/products/:id/price-history"
+          path="/inventory/overview"
           element={
-            <ProtectedRoute allowedRoles={['Admin', 'SalesManager', 'SalesStaff', 'WarehouseManager', 'WarehouseStaff', 'Director', 'Manager', 'Staff']}>
-              <ProductPriceHistoryPage />
+            <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
+              <InventoryOverview />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/inventory/transfers"
+          element={
+            <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
+              <StockTransferList />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/inventory/transfers/create"
+          element={
+            <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
+              <StockTransferCreate />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/inventory/transfers/:id"
+          element={
+            <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
+              <StockTransferDetail />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/inventory/stock-in"
+          element={
+            <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
+              <StockIn />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/inventory/stock-out"
+          element={
+            <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
+              <StockOut />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/inventory/history"
+          element={
+            <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
+              <InventoryHistory />
             </ProtectedRoute>
           }
         />
@@ -343,14 +509,30 @@ export const AppRoutes: React.FC = () => {
         <Route
           path="/reports/inventory"
           element={
-            <ProtectedRoute allowedRoles={['Admin', 'WarehouseManager', 'WarehouseStaff', 'Director', 'Manager']}>
+            <ProtectedRoute allowedRoles={['Admin', 'WarehouseManager', 'WarehouseStaff', 'Director', 'Manager', 'Accountant']}>
               <InventoryReport />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/reports/sales-multidim"
+          element={
+            <ProtectedRoute allowedRoles={['Admin', 'SalesManager', 'Director', 'Manager', 'Accountant', 'SalesStaff']}>
+              <SalesMultiDimReport />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/reports/inventory-turnover"
+          element={
+            <ProtectedRoute allowedRoles={['Admin', 'WarehouseManager', 'WarehouseStaff', 'Director', 'Manager', 'Accountant']}>
+              <InventoryTurnoverReport />
             </ProtectedRoute>
           }
         />
 
         {/* ============================================================ */}
-        {/* KHO VẬN & TỒN KHO (SCRUM-537, SCRUM-538, SCRUM-599, SCRUM-601)*/}
+        {/* QUẢN LÝ KHO HÀNG, SỔ TỒN KHO 3 CỘT & KIỂM KÊ (S5-08)         */}
         {/* ============================================================ */}
         <Route
           path="/inventory"
@@ -361,25 +543,17 @@ export const AppRoutes: React.FC = () => {
           }
         />
         <Route
-          path="/inventory/warehouses"
+          path="/inventory/overview"
           element={
-            <ProtectedRoute allowedRoles={['Admin', 'WarehouseManager', 'Director', 'Manager']}>
-              <WarehouseListPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/inventory/min-stock"
-          element={
-            <ProtectedRoute allowedRoles={['Admin', 'WarehouseManager', 'Director', 'Manager']}>
-              <MinStockConfigPage />
+            <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
+              <InventoryOverview />
             </ProtectedRoute>
           }
         />
         <Route
           path="/inventory/stock-in"
           element={
-            <ProtectedRoute allowedRoles={['Admin', 'WarehouseManager', 'WarehouseStaff', 'Director', 'Manager']}>
+            <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
               <StockIn />
             </ProtectedRoute>
           }
@@ -387,7 +561,7 @@ export const AppRoutes: React.FC = () => {
         <Route
           path="/inventory/stock-out"
           element={
-            <ProtectedRoute allowedRoles={['Admin', 'WarehouseManager', 'WarehouseStaff', 'Director', 'Manager']}>
+            <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
               <StockOut />
             </ProtectedRoute>
           }
@@ -400,15 +574,83 @@ export const AppRoutes: React.FC = () => {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/inventory/stock-takes"
+          element={
+            <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
+              <StockTakeList />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/inventory/stock-takes/create"
+          element={
+            <ProtectedRoute allowedRoles={['Admin', 'WarehouseManager', 'WarehouseStaff', 'Director', 'Manager']}>
+              <StockTakeCreate />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/inventory/stock-takes/new"
+          element={
+            <ProtectedRoute allowedRoles={['Admin', 'WarehouseManager', 'WarehouseStaff', 'Director', 'Manager']}>
+              <StockTakeCreate />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/inventory/stock-takes/:id"
+          element={
+            <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
+              <StockTakeDetail />
+            </ProtectedRoute>
+          }
+        />
 
         {/* ============================================================ */}
-        {/* KÊNH ĐẠI LÝ & TẠO ĐƠN (SCRUM-229, SCRUM-230, SCRUM-347)       */}
+        {/* ĐIỀU CHỈNH TỒN KHO & DUYỆT PHIẾU (SCRUM-274: SCRUM-790/794) */}
+        {/* ============================================================ */}
+        <Route
+          path="/inventory/adjustments"
+          element={
+            <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
+              <StockAdjustList />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/inventory/adjustments/create"
+          element={
+            <ProtectedRoute allowedRoles={['Admin', 'WarehouseManager', 'WarehouseStaff', 'Director', 'Manager']}>
+              <StockAdjustCreate />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/inventory/adjustments/:id"
+          element={
+            <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
+              <StockAdjustDetail />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* ============================================================ */}
+        {/* HỢP NHẤT ĐẠI LÝ & KHÁCH HÀNG (EP-03) - REDIRECT TƯƠNG THÍCH   */}
         {/* ============================================================ */}
         <Route
           path="/agents"
           element={
             <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
-              <AgentList />
+              <Navigate to="/customers" replace />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/agents/:id"
+          element={
+            <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
+              <Navigate to="/customers" replace />
             </ProtectedRoute>
           }
         />
@@ -416,7 +658,7 @@ export const AppRoutes: React.FC = () => {
           path="/agents/orders/new"
           element={
             <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
-              <AgentOrderCreate />
+              <Navigate to="/orders/create" replace />
             </ProtectedRoute>
           }
         />
@@ -472,9 +714,97 @@ export const AppRoutes: React.FC = () => {
             </ProtectedRoute>
           }
         />
+
+        {/* ============================================================ */}
+        {/* QUẢN LÝ LÔ HÀNG & ĐIỀU PHỐI XUẤT KHO                         */}
+        {/* ============================================================ */}
+        <Route
+          path="/inventory/lots"
+          element={
+            <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
+              <LotManagementPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/inventory/dispatches"
+          element={
+            <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
+              <StockDispatchListPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/inventory/backorders"
+          element={
+            <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
+              <BackorderListPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* ============================================================ */}
+        {/* HÓA ĐƠN BÁN HÀNG & PHIẾU THU CÔNG NỢ                         */}
+        {/* ============================================================ */}
+        <Route
+          path="/invoices"
+          element={
+            <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
+              <InvoiceListPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/payments"
+          element={
+            <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
+              <PaymentListPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* ============================================================ */}
+        {/* TRẢ HÀNG & CHỨNG TỪ GIẢM NỢ                                  */}
+        {/* ============================================================ */}
+        <Route
+          path="/returns"
+          element={
+            <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
+              <ReturnListPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/credit-notes"
+          element={
+            <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
+              <CreditNoteListPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* ============================================================ */}
+        {/* QUẢN LÝ CHỈ TIÊU & TIẾN ĐỘ DOANH SỐ (SCRUM-275: 802, 803, 805) */}
+        {/* ============================================================ */}
+        <Route
+          path="/sales/targets"
+          element={
+            <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
+              <SalesTargetManagement />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/sales/targets/progress"
+          element={
+            <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
+              <SalesTargetProgress />
+            </ProtectedRoute>
+          }
+        />
       </Route>
 
-      {/* Cổng Đại lý tự đặt hàng B2B 24/7 Mobile & Desktop (S4-10, SCRUM-242) */}
+      {/* Cổng Đại lý tự đặt hàng B2B 24/7 Mobile & Desktop (SCRUM-242) */}
       <Route
         path="/portal/order"
         element={
