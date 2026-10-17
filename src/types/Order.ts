@@ -18,7 +18,10 @@ export interface OrderItem {
   name: string;
   unit?: string;
   price: number;
-  quantity: number;
+  quantity: number; // Số lượng đặt
+  deliveredQuantity?: number; // Số lượng thực giao (SCRUM-696)
+  shortageReason?: string; // Lý do giao thiếu nếu có (SCRUM-696)
+  unit?: string; // Đơn vị tính (Cái, Chiếc, Bộ, Thùng...)
   discount: number;
   subtotal: number;
 }
@@ -55,6 +58,8 @@ export interface Order {
   staffId: string;
   staffName: string;
   note?: string;
+  hasShortage?: boolean; // Đơn hàng có phát sinh giao thiếu (SCRUM-696)
+  shortageResolution?: string; // Phương án xử lý giao thiếu: bù đợt 2, trừ công nợ...
   expectedDeliveryDate?: string;
   deliveryAddressId?: number | string;
   deliveryAddress?: string;
