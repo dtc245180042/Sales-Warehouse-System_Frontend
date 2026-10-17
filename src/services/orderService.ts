@@ -90,7 +90,7 @@ let activeOrdersFetchPromise: Promise<Order[]> | null = null;
 export const orderService = {
   /** Lấy dữ liệu tức thì từ bộ nhớ cache RAM (0ms) khi chuyển trang qua lại */
   getCached: (): Order[] => {
-    if (memoryCacheOrders && memoryCacheOrders.length > 0) {
+    if (memoryCacheOrders !== null) {
       return memoryCacheOrders;
     }
     const cached = getStorageItem<Order[]>(STORAGE_KEY, []);
@@ -113,7 +113,7 @@ export const orderService = {
     activeOrdersFetchPromise = (async () => {
       try {
         const res = await apiClient.get('/orders');
-        if (Array.isArray(res.data) && res.data.length > 0) {
+        if (Array.isArray(res.data)) {
           const list = res.data.map(mapApiOrder);
           memoryCacheOrders = list;
           lastOrdersFetchTime = Date.now();

@@ -98,7 +98,7 @@ export const api = {
       let list = getStored<ProductItem[]>(STORAGE_KEYS.PRODUCTS, initialMockProducts);
       try {
         const res = await apiClient.get('/products');
-        if (Array.isArray(res.data) && res.data.length > 0) {
+        if (Array.isArray(res.data)) {
           list = res.data.map((p: any) => ({
             id: p.id,
             code: p.sku || p.code || p.id,
@@ -252,7 +252,7 @@ export const api = {
       let list = getStored<UserOrder[]>(STORAGE_KEYS.ORDERS, initialMockOrders);
       try {
         const res = await apiClient.get('/orders');
-        if (Array.isArray(res.data) && res.data.length > 0) {
+        if (Array.isArray(res.data)) {
           list = res.data.map((o: any) => ({
             id: o.id,
             code: o.code,
