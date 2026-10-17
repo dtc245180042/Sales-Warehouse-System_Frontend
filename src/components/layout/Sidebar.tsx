@@ -251,6 +251,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
       heading: 'KHO VẬN & TỒN KHO',
       items: [
         {
+          title: 'Phiếu soạn hàng',
+          path: '/inventory/picking-lists',
+          icon: <ClipboardList className="w-5 h-5" />,
+          allowedRoles: ['Admin', 'WarehouseManager', 'WarehouseStaff'],
+        },
+        {
           title: 'Tổng quan tồn kho',
           path: '/inventory',
           icon: <Package className="w-5 h-5" />,
