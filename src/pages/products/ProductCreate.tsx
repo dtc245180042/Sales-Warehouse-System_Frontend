@@ -17,6 +17,7 @@ export const ProductCreate: React.FC = () => {
 
       await productService.create({
         ...values,
+        image: values.image || '',
         description: values.description || '',
         supplierName,
       });

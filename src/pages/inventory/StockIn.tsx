@@ -32,6 +32,9 @@ import { useToast } from '../../contexts/ToastContext';
 interface StockInItemState extends StockInItem {
   availableUnits: UnitConversion[];
   baseUnit: string;
+  unitName: string;
+  unitRatio: number;
+  baseQty: number;
 }
 
 // ── Helper: build default units khi sản phẩm chưa có cấu hình ──
@@ -126,11 +129,14 @@ export const StockIn: React.FC = () => {
     const validPrice = Math.max(0, price || 0);
     setItems((prev) => {
       const updated = [...prev];
-      updated[index] = {
-        ...updated[index],
-        costPrice: validPrice,
-        subtotal: updated[index].baseQty * validPrice,
-      };
+      const target = updated[index];
+      if (target) {
+        updated[index] = {
+          ...target,
+          costPrice: validPrice,
+          subtotal: target.baseQty * validPrice,
+        };
+      }
       return updated;
     });
   };

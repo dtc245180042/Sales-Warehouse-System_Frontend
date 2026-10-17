@@ -138,6 +138,11 @@ export const AgentOrderCreate: React.FC = () => {
       .catch(() => {});
   }, []);
 
+  // ── S4-02: Hạn mức công nợ & S4-04: Lịch sử mua hàng 90 ngày ──
+  const [creditSummary, setCreditSummary] = useState<any>(null);
+  const [suggestions, setSuggestions] = useState<any>(null);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+
   // Tải dữ liệu ban đầu
   useEffect(() => {
     agentService.getAll().then((data) => {
@@ -153,6 +158,31 @@ export const AgentOrderCreate: React.FC = () => {
     productService.getAll().then(setProducts);
     refreshDraftCount();
   }, [preselectedAgentId, refreshDraftCount]);
+
+  // S4-02 & S4-04: Tự động tải hồ sơ công nợ và gợi ý lịch sử mua hàng 90 ngày khi chọn đại lý
+  useEffect(() => {
+    if (!selectedAgentId) {
+      setCreditSummary(null);
+      setSuggestions(null);
+      return;
+    }
+
+    // 1. Lấy thông tin hạn mức công nợ thời gian thực (S4-02)
+    orderService.getCreditSummary(selectedAgentId).then((res) => {
+      if (res) setCreditSummary(res);
+    });
+
+    // 2. Lấy gợi ý mặt hàng 3 tháng gần nhất (S4-04)
+    setLoadingSuggestions(true);
+    orderService
+      .getSuggestions(selectedAgentId, 90)
+      .then((res) => {
+        if (res) setSuggestions(res);
+      })
+      .finally(() => {
+        setLoadingSuggestions(false);
+      });
+  }, [selectedAgentId]);
 
   // Nghe sự kiện thay đổi chính sách chiết khấu từ các module khác
   useEffect(() => {
@@ -186,6 +216,7 @@ export const AgentOrderCreate: React.FC = () => {
             const fallbackProd: Product = matched || {
               id: it.productId,
               sku: it.sku,
+              barcode: '',
               name: it.name,
               salePrice: it.price,
               costPrice: 0,
@@ -194,6 +225,9 @@ export const AgentOrderCreate: React.FC = () => {
               unit: 'Cái',
               image: '',
               category: 'Chung',
+              supplierId: '',
+              supplierName: '',
+              description: '',
               status: 'active',
               createdAt: '',
               updatedAt: '',
@@ -388,6 +422,57 @@ export const AgentOrderCreate: React.FC = () => {
   const removeLine = (productId: string) => {
     setCart((prev) => prev.filter((l) => l.productId !== productId));
   };
+
+  // ── S4-04: Thêm nhanh mặt hàng từ gợi ý lịch sử 90 ngày (Quy tắc chống trùng dòng) ──
+  const addSuggestionToCart = useCallback(
+    (sug: { product_id: string; sku: string; name: string; avg_quantity?: number; unit?: string }) => {
+      const prod = products.find((p) => p.id === sug.product_id || p.sku === sug.sku);
+      if (!prod) {
+        showToast(`Không tìm thấy sản phẩm ${sug.name || sug.sku} trong danh mục`, 'warning');
+        return;
+      }
+      if (prod.stock <= 0) {
+        showToast(`${prod.name} hiện đã hết hàng khả dụng trong kho`, 'error');
+        return;
+      }
+      const qtyToAdd = Math.max(1, Math.round(sug.avg_quantity || 1));
+      setCart((prev) => {
+        const idx = prev.findIndex((l) => l.productId === prod.id);
+        if (idx >= 0) {
+          const newQty = prev[idx].quantity + qtyToAdd;
+          if (newQty > prod.stock) {
+            showToast(`Kho chỉ còn ${prod.stock} sản phẩm khả dụng, đã cộng tối đa tồn kho`, 'warning');
+            const updated = [...prev];
+            updated[idx] = calculateCartLine(prod, prod.stock, activeTiers);
+            return updated;
+          }
+          const updated = [...prev];
+          updated[idx] = calculateCartLine(prod, newQty, activeTiers);
+          return updated;
+        }
+        const safeQty = Math.min(qtyToAdd, prod.stock);
+        return [...prev, calculateCartLine(prod, safeQty, activeTiers)];
+      });
+      showToast(`Đã thêm ${prod.name} (×${qtyToAdd} ${sug.unit || prod.unit}) từ lịch sử 90 ngày`, 'info');
+    },
+    [products, activeTiers, showToast]
+  );
+
+  // S4-04: Thêm tất cả sản phẩm gợi ý vào đơn
+  const addAllSuggestions = useCallback(() => {
+    if (!suggestions?.suggested_products || suggestions.suggested_products.length === 0) return;
+    let addedCount = 0;
+    suggestions.suggested_products.forEach((sug: any) => {
+      const prod = products.find((p) => p.id === sug.product_id || p.sku === sug.sku);
+      if (prod && prod.stock > 0) {
+        addSuggestionToCart(sug);
+        addedCount++;
+      }
+    });
+    if (addedCount > 0) {
+      showToast(`Đã tự động thêm ${addedCount} mặt hàng thường mua vào đơn!`, 'success');
+    }
+  }, [suggestions, products, addSuggestionToCart, showToast]);
 
   // ── Lưu đơn (nháp hoặc gửi thật) ──
   const handleSubmit = async (draft: boolean) => {
@@ -626,15 +711,87 @@ export const AgentOrderCreate: React.FC = () => {
                 </div>
               </div>
 
-              {/* Cảnh báo công nợ hiện tại nếu có */}
-              {selectedAgent.outstandingDebt > 0 && (
-                <div className="flex items-center gap-1.5 p-2 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg text-xs text-amber-700 dark:text-amber-300">
-                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                  <span>
-                    Công nợ chưa thu: <strong>{formatCurrency(selectedAgent.outstandingDebt)}</strong>
+              {/* S4-02: Widget Hạn Mức & Tình Trạng Công Nợ Thời Gian Thực */}
+              <div className="mt-2 pt-2 border-t border-indigo-200/60 dark:border-indigo-800/40 space-y-2">
+                <div className="flex items-center justify-between text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                  <span className="flex items-center gap-1 text-indigo-700 dark:text-indigo-300">
+                    <Info className="w-3.5 h-3.5" />
+                    Hồ sơ hạn mức công nợ (S4-02)
                   </span>
+                  {creditSummary?.status_display && (
+                    <span
+                      className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
+                        creditSummary.status === 'blocked'
+                          ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300'
+                          : creditSummary.status === 'warning'
+                          ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300'
+                          : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300'
+                      }`}
+                    >
+                      {creditSummary.status_display}
+                    </span>
+                  )}
                 </div>
-              )}
+
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <div className="p-2 bg-white/80 dark:bg-slate-800/80 rounded-xl border border-slate-200 dark:border-slate-700">
+                    <span className="block text-[10px] text-slate-400">Hạn mức</span>
+                    <strong className="text-xs text-slate-900 dark:text-white font-bold">
+                      {formatCurrency(creditSummary?.credit_limit ?? selectedAgent.creditLimit ?? 50000000)}
+                    </strong>
+                  </div>
+                  <div className="p-2 bg-white/80 dark:bg-slate-800/80 rounded-xl border border-slate-200 dark:border-slate-700">
+                    <span className="block text-[10px] text-slate-400">Nợ hiện tại</span>
+                    <strong className="text-xs text-amber-600 dark:text-amber-400 font-bold">
+                      {formatCurrency(creditSummary?.current_debt ?? selectedAgent.outstandingDebt ?? 0)}
+                    </strong>
+                  </div>
+                  <div className="p-2 bg-white/80 dark:bg-slate-800/80 rounded-xl border border-slate-200 dark:border-slate-700">
+                    <span className="block text-[10px] text-slate-400">Còn lại</span>
+                    <strong
+                      className={`text-xs font-bold ${
+                        (creditSummary?.remaining_credit ?? 0) <= 0
+                          ? 'text-rose-600 dark:text-rose-400'
+                          : 'text-emerald-600 dark:text-emerald-400'
+                      }`}
+                    >
+                      {formatCurrency(
+                        creditSummary?.remaining_credit ??
+                          Math.max(
+                            0,
+                            (selectedAgent.creditLimit ?? 50000000) - (selectedAgent.outstandingDebt ?? 0)
+                          )
+                      )}
+                    </strong>
+                  </div>
+                </div>
+
+                {/* Cảnh báo nợ quá hạn */}
+                {creditSummary?.overdue_invoices_count > 0 && (
+                  <div className="flex items-center gap-1.5 p-2 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 rounded-xl text-xs text-rose-700 dark:text-rose-300">
+                    <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+                    <span>
+                      Đại lý có <strong>{creditSummary.overdue_invoices_count} hóa đơn quá hạn</strong> (Tổng nợ quá hạn:{' '}
+                      {formatCurrency(creditSummary.overdue_debt_amount)}).
+                    </span>
+                  </div>
+                )}
+
+                {/* Cảnh báo đơn này vượt hạn mức */}
+                {isDebt &&
+                  grandTotal > (creditSummary?.remaining_credit ?? 50000000) && (
+                    <div className="flex items-center gap-1.5 p-2 bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 rounded-xl text-xs text-amber-800 dark:text-amber-200 animate-pulse">
+                      <AlertCircle className="w-4 h-4 shrink-0 text-amber-600" />
+                      <span>
+                        ⚠️ Đơn hàng ({formatCurrency(grandTotal)}) sẽ làm vượt hạn mức nợ còn lại (
+                        {formatCurrency(
+                          grandTotal - (creditSummary?.remaining_credit ?? 50000000)
+                        )}
+                        ). Đơn sẽ tự động chuyển sang <strong>Chờ Quản lý duyệt ngoại lệ (S4-05)</strong>.
+                      </span>
+                    </div>
+                  )}
+              </div>
             </div>
           ) : (
             <div className="relative">
@@ -740,6 +897,102 @@ export const AgentOrderCreate: React.FC = () => {
           </div>
         </section>
 
+        {/* ── S4-04: Panel Gợi Ý Mặt Hàng Từ Lịch Sử Mua Hàng 90 Ngày ── */}
+        {selectedAgent && (
+          <section className="bg-gradient-to-r from-violet-50/90 to-indigo-50/80 dark:from-slate-900 dark:to-indigo-950/30 rounded-2xl border border-violet-200 dark:border-violet-900/40 p-3.5 sm:p-4 shadow-sm space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-violet-600 text-white flex items-center justify-center shadow-xs">
+                  <Sparkles className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                    Gợi ý mặt hàng thường mua (90 ngày gần nhất)
+                    <span className="px-2 py-0.2 rounded-full text-[10px] font-extrabold bg-violet-200/80 text-violet-800 dark:bg-violet-900/60 dark:text-violet-200">
+                      S4-04
+                    </span>
+                  </h3>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    {loadingSuggestions
+                      ? 'Đang phân tích dữ liệu mua sắm...'
+                      : suggestions?.total_past_orders
+                      ? `Phân tích từ ${suggestions.total_past_orders} đơn hàng đã hoàn tất`
+                      : 'Đại lý chưa có lịch sử mua hàng trong 90 ngày'}
+                  </p>
+                </div>
+              </div>
+
+              {suggestions?.suggested_products && suggestions.suggested_products.length > 0 && (
+                <button
+                  type="button"
+                  onClick={addAllSuggestions}
+                  className="px-2.5 py-1 text-xs font-bold text-violet-700 dark:text-violet-300 bg-white/90 dark:bg-slate-800 hover:bg-violet-100 rounded-xl border border-violet-200 dark:border-violet-700 transition shadow-xs flex items-center gap-1"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Thêm tất cả gợi ý</span>
+                </button>
+              )}
+            </div>
+
+            {loadingSuggestions ? (
+              <div className="py-4 text-center text-xs text-slate-400">
+                Đang tải dữ liệu gợi ý...
+              </div>
+            ) : suggestions?.suggested_products && suggestions.suggested_products.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                {suggestions.suggested_products.map((item: any) => {
+                  const qtySug = Math.max(1, Math.round(item.avg_quantity || 1));
+                  const inCart = cart.find(
+                    (l) => l.productId === item.product_id || l.sku === item.sku
+                  );
+                  return (
+                    <div
+                      key={item.product_id || item.sku}
+                      className="p-2.5 bg-white/90 dark:bg-slate-800/90 rounded-xl border border-violet-100 dark:border-violet-900/50 flex items-center justify-between gap-2 shadow-xs hover:border-violet-300 transition"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-bold text-slate-900 dark:text-white truncate">
+                          {item.name}
+                        </p>
+                        <p className="text-[10px] text-slate-500 dark:text-slate-400 flex items-center gap-2 mt-0.5">
+                          <span>SKU: {item.sku}</span>
+                          <span>·</span>
+                          <span className="font-semibold text-violet-700 dark:text-violet-300">
+                            TB: {qtySug} {item.unit || 'cái'}
+                          </span>
+                          {item.last_order_date && (
+                            <>
+                              <span>·</span>
+                              <span>Gần nhất: {item.last_order_date}</span>
+                            </>
+                          )}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => addSuggestionToCart(item)}
+                        className={`px-2 py-1 rounded-lg text-[11px] font-bold shrink-0 transition flex items-center gap-1 ${
+                          inCart
+                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
+                            : 'bg-violet-600 text-white hover:bg-violet-700 shadow-xs'
+                        }`}
+                        title="Thêm số lượng bình quân vào đơn hàng"
+                      >
+                        <Plus className="w-3 h-3" />
+                        <span>{inCart ? `+${qtySug} (Đã có ${inCart.quantity})` : `+${qtySug}`}</span>
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="py-2 text-center text-xs text-slate-400 italic">
+                Chưa có đơn hàng trong 90 ngày để trích xuất gợi ý. Hãy thêm sản phẩm ở mục bên dưới.
+              </div>
+            )}
+          </section>
+        )}
+
         {/* ── Card 3: Thêm hàng hoá & Chiết khấu theo số lượng (SCRUM-474 + SCRUM-486) ── */}
         <section className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-3.5 sm:p-4 shadow-sm space-y-3">
           <div className="flex items-center justify-between">
@@ -788,18 +1041,6 @@ export const AgentOrderCreate: React.FC = () => {
                       disabled={p.stock <= 0}
                       className="w-full flex items-center gap-3 px-3.5 py-2.5 hover:bg-indigo-50 dark:hover:bg-indigo-950/30 text-left transition-colors border-b border-slate-100 dark:border-slate-800 last:border-0 disabled:opacity-50"
                     >
-                      {p.image ? (
-                        <img
-                          src={p.image}
-                          alt={p.name}
-                          className="w-9 h-9 rounded-lg object-cover bg-slate-100 shrink-0"
-                          onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                        />
-                      ) : (
-                        <div className="w-9 h-9 rounded-lg bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
-                          <Package className="w-4 h-4" />
-                        </div>
-                      )}
                       <div className="min-w-0 flex-1">
                         <p className="text-xs sm:text-sm font-semibold text-slate-900 dark:text-slate-100 truncate">
                           {p.name}
@@ -855,18 +1096,6 @@ export const AgentOrderCreate: React.FC = () => {
                     className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700/60 space-y-2"
                   >
                     <div className="flex items-start gap-2.5">
-                      {line.image ? (
-                        <img
-                          src={line.image}
-                          alt={line.name}
-                          className="w-11 h-11 rounded-lg object-cover bg-slate-200 shrink-0"
-                          onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                        />
-                      ) : (
-                        <div className="w-10 h-10 rounded-lg bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
-                          <Package className="w-4 h-4" />
-                        </div>
-                      )}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-1">
                           <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100 line-clamp-1">

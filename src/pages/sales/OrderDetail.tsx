@@ -12,12 +12,22 @@ import {
   Truck,
   ExternalLink,
   FileText,
+  Calendar,
+  AlertCircle,
+  Copy,
+  Check,
+  XCircle,
+  RotateCcw,
+  ShieldAlert,
 } from 'lucide-react';
 import { PageContainer } from '../../components/layout/PageContainer';
 import { Button } from '../../components/common/Button';
+import { Badge } from '../../components/common/Badge';
+import { Modal } from '../../components/common/Modal';
 import { ConfirmDialog } from '../../components/common/ConfirmDialog';
 import { Loading } from '../../components/common/Loading';
 import { EmptyState } from '../../components/common/EmptyState';
+import { OrderLifecycleTimeline } from '../../components/sales/OrderLifecycleTimeline';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 import { orderService } from '../../services/orderService';
 import { deliveryTrackingService } from '../../services/deliveryTrackingService';
@@ -46,6 +56,20 @@ export const OrderDetail: React.FC = () => {
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
   const [isEditQuantityModalOpen, setIsEditQuantityModalOpen] = useState(false);
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
+  const [isCopying, setIsCopying] = useState(false);
+
+  // S4-05: Modal xử lý phê duyệt ngoại lệ (Reject/Return kèm lý do)
+  const [approvalModalAction, setApprovalModalAction] = useState<'reject' | 'return' | null>(null);
+  const [approvalComment, setApprovalComment] = useState('');
+  const [isProcessingApproval, setIsProcessingApproval] = useState(false);
+
+  const isSalesManagerOrAdmin =
+    user?.role === 'Admin' ||
+    user?.role === 'SalesManager' ||
+    user?.role === 'Manager' ||
+    (user?.role as unknown as string) === 'Sales Manager' ||
+    (user?.role as unknown as string) === 'sales_manager';
 
   const loadData = async () => {
     if (!id) return;
@@ -101,21 +125,95 @@ export const OrderDetail: React.FC = () => {
     }
   };
 
-  const handleCancel = async () => {
+  const handleUpdateStatus = async (nextStatus: OrderStatus, note?: string) => {
     if (!order) return;
     try {
-      const updated = await orderService.cancelOrder(order.id);
+      const updated = await orderService.updateStatus(order.id, nextStatus, note, user?.name);
       setOrder(updated);
-      showToast('Đã hủy đơn hàng thành công', 'success');
+      showToast(`Đã chuyển khâu đơn hàng sang "${nextStatus}" thành công`, 'success');
+    } catch {
+      showToast('Lỗi cập nhật trạng thái đơn hàng', 'error');
+    }
+  };
+
+  // S4-06: Hủy đơn hàng kèm bắt buộc nhập lý do
+  const handleCancel = async () => {
+    if (!order) return;
+    if (!cancelReason.trim() || cancelReason.trim().length < 5) {
+      showToast('Vui lòng nhập lý do hủy đơn (tối thiểu 5 ký tự)', 'warning');
+      return;
+    }
+    try {
+      const updated = await orderService.cancelOrder(order.id, cancelReason.trim(), user?.name || 'Nhân viên');
+      setOrder(updated);
+      showToast('Đã hủy đơn hàng thành công, tồn kho giữ chỗ đã được giải phóng', 'success');
       setIsCancelModalOpen(false);
-      // Reload tracking to reflect cancellation
+      setCancelReason('');
       if (id) {
         const trackingData = await deliveryTrackingService.getByOrderId(id);
         if (trackingData) setTracking(trackingData);
       }
-    } catch {
-      showToast('Lỗi khi hủy đơn hàng', 'error');
+    } catch (err: any) {
+      showToast(err?.message || 'Lỗi khi hủy đơn hàng', 'error');
     }
+  };
+
+  // S4-09: Sao chép đơn hàng cũ thành đơn nháp mới
+  const handleCopyOrder = async () => {
+    if (!order) return;
+    setIsCopying(true);
+    try {
+      const res = await orderService.copyOrder(order.id);
+      showToast(res.message || 'Đã sao chép đơn hàng thành công sang đơn nháp mới!', 'success');
+      if (res.warnings && res.warnings.length > 0) {
+        showToast(res.warnings.join('; '), 'warning');
+      }
+      // Chuyển hướng sang trang tạo/tiếp tục đơn hàng với mã đơn mới
+      navigate(`/agents/orders/new?orderId=${encodeURIComponent(res.order.id)}`);
+    } catch (err: any) {
+      showToast(err?.response?.data?.detail || 'Lỗi khi sao chép đơn hàng', 'error');
+    } finally {
+      setIsCopying(false);
+    }
+  };
+
+  // S4-05: Xử lý hành động phê duyệt ngoại lệ (Approve, Reject, Return)
+  const handleApprovalAction = async (action: 'approve' | 'reject' | 'return') => {
+    if (!order) return;
+    if ((action === 'reject' || action === 'return') && !approvalComment.trim()) {
+      showToast('Bắt buộc phải nhập ý kiến giải thích khi từ chối hoặc trả lại đơn!', 'warning');
+      return;
+    }
+
+    setIsProcessingApproval(true);
+    try {
+      await orderService.processApprovalAction(order.id, action, approvalComment.trim());
+      const actionName =
+        action === 'approve'
+          ? 'Đã phê duyệt ngoại lệ đơn hàng thành công!'
+          : action === 'reject'
+          ? 'Đã từ chối đơn hàng ngoại lệ!'
+          : 'Đã trả lại đơn hàng yêu cầu nhân viên sửa!';
+      showToast(actionName, 'success');
+      setApprovalModalAction(null);
+      setApprovalComment('');
+      loadOrder();
+    } catch (err: any) {
+      showToast(err?.response?.data?.detail || 'Lỗi khi xử lý phê duyệt đơn hàng', 'error');
+    } finally {
+      setIsProcessingApproval(false);
+    }
+  };
+
+  // S4-08: In phiếu xuất HTML thật & Tải PDF thật
+  const handlePrintHtml = () => {
+    if (!order) return;
+    window.open(`/api/v1/orders/${encodeURIComponent(order.id)}/print-html`, '_blank');
+  };
+
+  const handleExportPdf = () => {
+    if (!order) return;
+    window.open(`/api/v1/orders/${encodeURIComponent(order.id)}/export-pdf`, '_blank');
   };
 
   if (loading) return <Loading text="Đang tải chi tiết đơn hàng..." />;
@@ -135,7 +233,7 @@ export const OrderDetail: React.FC = () => {
       title={`Chi Tiết Đơn Hàng: ${order.code}`}
       subtitle={`Ngày tạo: ${formatDate(order.createdAt)} | Phụ trách: ${order.staffName}`}
       actions={
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <Link to="/orders">
             <Button variant="secondary" size="sm" leftIcon={<ArrowLeft className="w-4 h-4" />}>
               Danh sách
@@ -162,23 +260,42 @@ export const OrderDetail: React.FC = () => {
               Hóa đơn VAT ({invoice.invoiceNumber})
             </Button>
           )}
+
+          {/* S4-09: Nút Sao chép đơn hàng */}
           <Button
             variant="outline"
             size="sm"
-            onClick={() => window.print()}
+            onClick={handleCopyOrder}
+            isLoading={isCopying}
+            leftIcon={<Copy className="w-4 h-4 text-indigo-600" />}
+            title="Tạo đơn nháp mới kế thừa toàn bộ danh sách sản phẩm và tính lại giá hiện hành"
+          >
+            Sao chép đơn
+          </Button>
+
+          {/* S4-08: Nút In phiếu xuất HTML */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handlePrintHtml}
             leftIcon={<Printer className="w-4 h-4" />}
+            title="Mở mẫu in phiếu xuất kho chuẩn A4/A5"
           >
             In phiếu xuất
           </Button>
+
+          {/* S4-08: Nút Xuất PDF */}
           <Button
             variant="outline"
             size="sm"
-            onClick={() => showToast('Đang tạo và tải file PDF đơn hàng...', 'info')}
+            onClick={handleExportPdf}
             leftIcon={<FileDown className="w-4 h-4" />}
+            title="Tải tệp PDF phiếu xuất giao hàng"
           >
             Xuất PDF
           </Button>
-          {order.status !== 'cancelled' && order.status !== 'completed' && (
+          {/* S4-06: Nút Hủy đơn */}
+          {!['shipping', 'completed', 'closed', 'cancelled'].includes(order.status) && (
             <Button
               variant="danger"
               size="sm"
@@ -214,6 +331,83 @@ export const OrderDetail: React.FC = () => {
           </div>
         </div>
       )}
+      {/* S4-05: Khối Phê Duyệt Đơn Ngoại Lệ (Dành cho Quản lý kinh doanh & Admin) */}
+      {(order.status === 'pending_approval' || (order.status === 'pending' && isSalesManagerOrAdmin)) && (
+        <div className="p-5 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border-2 border-amber-300 dark:border-amber-800 shadow-sm mb-6 space-y-3 animate-fadeIn">
+          <div className="flex items-start justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-amber-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                <ShieldAlert className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="text-sm font-bold text-amber-900 dark:text-amber-100">
+                    Đơn hàng cần phê duyệt ngoại lệ (S4-05)
+                  </h3>
+                  <Badge variant="warning" size="sm">
+                    CHỜ QUẢN LÝ DUYỆT
+                  </Badge>
+                </div>
+                <p className="text-xs text-amber-700 dark:text-amber-300 mt-0.5">
+                  Lý do vi phạm:{' '}
+                  <strong>
+                    {order.note && order.note.includes('Lý do:')
+                      ? order.note
+                      : 'Đơn hàng vượt hạn mức công nợ hoặc có mặt hàng bán dưới giá sàn tối thiểu.'}
+                  </strong>
+                </p>
+              </div>
+            </div>
+
+            {isSalesManagerOrAdmin ? (
+              <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                <Button
+                  variant="success"
+                  size="sm"
+                  onClick={() => handleApprovalAction('approve')}
+                  isLoading={isProcessingApproval}
+                  leftIcon={<Check className="w-4 h-4" />}
+                >
+                  Phê duyệt đơn
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setApprovalModalAction('return');
+                    setApprovalComment('');
+                  }}
+                  leftIcon={<RotateCcw className="w-4 h-4 text-amber-600" />}
+                >
+                  Trả lại sửa
+                </Button>
+                <Button
+                  variant="danger"
+                  size="sm"
+                  onClick={() => {
+                    setApprovalModalAction('reject');
+                    setApprovalComment('');
+                  }}
+                  leftIcon={<XCircle className="w-4 h-4" />}
+                >
+                  Từ chối
+                </Button>
+              </div>
+            ) : (
+              <span className="text-xs italic text-amber-700 bg-amber-100 dark:bg-amber-900/40 px-3 py-1 rounded-lg">
+                Đang chờ Quản lý duyệt
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* SC-238: Hiển thị trực quan Timeline vòng đời đơn hàng và nhánh Hủy */}
+      <OrderLifecycleTimeline
+        order={order}
+        onUpdateStatus={handleUpdateStatus}
+        onRequestCancel={() => setIsCancelModalOpen(true)}
+      />
 
       {/* Main Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -311,7 +505,7 @@ export const OrderDetail: React.FC = () => {
               </div>
               <div className="flex justify-between text-slate-600 dark:text-slate-400">
                 <span>Thuế giá trị gia tăng (VAT):</span>
-                <span>+{formatCurrency(order.tax)}</span>
+                <span>+{formatCurrency(order.tax || 0)}</span>
               </div>
               <div className="flex justify-between text-base font-black pt-3 border-t border-slate-100 dark:border-slate-800 text-slate-900 dark:text-white">
                 <span>TỔNG THANH TOÁN:</span>
@@ -346,15 +540,113 @@ export const OrderDetail: React.FC = () => {
         invoice={invoice}
       />
 
-      <ConfirmDialog
+      {/* Modal Hủy Đơn Hàng (kèm nhập lý do cho nhánh Hủy SC-238 & S4-06) */}
+      <Modal
         isOpen={isCancelModalOpen}
-        onClose={() => setIsCancelModalOpen(false)}
-        onConfirm={handleCancel}
-        title="Xác nhận hủy đơn hàng"
-        message="Bạn có chắc chắn muốn hủy đơn hàng này? Toàn bộ số lượng sản phẩm sẽ được hoàn trả về tồn kho."
-        confirmText="Hủy đơn"
-        variant="danger"
-      />
+        onClose={() => {
+          setIsCancelModalOpen(false);
+          setCancelReason('');
+        }}
+        title="Xác Nhận Hủy Đơn Hàng (S4-06)"
+        maxWidth="md"
+      >
+        <div className="space-y-4">
+          <div className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-rose-800 dark:text-rose-200 text-xs">
+            <p className="font-bold">Lưu ý khi hủy đơn hàng:</p>
+            <p className="mt-1">
+              Đơn hàng sẽ chuyển sang nhánh <span className="font-black">ĐÃ HỦY</span>, toàn bộ sản phẩm trong đơn sẽ được tự động hoàn trả lại số lượng tồn kho.
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+              Lý do hủy đơn hàng <span className="text-rose-500">*</span>
+            </label>
+            <textarea
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+              placeholder="Nhập lý do chi tiết (tối thiểu 5 ký tự)..."
+              rows={3}
+              className="w-full px-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-rose-500"
+              required
+            />
+            <span className="text-[11px] text-slate-400 mt-1 block">Yêu cầu tối thiểu 5 ký tự</span>
+          </div>
+
+          <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-slate-800">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => {
+                setIsCancelModalOpen(false);
+                setCancelReason('');
+              }}
+            >
+              Quay lại
+            </Button>
+            <Button
+              variant="danger"
+              size="sm"
+              onClick={handleCancel}
+              disabled={cancelReason.trim().length < 5}
+            >
+              Xác nhận hủy đơn
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* S4-05: Modal Nhập Ý Kiến Duyệt Ngoại Lệ (Từ chối / Trả lại sửa) */}
+      {approvalModalAction && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fadeIn">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 max-w-md w-full shadow-2xl space-y-4">
+            <div className="flex items-center gap-2.5">
+              <ShieldAlert className="w-5 h-5 shrink-0 text-amber-600" />
+              <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                {approvalModalAction === 'reject' ? 'Từ chối đơn hàng ngoại lệ' : 'Trả lại đơn hàng yêu cầu sửa'}
+              </h3>
+            </div>
+            <p className="text-xs text-slate-500">
+              {approvalModalAction === 'reject'
+                ? 'Nhập lý do từ chối để giải thích lý do không phê duyệt đơn hàng này.'
+                : 'Nhập hướng dẫn cụ thể để nhân viên kinh doanh điều chỉnh đơn cho phù hợp.'}
+            </p>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                Ý kiến giải thích / hướng dẫn <span className="text-rose-500">*</span>
+              </label>
+              <textarea
+                value={approvalComment}
+                onChange={(e) => setApprovalComment(e.target.value)}
+                placeholder="Nhập nội dung phản hồi bắt buộc..."
+                rows={3}
+                className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 placeholder:text-slate-400"
+              />
+            </div>
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  setApprovalModalAction(null);
+                  setApprovalComment('');
+                }}
+              >
+                Hủy bỏ
+              </Button>
+              <Button
+                variant={approvalModalAction === 'reject' ? 'danger' : 'primary'}
+                size="sm"
+                onClick={() => handleApprovalAction(approvalModalAction)}
+                isLoading={isProcessingApproval}
+                disabled={!approvalComment.trim()}
+              >
+                {approvalModalAction === 'reject' ? 'Xác nhận từ chối' : 'Gửi yêu cầu sửa'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </PageContainer>
   );
 };

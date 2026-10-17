@@ -56,30 +56,16 @@ export const ProductTable: React.FC<ProductTableProps> = ({ products }) => {
               return (
                 <tr key={p.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
                   <td className="py-3 px-4">
-                    <div className="flex items-center gap-3">
-                      {p.image ? (
-                        <img
-                          src={p.image}
-                          alt={p.name}
-                          className="w-11 h-11 rounded-xl object-cover border border-slate-200 dark:border-slate-700 shrink-0"
-                          onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                        />
-                      ) : (
-                        <div className="w-11 h-11 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 flex items-center justify-center shrink-0">
-                          <Package className="w-5 h-5" />
-                        </div>
-                      )}
-                      <div className="min-w-0">
-                        <Link
-                          to={`/user/products/${p.id}`}
-                          className="font-bold text-slate-900 dark:text-white hover:text-indigo-600 line-clamp-1"
-                        >
-                          {p.name}
-                        </Link>
-                        <span className="text-[11px] text-slate-400 block sm:hidden font-mono mt-0.5">
-                          {p.code}
-                        </span>
-                      </div>
+                    <div className="min-w-0">
+                      <Link
+                        to={`/user/products/${p.id}`}
+                        className="font-bold text-slate-900 dark:text-white hover:text-indigo-600 line-clamp-1"
+                      >
+                        {p.name}
+                      </Link>
+                      <span className="text-[11px] text-slate-400 block sm:hidden font-mono mt-0.5">
+                        {p.code}
+                      </span>
                     </div>
                   </td>
                   <td className="py-3 px-4 font-mono text-slate-500 font-semibold">{p.code}</td>

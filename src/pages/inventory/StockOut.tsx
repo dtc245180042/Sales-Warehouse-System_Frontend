@@ -29,6 +29,9 @@ import { useToast } from '../../contexts/ToastContext';
 interface StockOutItemState extends StockOutItem {
   availableUnits: UnitConversion[];
   baseUnit: string;
+  unitName: string;
+  unitRatio: number;
+  baseQty: number;
 }
 
 const buildDefaultUnits = (product: Product): UnitConversion[] => [

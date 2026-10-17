@@ -10,6 +10,7 @@ import {
   History,
   Search,
   Download,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { PageContainer } from '../../components/layout/PageContainer';
 import { DataTable, Column } from '../../components/common/DataTable';
@@ -26,7 +27,7 @@ interface InventoryItemView {
   productId: string;
   sku: string;
   name: string;
-  image: string;
+  image?: string;
   category: string;
   warehouse: string;
   initialStock: number;
@@ -105,7 +106,6 @@ export const InventoryOverview: React.FC = () => {
         productId: p.id,
         sku: p.sku,
         name: p.name,
-        image: p.image,
         category: p.category,
         warehouse: index % 2 === 0 ? 'Kho Tổng TP. HCM' : 'Kho Tổng Hà Nội',
         initialStock,
@@ -128,7 +128,11 @@ export const InventoryOverview: React.FC = () => {
         item.name.toLowerCase().includes(search.toLowerCase()) ||
         item.sku.toLowerCase().includes(search.toLowerCase());
       const matchWarehouse = warehouseFilter === 'all' || item.warehouse === warehouseFilter;
-      const matchStatus = statusFilter === 'all' || item.status === statusFilter;
+      const matchStatus =
+        statusFilter === 'all' ||
+        (statusFilter === 'under_threshold'
+          ? item.currentStock <= item.minStock
+          : item.status === statusFilter);
       return matchSearch && matchWarehouse && matchStatus;
     });
   }, [inventoryItems, search, warehouseFilter, statusFilter]);
@@ -171,28 +175,14 @@ export const InventoryOverview: React.FC = () => {
       sortable: true,
       className: 'min-w-[200px]',
       render: (item) => (
-        <div className="flex items-center gap-2.5">
-          {item.image ? (
-            <img
-              src={item.image}
-              alt={item.name}
-              className="w-9 h-9 rounded-lg object-cover bg-slate-100 dark:bg-slate-800 shrink-0"
-              onError={(e) => { e.currentTarget.style.display = 'none'; }}
-            />
-          ) : (
-            <div className="w-9 h-9 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 flex items-center justify-center shrink-0">
-              <Package className="w-4 h-4" />
-            </div>
-          )}
-          <div className="truncate">
-            <Link
-              to={`/products/${item.productId}`}
-              className="font-bold text-slate-800 dark:text-slate-200 hover:text-indigo-600 truncate block"
-            >
-              {item.name}
-            </Link>
-            <span className="text-[11px] text-slate-400">{item.category}</span>
-          </div>
+        <div className="truncate">
+          <Link
+            to={`/products/${item.productId}`}
+            className="font-bold text-slate-800 dark:text-slate-200 hover:text-indigo-600 truncate block"
+          >
+            {item.name}
+          </Link>
+          <span className="text-[11px] text-slate-400">{item.category}</span>
         </div>
       ),
     },
@@ -229,17 +219,22 @@ export const InventoryOverview: React.FC = () => {
       header: 'Tồn Cuối',
       sortable: true,
       render: (item) => (
-        <span
-          className={`font-black text-sm ${
-            item.currentStock === 0
-              ? 'text-rose-600'
-              : item.currentStock <= item.minStock
-              ? 'text-amber-600'
-              : 'text-slate-900 dark:text-white'
-          }`}
-        >
-          {item.currentStock} {item.unit}
-        </span>
+        <div className="space-y-0.5">
+          <div
+            className={`font-black text-sm ${
+              item.currentStock === 0
+                ? 'text-rose-600 dark:text-rose-400'
+                : item.currentStock <= item.minStock
+                ? 'text-amber-600 dark:text-amber-400'
+                : 'text-slate-900 dark:text-white'
+            }`}
+          >
+            {item.currentStock} {item.unit}
+          </div>
+          <div className="text-[11px] text-slate-400">
+            Ngưỡng tối thiểu: <span className="font-semibold text-slate-600 dark:text-slate-300">{item.minStock}</span>
+          </div>
+        </div>
       ),
     },
     {
@@ -257,13 +252,21 @@ export const InventoryOverview: React.FC = () => {
       header: 'Trạng Thái',
       sortable: true,
       render: (item) => {
-        if (item.status === 'out_of_stock') {
-          return <Badge variant="danger" size="sm" dot>Hết hàng</Badge>;
+        if (item.currentStock === 0) {
+          return (
+            <Badge variant="danger" size="sm" dot>
+              HẾT HÀNG (0)
+            </Badge>
+          );
         }
-        if (item.status === 'low_stock') {
-          return <Badge variant="warning" size="sm" dot>Sắp hết ({item.currentStock})</Badge>;
+        if (item.currentStock <= item.minStock) {
+          return (
+            <Badge variant="warning" size="sm" dot>
+              DƯỚI NGƯỠNG ({item.currentStock}/{item.minStock})
+            </Badge>
+          );
         }
-        return <Badge variant="success" size="sm" dot>Còn hàng</Badge>;
+        return <Badge variant="success" size="sm" dot>ĐỦ ĐỊNH MỨC</Badge>;
       },
     },
   ];
@@ -282,6 +285,11 @@ export const InventoryOverview: React.FC = () => {
           >
             Xuất Excel
           </Button>
+          <Link to="/inventory/min-stock">
+            <Button variant="outline" size="sm" leftIcon={<SlidersHorizontal className="w-4 h-4 text-indigo-500" />}>
+              Định mức tồn (Min-Stock)
+            </Button>
+          </Link>
           <Link to="/inventory/history">
             <Button variant="secondary" size="sm" leftIcon={<History className="w-4 h-4" />}>
               Lịch sử kho
@@ -328,7 +336,14 @@ export const InventoryOverview: React.FC = () => {
           <span className="text-xs text-slate-400 mt-1 block">Theo đơn giá giá nhập</span>
         </div>
 
-        <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-card">
+        <div
+          onClick={() => handleStatusChange(statusFilter === 'low_stock' ? 'all' : 'low_stock')}
+          className={`p-5 rounded-2xl bg-white dark:bg-slate-900 border cursor-pointer transition-all ${
+            statusFilter === 'low_stock'
+              ? 'border-amber-500 ring-2 ring-amber-500/20 shadow-md'
+              : 'border-slate-200 dark:border-slate-800 hover:border-amber-300 shadow-card'
+          }`}
+        >
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-slate-400 uppercase">Sắp Hết Hàng</span>
             <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400">
@@ -338,10 +353,17 @@ export const InventoryOverview: React.FC = () => {
           <p className="text-2xl font-black text-amber-600 dark:text-amber-400 mt-2">
             {lowStockCount} <span className="text-sm font-medium text-slate-400">mặt hàng</span>
           </p>
-          <span className="text-xs text-slate-400 mt-1 block">Dưới ngưỡng an toàn</span>
+          <span className="text-xs text-slate-400 mt-1 block">Dưới ngưỡng an toàn (Click lọc)</span>
         </div>
 
-        <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-card">
+        <div
+          onClick={() => handleStatusChange(statusFilter === 'out_of_stock' ? 'all' : 'out_of_stock')}
+          className={`p-5 rounded-2xl bg-white dark:bg-slate-900 border cursor-pointer transition-all ${
+            statusFilter === 'out_of_stock'
+              ? 'border-rose-500 ring-2 ring-rose-500/20 shadow-md'
+              : 'border-slate-200 dark:border-slate-800 hover:border-rose-300 shadow-card'
+          }`}
+        >
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-slate-400 uppercase">Hết Tồn Kho</span>
             <div className="p-2.5 rounded-xl bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400">
@@ -351,9 +373,36 @@ export const InventoryOverview: React.FC = () => {
           <p className="text-2xl font-black text-rose-600 dark:text-rose-400 mt-2">
             {outOfStockCount} <span className="text-sm font-medium text-slate-400">mặt hàng</span>
           </p>
-          <span className="text-xs text-slate-400 mt-1 block">Cần đặt hàng gấp</span>
+          <span className="text-xs text-slate-400 mt-1 block">Cần đặt hàng gấp (Click lọc)</span>
         </div>
       </div>
+
+      {/* Warning alert banner (SCRUM-599) */}
+      {(lowStockCount > 0 || outOfStockCount > 0) && (
+        <div className="mt-5 p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-2 text-amber-800 dark:text-amber-300 font-medium">
+            <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
+            <span>
+              <strong>Cảnh báo tồn kho:</strong> Có <strong>{lowStockCount + outOfStockCount}</strong> mặt hàng đang dưới ngưỡng an toàn (gồm {outOfStockCount} SKU hết hàng và {lowStockCount} SKU sắp hết).
+            </span>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <Button
+              size="sm"
+              variant="outline"
+              className="!text-xs !py-1"
+              onClick={() => handleStatusChange(statusFilter === 'under_threshold' ? 'all' : 'under_threshold')}
+            >
+              {statusFilter === 'under_threshold' ? 'Xem tất cả SKU' : 'Lọc tất cả SKU dưới ngưỡng'}
+            </Button>
+            <Link to="/inventory/stock-in">
+              <Button size="sm" variant="primary" className="!text-xs !py-1">
+                Tạo phiếu nhập kho
+              </Button>
+            </Link>
+          </div>
+        </div>
+      )}
 
       {/* Main Table */}
       <div className="mt-6">
@@ -388,12 +437,13 @@ export const InventoryOverview: React.FC = () => {
                 <select
                   value={statusFilter}
                   onChange={(e) => handleStatusChange(e.target.value)}
-                  className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs sm:text-sm text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs sm:text-sm text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium"
                 >
                   <option value="all">Tất cả trạng thái</option>
-                  <option value="in_stock">Còn hàng</option>
-                  <option value="low_stock">Sắp hết</option>
-                  <option value="out_of_stock">Hết hàng</option>
+                  <option value="under_threshold">⚠️ Cần nhập (Dưới ngưỡng / Hết hàng)</option>
+                  <option value="in_stock">Còn hàng an toàn</option>
+                  <option value="low_stock">Sắp hết hàng</option>
+                  <option value="out_of_stock">Hết tồn kho (0)</option>
                 </select>
               </div>
             </div>

@@ -786,11 +786,12 @@ export const UserManagement: React.FC = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               {AVAILABLE_ROLES.map(({ role, label, desc }) => {
                 const isChecked = formData.roles.includes(role);
-                const isSelfAdmin =
+                const isSelfAdmin = Boolean(
                   editingUser &&
                   currentUser &&
                   currentUser.id === editingUser.id &&
-                  role === 'Admin';
+                  role === 'Admin'
+                );
 
                 return (
                   <label

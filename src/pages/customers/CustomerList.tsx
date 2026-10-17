@@ -48,12 +48,18 @@ export const CustomerList: React.FC = () => {
   // Add/Edit modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    name: string;
+    phone: string;
+    email: string;
+    address: string;
+    status: 'active' | 'inactive' | 'locked';
+  }>({
     name: '',
     phone: '',
     email: '',
     address: '',
-    status: 'active' as 'active' | 'inactive',
+    status: 'active',
   });
 
   const loadCustomers = async () => {

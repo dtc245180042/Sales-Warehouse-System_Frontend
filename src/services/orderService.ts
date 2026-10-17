@@ -141,7 +141,7 @@ export const orderService = {
     }
   },
 
-  updateStatus: async (id: string, status: OrderStatus): Promise<Order> => {
+  updateStatus: async (id: string, status: OrderStatus, note?: string, performedBy?: string): Promise<Order> => {
     try {
       const res = await apiClient.patch(`/orders/${encodeURIComponent(id)}/status`, { status });
       const updated = mapApiOrder(res.data);
@@ -158,10 +158,24 @@ export const orderService = {
       const index = orders.findIndex((o) => o.id === id || o.code === id);
       if (index === -1) throw new Error('Không tìm thấy đơn hàng');
 
+      const nowStr = new Date().toISOString().replace('T', ' ').slice(0, 16);
+      const prevTimeline = orders[index].timeline || [];
+      const updatedTimeline = [
+        ...prevTimeline,
+        {
+          status,
+          label: status,
+          timestamp: nowStr,
+          performedBy: performedBy || 'Nhân viên kinh doanh',
+          note: note || `Chuyển sang trạng thái ${status}`,
+        },
+      ];
+
       const updated = {
         ...orders[index],
         status,
-        updatedAt: new Date().toISOString().replace('T', ' ').slice(0, 16),
+        timeline: updatedTimeline,
+        updatedAt: nowStr,
       };
       orders[index] = updated;
       setStorageItem(STORAGE_KEY, [...orders]);
@@ -197,10 +211,13 @@ export const orderService = {
     }
   },
 
-  cancelOrder: async (id: string): Promise<Order> => {
+  cancelOrder: async (id: string, reason?: string, cancelledBy?: string): Promise<Order> => {
+    const effectiveReason = reason?.trim() || 'Hủy đơn hàng theo yêu cầu';
     try {
-      const res = await apiClient.post(`/orders/${encodeURIComponent(id)}/cancel`);
-      const updated = mapApiOrder(res.data);
+      const res = await apiClient.post(`/orders/${encodeURIComponent(id)}/cancel`, {
+        reason: effectiveReason,
+      });
+      const updated = mapApiOrder(res.data.order || res.data);
       const orders = getStorageItem<Order[]>(STORAGE_KEY, initialOrders);
       const idx = orders.findIndex((o) => o.id === id || o.code === id);
       if (idx !== -1) {
@@ -212,9 +229,14 @@ export const orderService = {
       console.warn('[orderService] Backend error, cancelling locally:', err);
       const orders = getStorageItem<Order[]>(STORAGE_KEY, initialOrders);
       const index = orders.findIndex((o) => o.id === id || o.code === id);
-      if (index === -1) throw new Error('Không tìm thấy đơn hàng');
+      const currentStatus = orders[index].status;
+      if (currentStatus === 'shipping' || currentStatus === 'completed' || currentStatus === 'closed') {
+        const statusLabel =
+          currentStatus === 'shipping' ? 'Đã xuất kho' : currentStatus === 'completed' ? 'Đã giao' : 'Đóng';
+        throw new Error(`Đơn hàng đang ở trạng thái "${statusLabel}", hàng đã xuất kho nên không thể hủy.`);
+      }
 
-      if (orders[index].status !== 'cancelled') {
+      if (currentStatus !== 'cancelled') {
         for (const item of orders[index].items) {
           try {
             await productService.updateStock(item.productId, item.quantity);
@@ -224,8 +246,29 @@ export const orderService = {
         }
       }
 
+      const nowStr = new Date().toISOString().replace('T', ' ').slice(0, 16);
+      const cancelNote = reason || 'Khách hàng yêu cầu hủy đơn hàng';
+      const prevTimeline = orders[index].timeline || [];
+      const updatedTimeline = [
+        ...prevTimeline,
+        {
+          status: 'cancelled' as OrderStatus,
+          label: 'Đã hủy',
+          timestamp: nowStr,
+          performedBy: cancelledBy || 'Nhân viên kinh doanh',
+          note: cancelNote,
+        },
+      ];
+
       orders[index].status = 'cancelled';
-      orders[index].updatedAt = new Date().toISOString().replace('T', ' ').slice(0, 16);
+      orders[index].note = orders[index].note
+        ? `${orders[index].note} [Lý do hủy: ${effectiveReason}]`
+        : `[Lý do hủy: ${effectiveReason}]`;
+      orders[index].cancelledReason = cancelNote;
+      orders[index].cancelledAt = nowStr;
+      orders[index].cancelledBy = cancelledBy || 'Nhân viên kinh doanh';
+      orders[index].timeline = updatedTimeline;
+      orders[index].updatedAt = nowStr;
       setStorageItem(STORAGE_KEY, [...orders]);
       return orders[index];
     }
@@ -274,5 +317,179 @@ export const orderService = {
     orders[index] = updatedOrder;
     setStorageItem(STORAGE_KEY, [...orders]);
     return updatedOrder;
+  },
+
+  // S4-09: Sao chép đơn hàng cũ thành đơn nháp mới
+  copyOrder: async (orderId: string): Promise<{ order: Order; warnings: string[]; message: string }> => {
+    const res = await apiClient.post(`/orders/${encodeURIComponent(orderId)}/copy`);
+    const mappedOrder = mapApiOrder(res.data.order || res.data);
+    const orders = getStorageItem<Order[]>(STORAGE_KEY, initialOrders);
+    setStorageItem(STORAGE_KEY, [mappedOrder, ...orders]);
+    return {
+      order: mappedOrder,
+      warnings: res.data.warnings || [],
+      message: res.data.message || 'Sao chép đơn thành công!',
+    };
+  },
+
+  // S4-04: Lấy gợi ý sản phẩm từ lịch sử mua hàng 90 ngày
+  getSuggestions: async (customerId: string, windowDays: number = 90): Promise<any> => {
+    try {
+      const res = await apiClient.get(
+        `/orders/suggestions/${encodeURIComponent(customerId)}?window_days=${windowDays}`
+      );
+      return res.data;
+    } catch (err) {
+      console.warn('[orderService] Failed to load suggestions from backend:', err);
+      return {
+        customer_id: customerId,
+        window_days: windowDays,
+        total_past_orders: 0,
+        suggested_products: [],
+        categories_purchased: [],
+      };
+    }
+  },
+
+  // S4-02: Kiểm tra hồ sơ hạn mức công nợ thời gian thực của đại lý
+  getCreditSummary: async (customerId: string): Promise<any> => {
+    try {
+      const res = await apiClient.get(`/customers/${encodeURIComponent(customerId)}/credit-summary`);
+      return res.data;
+    } catch (err) {
+      console.warn('[orderService] Failed to load credit summary:', err);
+      return null;
+    }
+  },
+
+  // S4-05: Lấy chi tiết thông tin phê duyệt ngoại lệ của đơn hàng
+  getApprovalDetail: async (orderId: string): Promise<any> => {
+    try {
+      const res = await apiClient.get(`/order-approvals/${encodeURIComponent(orderId)}`);
+      return res.data;
+    } catch (err) {
+      console.warn('[orderService] Failed to load approval detail:', err);
+      return null;
+    }
+  },
+
+  // S4-05: Thao tác duyệt đơn ngoại lệ (Approve, Reject, Return) của Quản lý kinh doanh
+  processApprovalAction: async (
+    orderId: string,
+    action: 'approve' | 'reject' | 'return',
+    comment?: string
+  ): Promise<any> => {
+    const res = await apiClient.post(`/order-approvals/${encodeURIComponent(orderId)}/action`, {
+      action,
+      comment: comment?.trim() || undefined,
+    });
+    return res.data;
+  },
+
+  updateDraft: async (id: string, data: any): Promise<Order> => {
+    try {
+      const res = await apiClient.put(`/orders/${encodeURIComponent(id)}/draft`, data);
+      return mapApiOrder(res.data.order || res.data);
+    } catch (err) {
+      console.warn('[orderService] Backend error, updating draft locally:', err);
+      const orders = getStorageItem<Order[]>(STORAGE_KEY, initialOrders);
+      const idx = orders.findIndex((o) => o.id === id || o.code === id);
+      if (idx !== -1) {
+        orders[idx] = { ...orders[idx], ...data, updatedAt: new Date().toISOString() };
+        setStorageItem(STORAGE_KEY, [...orders]);
+        return orders[idx];
+      }
+      throw new Error('Draft not found');
+    }
+  },
+
+  submitDraft: async (id: string): Promise<Order> => {
+    try {
+      const res = await apiClient.post(`/orders/${encodeURIComponent(id)}/submit`);
+      return mapApiOrder(res.data.order || res.data);
+    } catch (err) {
+      console.warn('[orderService] Backend error, submitting draft locally:', err);
+      const orders = getStorageItem<Order[]>(STORAGE_KEY, initialOrders);
+      const idx = orders.findIndex((o) => o.id === id || o.code === id);
+      if (idx !== -1) {
+        orders[idx] = { ...orders[idx], status: 'pending', updatedAt: new Date().toISOString() };
+        setStorageItem(STORAGE_KEY, [...orders]);
+        return orders[idx];
+      }
+      throw new Error('Draft not found');
+    }
+  },
+
+  getDrafts: async (): Promise<Order[]> => {
+    const all = await orderService.getAll();
+    return all.filter((o) => o.status === 'draft');
+  },
+
+  getPurchaseHistorySuggestions: async (customerId: string, windowDays: number = 90): Promise<any> => {
+    try {
+      const res = await apiClient.get(
+        `/orders/suggestions/${encodeURIComponent(customerId)}?window_days=${windowDays}`
+      );
+      return res.data;
+    } catch {
+      return {
+        customerId,
+        windowDays,
+        items: [],
+        groups: [],
+      };
+    }
+  },
+
+  searchProductsForOrder: async (query: string): Promise<any[]> => {
+    try {
+      const res = await apiClient.get(`/products?search=${encodeURIComponent(query)}`);
+      if (Array.isArray(res.data)) {
+        return res.data.map((p: any) => ({
+          id: p.id,
+          sku: p.sku,
+          name: p.name,
+          unit: p.unit || 'cái',
+          price: Number(p.salePrice || p.price || 0),
+          stock: Number(p.stock || 0),
+          availableUnits: [p.unit || 'cái', 'hộp', 'thùng'],
+          category: p.category,
+        }));
+      }
+    } catch {
+      // fallback
+    }
+    const all = await productService.getAll();
+    return all
+      .filter((p) => p.name.toLowerCase().includes(query.toLowerCase()) || p.sku.toLowerCase().includes(query.toLowerCase()))
+      .map((p) => ({
+        id: p.id,
+        sku: p.sku,
+        name: p.name,
+        unit: p.unit || 'cái',
+        price: p.salePrice,
+        stock: p.stock,
+        availableUnits: [p.unit || 'cái', 'hộp', 'thùng'],
+        category: p.category,
+      }));
+  },
+
+  calculate: async (params: { customer_id: string; items: any[] }): Promise<any> => {
+    try {
+      const res = await apiClient.post('/orders/calculate', params);
+      return res.data;
+    } catch {
+      const subtotal = params.items.reduce((s, itm) => s + Number(itm.price || 0) * Number(itm.quantity || 1), 0);
+      return {
+        subtotal,
+        discount: 0,
+        total: subtotal,
+        items: params.items.map((i) => ({
+          product_id: i.product_id,
+          subtotal: Number(i.price || 0) * Number(i.quantity || 1),
+          discount_amount: 0,
+        })),
+      };
+    }
   },
 };

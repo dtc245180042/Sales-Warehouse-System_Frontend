@@ -221,28 +221,30 @@ export const ProfilePage: React.FC = () => {
           </div>
 
           {/* Store / Branch info (Read-only) */}
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm space-y-3">
-            <h3 className="font-bold text-slate-900 dark:text-white text-sm flex items-center gap-2">
-              <Store className="w-4 h-4 text-blue-600" />
-              Chi nhánh công tác
-            </h3>
-            <div className="text-xs space-y-2 text-slate-600 dark:text-slate-400">
-              <div>
-                <strong className="text-slate-800 dark:text-slate-200 block">
-                  {profile.storeInfo.name}
-                </strong>
-                <p className="mt-0.5">{profile.storeInfo.address}</p>
-              </div>
-              <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
-                <span className="text-slate-400">Hotline chi nhánh: </span>
-                <strong className="text-slate-800 dark:text-slate-200">{profile.storeInfo.phone}</strong>
-              </div>
-              <div>
-                <span className="text-slate-400">Quản lý kho: </span>
-                <span className="text-slate-700 dark:text-slate-300">{profile.storeInfo.manager}</span>
+          {profile.storeInfo && (
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm space-y-3">
+              <h3 className="font-bold text-slate-900 dark:text-white text-sm flex items-center gap-2">
+                <Store className="w-4 h-4 text-blue-600" />
+                Chi nhánh công tác
+              </h3>
+              <div className="text-xs space-y-2 text-slate-600 dark:text-slate-400">
+                <div>
+                  <strong className="text-slate-800 dark:text-slate-200 block">
+                    {profile.storeInfo.name}
+                  </strong>
+                  <p className="mt-0.5">{profile.storeInfo.address}</p>
+                </div>
+                <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
+                  <span className="text-slate-400">Hotline chi nhánh: </span>
+                  <strong className="text-slate-800 dark:text-slate-200">{profile.storeInfo.phone}</strong>
+                </div>
+                <div>
+                  <span className="text-slate-400">Quản lý kho: </span>
+                  <span className="text-slate-700 dark:text-slate-300">{profile.storeInfo.manager}</span>
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Right Card: Editable Profile Form */}

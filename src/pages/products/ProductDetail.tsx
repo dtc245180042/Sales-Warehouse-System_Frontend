@@ -9,9 +9,8 @@ import {
   Calendar,
   TrendingUp,
   PackageCheck,
-  History,
   ArrowDownLeft,
-  Package,
+  History,
 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { PageContainer } from '../../components/layout/PageContainer';
@@ -87,6 +86,11 @@ export const ProductDetail: React.FC = () => {
               Nhập hàng mã này
             </Button>
           </Link>
+          <Link to={`/products/${product.id}/price-history`}>
+            <Button variant="outline" size="sm" leftIcon={<History className="w-4 h-4" />}>
+              Lịch sử giá
+            </Button>
+          </Link>
           <Link to={`/products/${product.id}/edit`}>
             <Button variant="primary" size="sm" leftIcon={<Edit className="w-4 h-4" />}>
               Chỉnh sửa
@@ -96,24 +100,9 @@ export const ProductDetail: React.FC = () => {
       }
     >
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column: Image & Quick Stats */}
+        {/* Left Column: Quick Stats & Metadata */}
         <div className="space-y-6">
-          <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-card text-center">
-            {product.image ? (
-              <img
-                src={product.image}
-                alt={product.name}
-                className="w-full h-64 object-cover rounded-xl border border-slate-200 dark:border-slate-700 mx-auto mb-4 bg-slate-50 dark:bg-slate-800"
-                onError={(e) => {
-                  e.currentTarget.style.display = 'none';
-                }}
-              />
-            ) : (
-              <div className="w-full h-48 rounded-xl border border-dashed border-slate-200 dark:border-slate-700 mx-auto mb-4 bg-slate-50 dark:bg-slate-800/60 flex flex-col items-center justify-center text-slate-400">
-                <Package className="w-12 h-12 stroke-[1.2] mb-1 text-slate-300 dark:text-slate-600" />
-                <span className="text-xs">Không có hình ảnh</span>
-              </div>
-            )}
+          <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-card text-center space-y-3">
             <div className="flex items-center justify-center gap-2 mb-2">
               <Badge
                 variant={
@@ -171,7 +160,17 @@ export const ProductDetail: React.FC = () => {
           {/* Key Metrics */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-card">
-              <span className="text-xs font-bold text-slate-400 uppercase">Giá Bán Lẻ</span>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-400 uppercase">Giá Bán Lẻ</span>
+                <Link
+                  to={`/products/${product.id}/price-history`}
+                  className="inline-flex items-center gap-1 text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 font-semibold transition-colors"
+                  title="Tra cứu lịch sử thay đổi giá của sản phẩm này"
+                >
+                  <History className="w-3.5 h-3.5" />
+                  <span>Lịch sử giá</span>
+                </Link>
+              </div>
               <p className="text-2xl font-extrabold text-indigo-600 dark:text-indigo-400 mt-1">
                 {formatCurrency(product.salePrice)}
               </p>

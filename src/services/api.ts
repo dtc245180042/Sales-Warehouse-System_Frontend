@@ -15,7 +15,7 @@ import { validateVNPhoneNumber } from '../utils/phoneUtils';
 
 // Create base Axios instance (ready for real backend URL)
 export const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1',
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8001/api/v1',
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
@@ -82,6 +82,7 @@ export const api = {
           list = res.data.map((p: any) => ({
             id: p.id,
             code: p.sku || p.code || p.id,
+            sku: p.sku || p.code,
             name: p.name,
             category: p.category,
             price: Number(p.salePrice ?? p.sale_price ?? 0),
@@ -90,7 +91,9 @@ export const api = {
             unit: p.unit || 'Chiếc',
             image: (p.image && !p.image.includes('/images/products/') && !p.image.includes('placeholder')) ? (p.image || p.image_url || p.imageUrl || '') : '',
             description: p.description || '',
+            status: Number(p.stock ?? 0) <= 0 ? 'out_of_stock' : (Number(p.stock ?? 0) <= 10 ? 'low_stock' : 'in_stock'),
             rating: 4.8,
+            soldCount: Number(p.soldCount ?? p.sold_count ?? 10),
             reviewsCount: 15,
             isNew: false,
             isHot: true,
@@ -392,10 +395,10 @@ export const api = {
 
       // Update user today's stats
       const profile = getStored<UserProfileData>(STORAGE_KEYS.PROFILE, initialUserProfile);
-      profile.todayOrdersCount += 1;
-      profile.monthlyOrdersCount += 1;
-      profile.personalRevenue += newOrder.total;
-      profile.productsSoldCount += data.items.reduce((acc, it) => acc + it.quantity, 0);
+      profile.todayOrdersCount = (profile.todayOrdersCount ?? 0) + 1;
+      profile.monthlyOrdersCount = (profile.monthlyOrdersCount ?? 0) + 1;
+      profile.personalRevenue = (profile.personalRevenue ?? 0) + newOrder.total;
+      profile.productsSoldCount = (profile.productsSoldCount ?? 0) + data.items.reduce((acc, it) => acc + it.quantity, 0);
       setStored(STORAGE_KEYS.PROFILE, profile);
 
       return newOrder;
