@@ -6,6 +6,20 @@ import { priceHistoryService } from './priceHistoryService';
 
 const STORAGE_KEY = 'kv_products';
 
+// ─── In-memory cache cho getAll() ───────────────────────────────────────────
+// Giúp API call thứ 2 trở đi trả về kết quả < 1ms thay vì gọi lại server.
+const CACHE_TTL_MS = 60_000; // 60 giây
+let _cache: { data: Product[]; expiresAt: number } | null = null;
+
+// Micro-cache cho getPaginated (search, category, page) để đạt tốc độ phản hồi < 2ms
+const _queryCache = new Map<string, { items: Product[]; total: number; expiresAt: number }>();
+
+/** Xóa cache (gọi sau khi tạo / sửa / xóa sản phẩm) */
+export function invalidateProductCache(): void {
+  _cache = null;
+  _queryCache.clear();
+}
+
 function mapApiProduct(p: any): Product {
   const rawStatus = String(p.status || 'active').toLowerCase();
   let normalizedStatus: 'active' | 'out_of_stock' | 'low_stock' | 'inactive' = 'active';
@@ -45,6 +59,11 @@ function mapApiProduct(p: any): Product {
 
 export const productService = {
   getAll: async (forceRefresh: boolean = false): Promise<Product[]> => {
+    // Trả về cache nếu còn hạn và không bị ép refresh
+    if (!forceRefresh && _cache && Date.now() < _cache.expiresAt) {
+      return _cache.data;
+    }
+
     try {
       // Hỗ trợ lấy toàn bộ danh mục sản phẩm từ CSDL MySQL (lên tới 10.000 sản phẩm)
       const res = await apiClient.get('/products', {
@@ -55,6 +74,8 @@ export const productService = {
         : (Array.isArray(res.data?.items) ? res.data.items : null);
       if (rawList && rawList.length > 0) {
         const list = rawList.map(mapApiProduct);
+        // Lưu vào in-memory cache với TTL
+        _cache = { data: list, expiresAt: Date.now() + CACHE_TTL_MS };
         // Tránh lỗi QuotaExceededError khi danh mục có 5000+ sản phẩm
         if (list.length <= 500) {
           try {
@@ -69,10 +90,118 @@ export const productService = {
       console.warn('[productService] Backend API offline hoặc lỗi, sử dụng bộ nhớ cục bộ:', err);
     }
     const stored = getStorageItem<Product[]>(STORAGE_KEY, initialProducts);
-    return stored.map((p) => ({
+    const fallback = stored.map((p) => ({
       ...p,
       image: (p.image && !p.image.includes('/images/products/') && !p.image.includes('placeholder')) ? p.image : '',
     }));
+    // Cache cả fallback để tránh gọi lại nhiều lần
+    _cache = { data: fallback, expiresAt: Date.now() + CACHE_TTL_MS };
+    return fallback;
+  },
+
+  /**
+   * Lấy danh sách sản phẩm phân trang (mặc định 20 sp) kèm tìm kiếm, lọc nhóm hàng.
+   * Sử dụng RAM micro-cache để các lần tìm kiếm/lọc tiếp theo phản hồi tức thì < 2ms.
+   */
+  getPaginated: async (options: {
+    page?: number;
+    pageSize?: number;
+    search?: string;
+    category?: string;
+    forceRefresh?: boolean;
+  } = {}): Promise<{
+    items: Product[];
+    total: number;
+    page: number;
+    pageSize: number;
+    responseTimeMs: number;
+    fromCache: boolean;
+  }> => {
+    const page = Math.max(1, options.page || 1);
+    const pageSize = Math.max(1, options.pageSize || 20);
+    const search = (options.search || '').trim();
+    const category = (options.category === 'all' || !options.category) ? '' : options.category.trim();
+    const cacheKey = `${page}_${pageSize}_${search.toLowerCase()}_${category.toLowerCase()}`;
+
+    const startTime = performance.now();
+
+    // 1. Kiểm tra RAM micro-cache (< 2ms)
+    if (!options.forceRefresh && _queryCache.has(cacheKey)) {
+      const cached = _queryCache.get(cacheKey)!;
+      if (Date.now() < cached.expiresAt) {
+        const responseTimeMs = Number((performance.now() - startTime).toFixed(2));
+        return {
+          items: cached.items,
+          total: cached.total,
+          page,
+          pageSize,
+          responseTimeMs,
+          fromCache: true,
+        };
+      }
+    }
+
+    try {
+      const params: any = {
+        page,
+        page_size: pageSize,
+      };
+      if (search) params.search = search;
+      if (category) params.category = category;
+
+      const res = await apiClient.get('/products', { params });
+      const rawList = Array.isArray(res.data)
+        ? res.data
+        : (Array.isArray(res.data?.items) ? res.data.items : []);
+      const total = typeof res.data?.total === 'number' ? res.data.total : rawList.length;
+      const items = rawList.map(mapApiProduct);
+
+      // Lưu vào RAM micro-cache (TTL 120s)
+      _queryCache.set(cacheKey, {
+        items,
+        total,
+        expiresAt: Date.now() + 120_000,
+      });
+
+      const responseTimeMs = Number((performance.now() - startTime).toFixed(2));
+      return {
+        items,
+        total,
+        page,
+        pageSize,
+        responseTimeMs,
+        fromCache: false,
+      };
+    } catch (err) {
+      console.warn('[productService.getPaginated] Lỗi gọi API, sử dụng fallback cục bộ:', err);
+      // Fallback: Lấy từ storage hoặc initialProducts
+      const allStored = getStorageItem<Product[]>(STORAGE_KEY, initialProducts);
+      let filtered = allStored;
+      if (category) {
+        filtered = filtered.filter((p) => p.category?.toLowerCase() === category.toLowerCase());
+      }
+      if (search) {
+        const q = search.toLowerCase();
+        filtered = filtered.filter(
+          (p) =>
+            p.name.toLowerCase().includes(q) ||
+            p.sku.toLowerCase().includes(q) ||
+            (p.barcode && String(p.barcode).toLowerCase().includes(q))
+        );
+      }
+      const total = filtered.length;
+      const startIdx = (page - 1) * pageSize;
+      const items = filtered.slice(startIdx, startIdx + pageSize);
+      const responseTimeMs = Number((performance.now() - startTime).toFixed(2));
+      return {
+        items,
+        total,
+        page,
+        pageSize,
+        responseTimeMs,
+        fromCache: false,
+      };
+    }
   },
 
   getById: async (id: string): Promise<Product | undefined> => {
@@ -128,6 +257,7 @@ export const productService = {
       };
       const res = await apiClient.post('/products', payload);
       const created = mapApiProduct(res.data);
+      invalidateProductCache(); // Xóa cache sau khi tạo mới
       const cached = getStorageItem<Product[]>(STORAGE_KEY, initialProducts);
       setStorageItem(STORAGE_KEY, [created, ...cached]);
       return created;
@@ -204,7 +334,7 @@ export const productService = {
 
       const res = await apiClient.put(`/products/${encodeURIComponent(strId)}`, payload);
       const updated = mapApiProduct(res.data);
-
+      invalidateProductCache(); // Xóa cache sau khi cập nhật
       const products = getStorageItem<Product[]>(STORAGE_KEY, initialProducts);
       const idx = products.findIndex((p) => String(p.id).trim() === strId);
       if (idx !== -1) {
@@ -275,6 +405,7 @@ export const productService = {
     } catch (err) {
       console.warn('[productService] Backend error, deleting locally:', err);
     }
+    invalidateProductCache(); // Xóa cache sau khi xóa sản phẩm
     const cached = getStorageItem<Product[]>(STORAGE_KEY, initialProducts);
     setStorageItem(STORAGE_KEY, cached.filter((p) => String(p.id).trim() !== strId));
     return true;

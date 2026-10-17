@@ -47,11 +47,14 @@ import { InventoryReport } from '../pages/reports/InventoryReport';
 
 // Inventory & Warehouse Pages (SCRUM-537, SCRUM-538, SCRUM-599, SCRUM-601)
 import { InventoryOverview } from '../pages/inventory/InventoryOverview';
+import { PickingListsPage } from '../pages/inventory/PickingListsPage';
+import { PickingDetailPage } from '../pages/inventory/PickingDetailPage';
 import { WarehouseListPage } from '../pages/inventory/WarehouseListPage';
 import { MinStockConfigPage } from '../pages/inventory/MinStockConfigPage';
 import { StockIn } from '../pages/inventory/StockIn';
 import { StockOut } from '../pages/inventory/StockOut';
 import { InventoryHistory } from '../pages/inventory/InventoryHistory';
+import { DeliveryRoutingPage } from '../pages/inventory/DeliveryRoutingPage';
 
 // Portal B2B Pages (S4-10, S5-01 / SCRUM-243)
 import { PortalOrderPage } from '../pages/portal/PortalOrderPage';
@@ -396,10 +399,26 @@ export const AppRoutes: React.FC = () => {
           }
         />
         <Route
+          path="/inventory/picking-lists"
+          element={<ProtectedRoute allowedRoles={['Admin', 'WarehouseManager', 'WarehouseStaff']}><PickingListsPage /></ProtectedRoute>}
+        />
+        <Route
+          path="/inventory/picking-lists/:id"
+          element={<ProtectedRoute allowedRoles={['Admin', 'WarehouseManager', 'WarehouseStaff']}><PickingDetailPage /></ProtectedRoute>}
+        />
+        <Route
           path="/inventory/history"
           element={
             <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
               <InventoryHistory />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/inventory/routing"
+          element={
+            <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
+              <DeliveryRoutingPage />
             </ProtectedRoute>
           }
         />

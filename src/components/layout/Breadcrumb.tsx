@@ -8,6 +8,7 @@ const routeNames: Record<string, string> = {
   create: 'Thêm Mới',
   edit: 'Chỉnh Sửa',
   inventory: 'Quản Lý Kho',
+  'picking-lists': 'Phiếu Soạn Hàng',
   'stock-in': 'Nhập Kho',
   'stock-out': 'Xuất Kho',
   history: 'Lịch Sử Giao Dịch',
