@@ -53,9 +53,10 @@ export const OrderDetail: React.FC = () => {
 
   const isSalesManagerOrAdmin =
     user?.role === 'Admin' ||
-    user?.role === 'Sales Manager' ||
+    user?.role === 'SalesManager' ||
     user?.role === 'Manager' ||
-    user?.role === 'sales_manager';
+    (user?.role as unknown as string) === 'Sales Manager' ||
+    (user?.role as unknown as string) === 'sales_manager';
 
   const loadOrder = async () => {
     if (!id) return;
@@ -422,7 +423,7 @@ export const OrderDetail: React.FC = () => {
               </div>
               <div className="flex justify-between text-slate-600 dark:text-slate-400">
                 <span>Thuế giá trị gia tăng (VAT):</span>
-                <span>+{formatCurrency(order.tax)}</span>
+                <span>+{formatCurrency(order.tax || 0)}</span>
               </div>
               <div className="flex justify-between text-base font-black pt-3 border-t border-slate-100 dark:border-slate-800 text-slate-900 dark:text-white">
                 <span>TỔNG THANH TOÁN:</span>

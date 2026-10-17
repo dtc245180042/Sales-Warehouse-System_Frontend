@@ -3,6 +3,7 @@ import React from 'react';
 interface PageContainerProps {
   title: string;
   subtitle?: string;
+  breadcrumbs?: Array<{ label: string; path?: string }> | React.ReactNode;
   actions?: React.ReactNode;
   children: React.ReactNode;
 }

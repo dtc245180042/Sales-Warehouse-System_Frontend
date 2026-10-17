@@ -75,7 +75,7 @@ export const CreateOrder: React.FC = () => {
 
   // Customer selection
   const [customerSearch, setCustomerSearch] = useState('');
-  const [isCustomerDropdownOpen, setIsCustomerDropdownOpen] = useState(false);
+  const [isCustomerDropdownOpen, setIsCustomerDropdownOpen] = useState(true); // Mặc định mở sẵn
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
 
@@ -179,7 +179,7 @@ export const CreateOrder: React.FC = () => {
           });
 
           // Delivery details
-          if (draft.deliveryAddressId) setSelectedAddressId(draft.deliveryAddressId);
+          if (draft.deliveryAddressId) setSelectedAddressId(Number(draft.deliveryAddressId));
           if (draft.deliveryAddress) setCustomAddress(draft.deliveryAddress);
           if (draft.deliveryReceiverName) setReceiverName(draft.deliveryReceiverName);
           if (draft.deliveryPhone) setReceiverPhone(draft.deliveryPhone);
@@ -363,7 +363,7 @@ export const CreateOrder: React.FC = () => {
         setItems((prev) =>
           prev.map((item) => {
             const resItem = res.items.find(
-              (ri) => String(ri.product_id) === String(item.productId)
+              (ri: any) => String(ri.product_id) === String(item.productId)
             );
             if (resItem) {
               return {
@@ -522,7 +522,7 @@ export const CreateOrder: React.FC = () => {
     let addedCount = 0;
     let mergedCount = 0;
 
-    suggestionsData.lastOrder.items.forEach((it) => {
+    suggestionsData.lastOrder.items.forEach((it: any) => {
       const existingIndex = updated.findIndex((i) => String(i.productId) === String(it.productId));
       if (existingIndex !== -1) {
         updated[existingIndex].quantity += it.quantity;
@@ -578,13 +578,15 @@ export const CreateOrder: React.FC = () => {
       })),
       subtotal: calculatedSubtotal,
       discount: calculatedDiscount,
+      tax: 0,
       total: calculatedTotal,
       paidAmount: 0,
+      changeAmount: 0,
       paymentMethod: 'transfer' as const,
       paymentStatus: 'unpaid' as const,
       status: status,
       staffId: user?.id ? String(user.id) : '1',
-      staffName: user?.username || user?.fullName || 'Nhân viên kinh doanh',
+      staffName: (user as any)?.username || user?.fullName || user?.name || 'Nhân viên kinh doanh',
       note: note.trim() || undefined,
       deliveryAddressId: selectedAddressId,
       deliveryAddressName: selectedAddr?.name,
@@ -733,7 +735,7 @@ export const CreateOrder: React.FC = () => {
     const c = customers.find((cust) => cust.id === draft.customerId || cust.code === draft.customerId);
     if (c) setSelectedCustomer(c);
 
-    if (draft.deliveryAddressId) setSelectedAddressId(draft.deliveryAddressId);
+    if (draft.deliveryAddressId) setSelectedAddressId(Number(draft.deliveryAddressId));
     if (draft.deliveryAddress) setCustomAddress(draft.deliveryAddress);
     if (draft.deliveryReceiverName) setReceiverName(draft.deliveryReceiverName);
     if (draft.deliveryPhone) setReceiverPhone(draft.deliveryPhone);
@@ -772,16 +774,18 @@ export const CreateOrder: React.FC = () => {
     setExpectedDeliveryDate(d.toISOString().split('T')[0]);
   };
 
-  // Filtered customer list
+  // Filtered customer list — hiển 10 đầu nếu chưa gõ gì, tìm kiếm không dấu tiếng Việt
   const filteredCustomers = useMemo(() => {
+    const normalize = (s: string) =>
+      s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase();
     if (!customerSearch.trim()) return customers.slice(0, 10);
-    const q = customerSearch.toLowerCase();
+    const q = normalize(customerSearch);
     return customers
       .filter(
         (c) =>
-          c.name.toLowerCase().includes(q) ||
+          normalize(c.name).includes(q) ||
           c.code.toLowerCase().includes(q) ||
-          c.phone.toLowerCase().includes(q)
+          normalize(c.phone).includes(q)
       )
       .slice(0, 10);
   }, [customers, customerSearch]);
@@ -873,7 +877,7 @@ export const CreateOrder: React.FC = () => {
 
           {/* Customer Selection */}
           {!selectedCustomer ? (
-            <div ref={customerSearchRef} className="relative">
+            <div ref={customerSearchRef} className="space-y-1.5">
               <div className="relative">
                 <Search className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
                 <input
@@ -881,10 +885,10 @@ export const CreateOrder: React.FC = () => {
                   value={customerSearch}
                   onChange={(e) => {
                     setCustomerSearch(e.target.value);
-                    setIsCustomerDropdownOpen(true);
                   }}
                   onFocus={() => setIsCustomerDropdownOpen(true)}
-                  placeholder="Tìm đại lý theo tên, mã hoặc SĐT..."
+                  placeholder="Nhập tên, mã hoặc SĐT để lọc đại lý..."
+                  autoComplete="off"
                   className="w-full pl-9 pr-8 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                 />
                 {customerSearch && (
@@ -897,44 +901,61 @@ export const CreateOrder: React.FC = () => {
                 )}
               </div>
 
-              {isCustomerDropdownOpen && (
-                <div className="absolute left-0 right-0 top-full mt-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-lg max-h-60 overflow-y-auto z-20 divide-y divide-slate-100 dark:divide-slate-800">
-                  {filteredCustomers.length === 0 ? (
-                    <div className="p-3 text-center text-xs text-slate-500">
-                      Không tìm thấy đại lý phù hợp
-                    </div>
-                  ) : (
-                    filteredCustomers.map((c) => (
-                      <button
-                        key={c.id}
-                        type="button"
-                        onClick={() => {
-                          setSelectedCustomer(c);
-                          setIsCustomerDropdownOpen(false);
-                          setCustomerSearch('');
-                        }}
-                        className="w-full text-left p-2.5 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-start gap-2.5 transition-colors"
-                      >
-                        <User className="w-4 h-4 text-blue-500 mt-0.5 shrink-0" />
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center justify-between gap-1">
-                            <span className="font-semibold text-xs text-slate-900 dark:text-white truncate">
-                              {c.name}
-                            </span>
-                            <span className="text-[10px] font-mono bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 px-1.5 py-0.5 rounded">
-                              {c.code}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                            <span>{c.phone || 'Chưa có SĐT'}</span>
-                            {c.address && <span className="truncate">&bull; {c.address}</span>}
-                          </div>
-                        </div>
-                      </button>
-                    ))
+              {/* Danh sách đại lý — luôn hiện 10 mặc định, thu hẹp theo tìm kiếm */}
+              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm max-h-64 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800">
+                {/* Header badge */}
+                <div className="sticky top-0 z-10 flex items-center justify-between px-3 py-1.5 bg-slate-50 dark:bg-slate-800/80 border-b border-slate-100 dark:border-slate-800">
+                  <span className="text-[11px] text-slate-400 dark:text-slate-500 font-medium">
+                    {customerSearch.trim()
+                      ? `Kết quả tìm kiếm: ${filteredCustomers.length} đại lý`
+                      : `Hiển thị ${Math.min(10, customers.length)} / ${customers.length} đại lý`}
+                  </span>
+                  {customers.length === 0 && (
+                    <span className="text-[11px] text-slate-400 animate-pulse">Đang tải...</span>
                   )}
                 </div>
-              )}
+
+                {filteredCustomers.length === 0 ? (
+                  <div className="p-4 text-center">
+                    <User className="w-8 h-8 text-slate-300 dark:text-slate-600 mx-auto mb-1" />
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      Không tìm thấy đại lý phù hợp
+                    </p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">Thử tìm bằng tên, mã hoặc SĐT</p>
+                  </div>
+                ) : (
+                  filteredCustomers.map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedCustomer(c);
+                        setIsCustomerDropdownOpen(false);
+                        setCustomerSearch('');
+                      }}
+                      className="w-full text-left p-2.5 hover:bg-blue-50 dark:hover:bg-blue-950/30 flex items-start gap-2.5 transition-colors group"
+                    >
+                      <span className="flex items-center justify-center w-7 h-7 rounded-full bg-blue-100 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5 group-hover:bg-blue-200 dark:group-hover:bg-blue-900/60 transition-colors">
+                        <User className="w-3.5 h-3.5" />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-1">
+                          <span className="font-semibold text-xs text-slate-900 dark:text-white truncate">
+                            {c.name}
+                          </span>
+                          <span className="text-[10px] font-mono bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 px-1.5 py-0.5 rounded shrink-0">
+                            {c.code}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                          <span>{c.phone || 'Chưa có SĐT'}</span>
+                          {c.address && <span className="truncate">&bull; {c.address}</span>}
+                        </div>
+                      </div>
+                    </button>
+                  ))
+                )}
+              </div>
             </div>
           ) : (
             <div className="p-3 bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200/70 dark:border-blue-800/60 rounded-xl">
@@ -1177,7 +1198,7 @@ export const CreateOrder: React.FC = () => {
                         >
                           Tất cả ({suggestionsData.items.length})
                         </button>
-                        {suggestionsData.groups.map((grp) => (
+                        {suggestionsData.groups.map((grp: any) => (
                           <button
                             key={grp.category}
                             type="button"
@@ -1197,8 +1218,8 @@ export const CreateOrder: React.FC = () => {
                     {/* Danh sách các nhóm hàng (Groups) */}
                     <div className="space-y-3">
                       {suggestionsData.groups
-                        .filter((grp) => selectedCategoryTab === 'all' || selectedCategoryTab === grp.category)
-                        .map((group) => (
+                        .filter((grp: any) => selectedCategoryTab === 'all' || selectedCategoryTab === grp.category)
+                        .map((group: any) => (
                           <div
                             key={group.category}
                             className="bg-white/95 dark:bg-slate-800/90 border border-indigo-100/90 dark:border-slate-700/80 rounded-xl p-3 shadow-xs space-y-2.5"
@@ -1228,7 +1249,7 @@ export const CreateOrder: React.FC = () => {
 
                             {/* Danh sách các món trong nhóm */}
                             <div className="grid grid-cols-1 gap-2">
-                              {group.items.map((item) => {
+                              {group.items.map((item: any) => {
                                 const inCartItem = items.find(
                                   (i) => String(i.productId) === String(item.productId)
                                 );

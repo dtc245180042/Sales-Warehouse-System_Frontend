@@ -129,67 +129,6 @@ export interface PortalOrderDetail {
   has_short_delivery: boolean;
 }
 
-export interface PortalReorderItemPreview {
-  item_id?: number;
-  product_id: string;
-  sku?: string;
-  name: string;
-  unit?: string;
-  old_quantity: number;
-  default_quantity: number;
-  old_price: number;
-  current_price: number;
-  is_price_changed: boolean;
-  price_difference: number;
-  estimated_subtotal: number;
-}
-
-export interface PortalReorderDiscontinuedItem {
-  product_id: string;
-  sku?: string;
-  name: string;
-  old_quantity: number;
-  old_price: number;
-  reason: string;
-}
-
-export interface PortalReorderPreviewResponse {
-  original_order_id: string;
-  original_order_code: string;
-  original_order_created_at: string;
-  available_items: PortalReorderItemPreview[];
-  discontinued_items: PortalReorderDiscontinuedItem[];
-  has_discontinued_items: boolean;
-  has_price_changes: boolean;
-  estimated_total: number;
-  notice?: string;
-}
-
-export interface PortalReorderItemIn {
-  product_id: string;
-  quantity: number;
-}
-
-export interface PortalReorderRequest {
-  selected_items: PortalReorderItemIn[];
-  delivery_notes?: string;
-  expected_delivery_date?: string;
-}
-
-export interface PortalReorderResponse {
-  order_id: string;
-  order_code: string;
-  customer_id: string;
-  status: string;
-  subtotal: number;
-  total: number;
-  items_count: number;
-  copied_from_order_id: string;
-  removed_discontinued_items: PortalReorderDiscontinuedItem[];
-  price_change_warnings: string[];
-  created_at: string;
-}
-
 export const portalService = {
   getProfile: async (): Promise<PortalProfile> => {
     const res = await apiClient.get<PortalProfile>('/portal/me');
@@ -240,25 +179,21 @@ export const portalService = {
     return res.data;
   },
 
-  getReorderPreview: async (orderId: string): Promise<PortalReorderPreviewResponse> => {
-    const res = await apiClient.get<PortalReorderPreviewResponse>(`/portal/orders/${orderId}/reorder-preview`);
+  cancelOrder: async (orderId: string, reason: string): Promise<any> => {
+    const res = await apiClient.post(`/portal/orders/${orderId}/cancel`, { reason });
     return res.data;
   },
 
-  createReorder: async (
+  updateOrder: async (
     orderId: string,
-    payload: PortalReorderRequest,
-    idempotencyKey: string
-  ): Promise<PortalReorderResponse> => {
-    const res = await apiClient.post<PortalReorderResponse>(
-      `/portal/orders/${orderId}/reorder`,
-      payload,
-      {
-        headers: {
-          'X-Idempotency-Key': idempotencyKey,
-        },
-      }
-    );
+    data: { delivery_address_id?: number; expected_delivery_date?: string; delivery_notes?: string }
+  ): Promise<any> => {
+    const res = await apiClient.put(`/portal/orders/${orderId}`, data);
+    return res.data;
+  },
+
+  confirmDelivery: async (orderId: string): Promise<any> => {
+    const res = await apiClient.post(`/portal/orders/${orderId}/confirm-delivery`);
     return res.data;
   },
 };
