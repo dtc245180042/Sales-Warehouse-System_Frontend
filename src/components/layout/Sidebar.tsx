@@ -22,11 +22,24 @@ import {
   Receipt,
   PlusCircle,
   ShoppingCart,
+  Warehouse,
+  Layers,
+  ArrowLeftRight,
+  ClipboardCheck,
+  ArrowDownLeft,
+  ArrowUpRight,
   History,
   Truck,
   DollarSign,
   FileText,
   Route as RouteIcon,
+  Clock,
+  RotateCcw,
+  FileCheck2,
+  CreditCard,
+  CalendarClock,
+  Target,
+  AlertOctagon,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { UserRole } from '../../types/User';
@@ -108,7 +121,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     'User',
   ];
 
-  const menuSections: { heading?: string; items: MenuItem[] }[] = [
+  const menuSections = useMemo<{ heading?: string; items: MenuItem[] }[]>(() => [
     {
       heading: 'BẢNG ĐIỀU KHIỂN',
       items: [
@@ -117,6 +130,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
           path: '/dashboard',
           icon: <LayoutDashboard className="w-5 h-5" />,
           allowedRoles: ALL_ROLES,
+        },
+        {
+          title: 'Điều hành Bán hàng & Kho',
+          path: '/executive-dashboard',
+          icon: <TrendingUp className="w-5 h-5" />,
+          allowedRoles: [
+            'Admin',
+            'SalesManager',
+            'Director',
+            'Manager',
+            'Accountant',
+            'WarehouseManager',
+          ],
         },
       ],
     },
@@ -130,7 +156,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           allowedRoles: ALL_ROLES,
         },
         {
-          title: 'Tạo đơn hiện trường',
+          title: 'Tạo đơn hàng',
           path: '/orders/create',
           icon: <ShoppingCart className="w-5 h-5" />,
           allowedRoles: ALL_ROLES,
@@ -139,6 +165,42 @@ export const Sidebar: React.FC<SidebarProps> = ({
           title: 'Bán hàng tại quầy (POS)',
           path: '/sales/pos',
           icon: <Store className="w-5 h-5" />,
+          allowedRoles: ALL_ROLES.filter((r) => r !== 'User'),
+        },
+        {
+          title: 'Hóa đơn bán hàng',
+          path: '/invoices',
+          icon: <FileText className="w-5 h-5" />,
+          allowedRoles: ALL_ROLES,
+        },
+        {
+          title: 'Phiếu thu công nợ',
+          path: '/payments',
+          icon: <CreditCard className="w-5 h-5" />,
+          allowedRoles: ALL_ROLES,
+        },
+        {
+          title: 'Phiếu trả hàng',
+          path: '/returns',
+          icon: <RotateCcw className="w-5 h-5" />,
+          allowedRoles: ALL_ROLES,
+        },
+        {
+          title: 'Chứng từ giảm nợ',
+          path: '/credit-notes',
+          icon: <FileCheck2 className="w-5 h-5" />,
+          allowedRoles: ALL_ROLES,
+        },
+        {
+          title: 'Chỉ tiêu doanh số',
+          path: '/sales/targets',
+          icon: <Target className="w-5 h-5" />,
+          allowedRoles: ALL_ROLES.filter((r) => r !== 'User'),
+        },
+        {
+          title: 'Tiến độ doanh số',
+          path: '/sales/targets/progress',
+          icon: <TrendingUp className="w-5 h-5" />,
           allowedRoles: ALL_ROLES.filter((r) => r !== 'User'),
         },
       ],
@@ -228,12 +290,83 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 'SalesManager',
                 'SalesStaff',
                 'Accountant',
-                'WarehouseManager',
-                'WarehouseStaff',
                 'Director',
                 'Manager',
-                'Staff',
               ],
+            },
+          ],
+        },
+        {
+          title: 'Quản Lý Kho Hàng',
+          icon: <Warehouse className="w-5 h-5" />,
+          allowedRoles: [
+            'Admin',
+            'WarehouseManager',
+            'WarehouseStaff',
+            'SalesManager',
+            'Director',
+            'Manager',
+          ],
+          submenu: [
+            {
+              title: 'Sổ tồn kho 3 cột',
+              path: '/inventory',
+              icon: <Layers className="w-3.5 h-3.5" />,
+              allowedRoles: ALL_ROLES,
+            },
+            {
+              title: 'Quản lý lô & Hạn dùng (FEFO)',
+              path: '/inventory/lots',
+              icon: <CalendarClock className="w-3.5 h-3.5" />,
+              allowedRoles: ALL_ROLES,
+            },
+            {
+              title: 'Phiếu xuất kho điều phối',
+              path: '/inventory/dispatches',
+              icon: <Truck className="w-3.5 h-3.5" />,
+              allowedRoles: ALL_ROLES,
+            },
+            {
+              title: 'Nợ hàng & Giao bù (Backorder)',
+              path: '/inventory/backorders',
+              icon: <RotateCcw className="w-3.5 h-3.5" />,
+              allowedRoles: ALL_ROLES,
+            },
+            {
+              title: 'Chuyển kho nội bộ',
+              path: '/inventory/transfers',
+              icon: <ArrowLeftRight className="w-3.5 h-3.5" />,
+              allowedRoles: ALL_ROLES,
+            },
+            {
+              title: 'Nhập kho nhà cung cấp',
+              path: '/inventory/stock-in',
+              icon: <ArrowDownLeft className="w-3.5 h-3.5" />,
+              allowedRoles: ALL_ROLES,
+            },
+            {
+              title: 'Xuất kho hàng hóa',
+              path: '/inventory/stock-out',
+              icon: <ArrowUpRight className="w-3.5 h-3.5" />,
+              allowedRoles: ALL_ROLES,
+            },
+            {
+              title: 'Kiểm kê kho hàng',
+              path: '/inventory/stock-takes',
+              icon: <ClipboardCheck className="w-3.5 h-3.5" />,
+              allowedRoles: ALL_ROLES,
+            },
+            {
+              title: 'Điều chỉnh tồn kho',
+              path: '/inventory/adjustments',
+              icon: <AlertOctagon className="w-3.5 h-3.5" />,
+              allowedRoles: ALL_ROLES,
+            },
+            {
+              title: 'Lịch sử thẻ kho',
+              path: '/inventory/history',
+              icon: <History className="w-3.5 h-3.5" />,
+              allowedRoles: ALL_ROLES,
             },
           ],
         },
@@ -434,6 +567,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
           ],
         },
         {
+          title: 'Doanh số Đa chiều',
+          path: '/reports/sales-multidim',
+          icon: <Layers className="w-5 h-5" />,
+          allowedRoles: [
+            'Admin',
+            'SalesManager',
+            'Director',
+            'Accountant',
+            'Manager',
+            'SalesStaff',
+          ],
+        },
+        {
           title: 'Báo cáo Tồn kho',
           path: '/reports/inventory',
           icon: <Package className="w-5 h-5" />,
@@ -443,6 +589,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
             'WarehouseStaff',
             'Director',
             'Manager',
+            'Accountant',
+          ],
+        },
+        {
+          title: 'Vòng quay Tồn kho',
+          path: '/reports/inventory-turnover',
+          icon: <RotateCcw className="w-5 h-5" />,
+          allowedRoles: [
+            'Admin',
+            'WarehouseManager',
+            'WarehouseStaff',
+            'Director',
+            'Manager',
+            'Accountant',
           ],
         },
       ],
@@ -470,17 +630,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
         },
       ],
     },
-  ];
+  ], []);
 
   const allTopLevelPaths = useMemo(() => {
-    const paths: string[] = [];
-    menuSections.forEach((sec) => {
-      sec.items.forEach((item) => {
-        if (item.path) paths.push(item.path);
-        if (item.submenu) item.submenu.forEach((sub) => paths.push(sub.path));
-      });
-    });
-    return paths;
+    return menuSections
+      .flatMap((s) => s.items.map((i) => i.path).filter(Boolean) as string[]);
   }, [menuSections]);
 
   const sidebarContent = (
@@ -583,11 +737,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     key={itemIdx}
                     to={item.path!}
                     onClick={onMobileClose}
-                    className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all outline-none focus:outline-none ${
-                      isItemActive
-                        ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/25'
-                        : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60'
-                    }`}
+                    className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all outline-none focus:outline-none ${isItemActive
+                      ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/25'
+                      : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60'
+                      }`}
                     title={isCollapsed ? item.title : undefined}
                     aria-current={isItemActive ? 'page' : undefined}
                   >
