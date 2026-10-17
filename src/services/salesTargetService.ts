@@ -7,187 +7,15 @@ import {
   SalesTargetAuditRecord,
 } from '../types/SalesTarget';
 import { getStorageItem, setStorageItem } from './storage';
+import { initialOrders } from '../mock/orders';
+import { parseSafeDate } from '../utils/formatters';
 
 const STORAGE_KEY = 'kv_sales_targets';
 const STORAGE_AUDIT_KEY = 'kv_sales_target_audits';
 
-const INITIAL_DEMO_TARGETS: SalesTarget[] = [
-  // Tháng 10/2026 - Active
-  {
-    id: 'TGT-202610-001',
-    year: 2026,
-    month: 10,
-    period: 'Tháng 10/2026',
-    scope: 'individual',
-    userId: 'USR-003',
-    userName: 'Nguyễn Văn Bán Hàng',
-    userRole: 'SalesStaff',
-    territory: 'Khu vực Hà Nội',
-    targetRevenue: 500000000,
-    targetOrders: 100,
-    status: 'active',
-    createdBy: 'USR-002',
-    createdByName: 'Trần Văn Quản Lý',
-    createdAt: '2026-10-01T08:00:00.000Z',
-  },
-  {
-    id: 'TGT-202610-002',
-    year: 2026,
-    month: 10,
-    period: 'Tháng 10/2026',
-    scope: 'individual',
-    userId: 'USR-007',
-    userName: 'Lê Thị Thu Thảo',
-    userRole: 'SalesStaff',
-    territory: 'Khu vực TP. Hồ Chí Minh',
-    targetRevenue: 650000000,
-    targetOrders: 120,
-    status: 'active',
-    createdBy: 'USR-002',
-    createdByName: 'Trần Văn Quản Lý',
-    createdAt: '2026-10-01T08:30:00.000Z',
-  },
-  {
-    id: 'TGT-202610-003',
-    year: 2026,
-    month: 10,
-    period: 'Tháng 10/2026',
-    scope: 'individual',
-    userId: 'USR-008',
-    userName: 'Phạm Minh Đức',
-    userRole: 'SalesStaff',
-    territory: 'Khu vực Đà Nẵng',
-    targetRevenue: 400000000,
-    targetOrders: 80,
-    status: 'active',
-    createdBy: 'USR-002',
-    createdByName: 'Trần Văn Quản Lý',
-    createdAt: '2026-10-01T08:45:00.000Z',
-  },
-  {
-    id: 'TGT-202610-004',
-    year: 2026,
-    month: 10,
-    period: 'Tháng 10/2026',
-    scope: 'territory',
-    territory: 'Khu vực Miền Bắc',
-    targetRevenue: 1800000000,
-    targetOrders: 350,
-    status: 'active',
-    createdBy: 'USR-001',
-    createdByName: 'Hệ thống Quản trị',
-    createdAt: '2026-10-01T07:30:00.000Z',
-  },
-  {
-    id: 'TGT-202610-005',
-    year: 2026,
-    month: 10,
-    period: 'Tháng 10/2026',
-    scope: 'territory',
-    territory: 'Khu vực Miền Nam',
-    targetRevenue: 2200000000,
-    targetOrders: 420,
-    status: 'active',
-    createdBy: 'USR-001',
-    createdByName: 'Hệ thống Quản trị',
-    createdAt: '2026-10-01T07:35:00.000Z',
-  },
-
-  // Tháng 09/2026 - Đã khóa (Locked) để test SCRUM-805
-  {
-    id: 'TGT-202609-001',
-    year: 2026,
-    month: 9,
-    period: 'Tháng 09/2026',
-    scope: 'individual',
-    userId: 'USR-003',
-    userName: 'Nguyễn Văn Bán Hàng',
-    userRole: 'SalesStaff',
-    territory: 'Khu vực Hà Nội',
-    targetRevenue: 450000000,
-    targetOrders: 90,
-    status: 'locked',
-    lockedAt: '2026-10-01T00:00:00.000Z',
-    lockedBy: 'USR-001',
-    lockedByName: 'Admin',
-    createdBy: 'USR-002',
-    createdByName: 'Trần Văn Quản Lý',
-    createdAt: '2026-09-01T08:00:00.000Z',
-  },
-  {
-    id: 'TGT-202609-002',
-    year: 2026,
-    month: 9,
-    period: 'Tháng 09/2026',
-    scope: 'individual',
-    userId: 'USR-007',
-    userName: 'Lê Thị Thu Thảo',
-    userRole: 'SalesStaff',
-    territory: 'Khu vực TP. Hồ Chí Minh',
-    targetRevenue: 600000000,
-    targetOrders: 110,
-    status: 'locked',
-    lockedAt: '2026-10-01T00:00:00.000Z',
-    lockedBy: 'USR-001',
-    lockedByName: 'Admin',
-    createdBy: 'USR-002',
-    createdByName: 'Trần Văn Quản Lý',
-    createdAt: '2026-09-01T08:15:00.000Z',
-  },
-  {
-    id: 'TGT-202609-003',
-    year: 2026,
-    month: 9,
-    period: 'Tháng 09/2026',
-    scope: 'territory',
-    territory: 'Khu vực Miền Bắc',
-    targetRevenue: 1600000000,
-    targetOrders: 320,
-    status: 'locked',
-    lockedAt: '2026-10-01T00:00:00.000Z',
-    lockedBy: 'USR-001',
-    lockedByName: 'Admin',
-    createdBy: 'USR-001',
-    createdByName: 'Hệ thống Quản trị',
-    createdAt: '2026-09-01T07:30:00.000Z',
-  },
-];
-
-const INITIAL_DEMO_AUDITS: SalesTargetAuditRecord[] = [
-  {
-    id: 'AUD-001',
-    targetId: 'TGT-202609-001',
-    timestamp: '2026-10-01T00:00:00.000Z',
-    userId: 'USR-001',
-    userName: 'Admin',
-    userRole: 'Admin',
-    action: 'LOCK',
-    changeSummary: 'Khoá kỳ chỉ tiêu kinh doanh Tháng 09/2026',
-  },
-  {
-    id: 'AUD-002',
-    targetId: 'TGT-202609-001',
-    timestamp: '2026-09-01T08:00:00.000Z',
-    userId: 'USR-002',
-    userName: 'Trần Văn Quản Lý',
-    userRole: 'SalesManager',
-    action: 'CREATE',
-    newRevenue: 450000000,
-    changeSummary: 'Tạo mới chỉ tiêu kinh doanh Tháng 09/2026: 450,000,000 đ',
-  },
-];
-
-// Mock achievements map for demo real-time progress (can also fetch orders)
-const MOCK_ACHIEVEMENTS: Record<string, { revenue: number; orders: number }> = {
-  'TGT-202610-001': { revenue: 385000000, orders: 78 }, // 77%
-  'TGT-202610-002': { revenue: 680000000, orders: 125 }, // 104% (overachieved)
-  'TGT-202610-003': { revenue: 180000000, orders: 36 }, // 45% (at risk)
-  'TGT-202610-004': { revenue: 1420000000, orders: 280 }, // 78.8%
-  'TGT-202610-005': { revenue: 2150000000, orders: 410 }, // 97.7%
-  'TGT-202609-001': { revenue: 462000000, orders: 92 }, // 102%
-  'TGT-202609-002': { revenue: 590000000, orders: 108 }, // 98%
-  'TGT-202609-003': { revenue: 1580000000, orders: 315 },
-};
+const INITIAL_DEMO_TARGETS: SalesTarget[] = [];
+const INITIAL_DEMO_AUDITS: SalesTargetAuditRecord[] = [];
+const MOCK_ACHIEVEMENTS: Record<string, { revenue: number; orders: number }> = {};
 
 export const salesTargetService = {
   getAll: async (params?: {
@@ -200,20 +28,26 @@ export const salesTargetService = {
       const res = await apiClient.get('/sales-targets', { params });
       if (res.data && Array.isArray(res.data.items || res.data)) {
         const items = res.data.items || res.data;
-        setStorageItem(STORAGE_KEY, items);
-        return items;
+        if (items.length > 0 && items[0].targetRevenue !== undefined) {
+          setStorageItem(STORAGE_KEY, items);
+          return items;
+        }
       }
     } catch {
       // Fallback
     }
 
     let list = getStorageItem<SalesTarget[]>(STORAGE_KEY, INITIAL_DEMO_TARGETS);
+    if (!Array.isArray(list) || list.length === 0) {
+      list = INITIAL_DEMO_TARGETS;
+      setStorageItem(STORAGE_KEY, list);
+    }
 
     if (params?.year) {
-      list = list.filter((t) => t.year === Number(params.year));
+      list = list.filter((t) => Number(t.year) === Number(params.year));
     }
     if (params?.month) {
-      list = list.filter((t) => t.month === Number(params.month));
+      list = list.filter((t) => Number(t.month) === Number(params.month));
     }
     if (params?.scope && params.scope !== 'all') {
       list = list.filter((t) => t.scope === params.scope);
@@ -400,27 +234,82 @@ export const salesTargetService = {
   getProgress: async (year: number, month: number): Promise<SalesTargetProgressItem[]> => {
     try {
       const res = await apiClient.get('/sales-targets/progress', { params: { year, month } });
-      if (res.data && Array.isArray(res.data)) return res.data;
+      if (
+        res.data &&
+        Array.isArray(res.data) &&
+        res.data.length > 0 &&
+        res.data[0].targetRevenue !== undefined &&
+        res.data[0].targetId !== undefined
+      ) {
+        return res.data;
+      }
     } catch {
       // Fallback
     }
 
-    const list = getStorageItem<SalesTarget[]>(STORAGE_KEY, INITIAL_DEMO_TARGETS);
-    const targets = list.filter((t) => t.year === year && t.month === month);
+    let list = getStorageItem<SalesTarget[]>(STORAGE_KEY, INITIAL_DEMO_TARGETS);
+    if (!Array.isArray(list) || list.length === 0) {
+      list = INITIAL_DEMO_TARGETS;
+      setStorageItem(STORAGE_KEY, list);
+    }
+
+    const targets = list.filter((t) => Number(t.year) === Number(year) && Number(t.month) === Number(month));
+
+    // Lấy danh sách đơn hàng thực tế để tính toán doanh số và số đơn
+    const orders = getStorageItem<any[]>('kv_orders', initialOrders);
 
     return targets.map((t) => {
-      const mock = MOCK_ACHIEVEMENTS[t.id] || {
-        revenue: Math.round(t.targetRevenue * (0.6 + Math.random() * 0.45)),
-        orders: Math.round((t.targetOrders || 100) * (0.6 + Math.random() * 0.45)),
-      };
+      const targetRev = Number(t.targetRevenue) || 0;
+      const targetOrd = Number(t.targetOrders) || 100;
 
-      const currentRev = mock.revenue;
-      const remainingRev = Math.max(0, t.targetRevenue - currentRev);
-      const revPct = t.targetRevenue > 0 ? (currentRev / t.targetRevenue) * 100 : 0;
+      // Lọc các đơn hàng phát sinh trong kỳ tháng/năm của chỉ tiêu
+      const matchingOrders = (orders || []).filter((o) => {
+        if (!o || o.status === 'cancelled' || o.status === 'draft') return false;
 
-      const targetOrd = t.targetOrders || 100;
-      const currentOrd = mock.orders;
-      const ordPct = targetOrd > 0 ? (currentOrd / targetOrd) * 100 : 0;
+        const orderDate = parseSafeDate(o.createdAt || o.created_at);
+        if (orderDate) {
+          if (orderDate.getFullYear() !== Number(year) || orderDate.getMonth() + 1 !== Number(month)) {
+            return false;
+          }
+        }
+
+        if (t.scope === 'individual') {
+          const matchId = t.userId && (String(o.staffId) === String(t.userId) || String(o.staff_id) === String(t.userId));
+          const matchName = t.userName && (
+            (o.staffName && o.staffName.toLowerCase() === t.userName.toLowerCase()) ||
+            (o.staff_name && o.staff_name.toLowerCase() === t.userName.toLowerCase())
+          );
+          return Boolean(matchId || matchName);
+        } else {
+          const terr = (t.territory || '').toLowerCase();
+          const addr = (o.customerAddress || o.customer_address || '').toLowerCase();
+          if (terr.includes('hà nội') && (addr.includes('hà nội') || addr.includes('hoàn kiếm') || addr.includes('ba đình'))) return true;
+          if ((terr.includes('hồ chí minh') || terr.includes('tp. hcm')) && (addr.includes('hồ chí minh') || addr.includes('quận 1') || addr.includes('tp. hcm'))) return true;
+          if (terr.includes('đà nẵng') && (addr.includes('đà nẵng') || addr.includes('hải châu'))) return true;
+          if (terr.includes('miền bắc') && (addr.includes('hà nội') || addr.includes('hải phòng') || addr.includes('quảng ninh'))) return true;
+          if (terr.includes('miền nam') && (addr.includes('hồ chí minh') || addr.includes('cần thơ') || addr.includes('bình dương'))) return true;
+          return terr ? addr.includes(terr) : false;
+        }
+      });
+
+      const realRevenue = matchingOrders.reduce((sum, o) => sum + (Number(o.total) || 0), 0);
+      const realOrders = matchingOrders.length;
+
+      const mock = MOCK_ACHIEVEMENTS[t.id];
+      let currentRev = realRevenue;
+      let currentOrd = realOrders;
+
+      if (mock) {
+        currentRev = Math.max(realRevenue, Number(mock.revenue) || 0);
+        currentOrd = Math.max(realOrders, Number(mock.orders) || 0);
+      } else if (realOrders === 0 && !mock) {
+        currentRev = realRevenue;
+        currentOrd = realOrders;
+      }
+
+      const remainingRev = Math.max(0, targetRev - currentRev);
+      const revPct = targetRev > 0 ? Math.round((currentRev / targetRev) * 1000) / 10 : 0;
+      const ordPct = targetOrd > 0 ? Math.round((currentOrd / targetOrd) * 1000) / 10 : 0;
 
       return {
         targetId: t.id,
@@ -429,13 +318,13 @@ export const salesTargetService = {
         userName: t.userName,
         userRole: t.userRole,
         territory: t.territory,
-        targetRevenue: t.targetRevenue,
+        targetRevenue: targetRev,
         currentRevenue: currentRev,
         remainingRevenue: remainingRev,
-        revenuePercentage: Math.round(revPct * 10) / 10,
+        revenuePercentage: revPct,
         targetOrders: targetOrd,
         currentOrders: currentOrd,
-        ordersPercentage: Math.round(ordPct * 10) / 10,
+        ordersPercentage: ordPct,
         status: t.status,
       };
     });

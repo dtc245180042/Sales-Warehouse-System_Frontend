@@ -1,13 +1,15 @@
-export const formatCurrency = (amount: number): string => {
+export const formatCurrency = (amount: number | undefined | null): string => {
+  if (amount === undefined || amount === null || isNaN(Number(amount))) return '0 ₫';
   return new Intl.NumberFormat('vi-VN', {
     style: 'currency',
     currency: 'VND',
     maximumFractionDigits: 0,
-  }).format(amount);
+  }).format(Number(amount));
 };
 
-export const formatNumber = (num: number): string => {
-  return new Intl.NumberFormat('vi-VN').format(num);
+export const formatNumber = (num: number | undefined | null): string => {
+  if (num === undefined || num === null || isNaN(Number(num))) return '0';
+  return new Intl.NumberFormat('vi-VN').format(Number(num));
 };
 
 /**
@@ -102,4 +104,9 @@ export const parseCurrencyInput = (formattedValue: string | undefined | null): n
   const clean = formattedValue.toString().replace(/\D/g, '').replace(/^0+(?=\d)/, '');
   return clean ? parseInt(clean, 10) : 0;
 };
+
+export const formatPercent = (val: number, decimals: number = 1): string => {
+  return `${(val || 0).toFixed(decimals)}%`;
+};
+
 
