@@ -78,36 +78,7 @@ export const ReturnListPage: React.FC = () => {
       product_name: string;
       sku: string;
       lot_id: number | null;
-      lot_number: string;
-      quantity: number;
-      condition: ItemCondition;
-      unit_price: number;
-      subtotal: number;
-    }[]
-  >([
-    {
-      invoice_item_id: 101,
-      product_name: 'iPhone 15 Pro Max 256GB Titan Tự Nhiên',
-      sku: 'IP15PM-256-TI',
-      lot_id: 10,
-      lot_number: 'LOT-2026-IP15P-01',
-      quantity: 1,
-      condition: 'GOOD',
-      unit_price: 26990000,
-      subtotal: 26990000,
-    },
-    {
-      invoice_item_id: 102,
-      product_name: 'Tai nghe Chống Ồn Sony WH-1000XM5 Đen',
-      sku: 'SNY-WH1000XM5',
-      lot_id: null,
-      lot_number: 'N/A',
-      quantity: 1,
-      condition: 'DAMAGED',
-      unit_price: 7990000,
-      subtotal: 7990000,
-    },
-  ]);
+      lot_number: string; quantity: number; condition: ItemCondition; unit_price: number; subtotal: number; }[]>([]);
 
   const loadData = async () => {
     try {
