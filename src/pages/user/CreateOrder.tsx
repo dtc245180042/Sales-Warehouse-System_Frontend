@@ -16,7 +16,6 @@ import {
   MapPin,
   AlertCircle,
   PackageCheck,
-  Package,
 } from 'lucide-react';
 import { useUserCart } from '../../contexts/UserCartContext';
 import { mockUserApi } from '../../services/api';
@@ -147,7 +146,7 @@ export const CreateOrderPage: React.FC = () => {
           </div>
 
           <h2 className="text-3xl font-extrabold text-slate-900 dark:text-white mb-2">
-            ✓ Tạo đơn hàng thành công!
+            Tạo đơn hàng thành công!
           </h2>
           <p className="text-slate-500 dark:text-slate-400 mb-6">
             Đơn hàng đã được lưu vào hệ thống và sẵn sàng để đóng gói, xử lý giao hàng.
@@ -536,7 +535,7 @@ export const CreateOrderPage: React.FC = () => {
                       : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
                   }`}
                 >
-                  ✓ Đã thanh toán
+                  Đã thanh toán
                 </button>
                 <button
                   type="button"
@@ -584,7 +583,7 @@ export const CreateOrderPage: React.FC = () => {
               <div className="bg-slate-50 dark:bg-slate-800/60 p-4 rounded-xl space-y-2 border border-slate-200 dark:border-slate-700">
                 <div className="text-xs font-bold uppercase text-slate-400">Phương thức thanh toán</div>
                 <div className="font-semibold text-slate-900 dark:text-white">
-                  {paymentMethod === 'cash' ? '💵 Tiền mặt' : paymentMethod === 'transfer' ? '🏦 Chuyển khoản ngân hàng' : '📱 Ví điện tử'}
+                  {paymentMethod === 'cash' ? 'Tiền mặt' : paymentMethod === 'transfer' ? 'Chuyển khoản ngân hàng' : 'Ví điện tử'}
                 </div>
                 <div className="text-sm text-slate-600 dark:text-slate-300">
                   Tình trạng:{' '}

@@ -137,7 +137,7 @@ export const VolumeDiscountPolicyModal: React.FC<VolumeDiscountPolicyModalProps>
   const handleResetDefault = () => {
     const def = volumeDiscountService.resetToDefault();
     setTiers(def);
-    setEditList(def.map((t: any) => ({ ...t })));
+    setEditList(def.map((t) => ({ ...t })));
     setIsEditing(false);
     setValidationError(null);
     showToast('Đã khôi phục chính sách chiết khấu mặc định!', 'info');

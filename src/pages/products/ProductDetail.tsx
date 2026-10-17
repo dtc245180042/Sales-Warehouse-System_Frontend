@@ -9,8 +9,8 @@ import {
   Calendar,
   TrendingUp,
   PackageCheck,
-  ArrowDownLeft,
   History,
+  ArrowDownLeft,
 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { PageContainer } from '../../components/layout/PageContainer';
@@ -86,8 +86,8 @@ export const ProductDetail: React.FC = () => {
               Nhập hàng mã này
             </Button>
           </Link>
-          <Link to={`/products/${product.id}/price-history`}>
-            <Button variant="outline" size="sm" leftIcon={<History className="w-4 h-4" />}>
+          <Link to={`/products/price-history?productId=${product.sku || product.id}`}>
+            <Button variant="outline" size="sm" leftIcon={<History className="w-4 h-4 text-indigo-500" />}>
               Lịch sử giá
             </Button>
           </Link>
@@ -100,10 +100,10 @@ export const ProductDetail: React.FC = () => {
       }
     >
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column: Quick Stats & Metadata */}
+        {/* Left Column: Product Info & Supplier */}
         <div className="space-y-6">
-          <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-card text-center space-y-3">
-            <div className="flex items-center justify-center gap-2 mb-2">
+          <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-card">
+            <div className="flex flex-wrap items-center justify-between gap-2 pb-4 border-b border-slate-100 dark:border-slate-800">
               <Badge
                 variant={
                   product.status === 'active'
@@ -129,13 +129,15 @@ export const ProductDetail: React.FC = () => {
                 {product.category}
               </span>
             </div>
-            <div className="space-y-1 text-xs text-slate-400 mt-2">
-              <p>
-                Đơn vị tính cơ sở: <span className="font-semibold text-slate-700 dark:text-slate-200">{product.unit}</span>
-              </p>
-              <p>
-                Quy cách đóng gói: <span className="font-semibold text-slate-700 dark:text-slate-200">{product.packagingSpecification || '1 chiếc/hộp'}</span>
-              </p>
+            <div className="pt-4 space-y-2.5 text-xs text-slate-500 dark:text-slate-400">
+              <div className="flex items-center justify-between">
+                <span>Đơn vị tính cơ sở:</span>
+                <span className="font-semibold text-slate-800 dark:text-slate-200">{product.unit}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>Quy cách đóng gói:</span>
+                <span className="font-semibold text-slate-800 dark:text-slate-200">{product.packagingSpecification || '1 chiếc/hộp'}</span>
+              </div>
             </div>
           </div>
 
@@ -163,12 +165,12 @@ export const ProductDetail: React.FC = () => {
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-slate-400 uppercase">Giá Bán Lẻ</span>
                 <Link
-                  to={`/products/${product.id}/price-history`}
-                  className="inline-flex items-center gap-1 text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 font-semibold transition-colors"
-                  title="Tra cứu lịch sử thay đổi giá của sản phẩm này"
+                  to={`/products/price-history?productId=${product.sku || product.id}`}
+                  className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 hover:underline transition"
+                  title="Xem lịch sử điều chỉnh giá bán"
                 >
                   <History className="w-3.5 h-3.5" />
-                  <span>Lịch sử giá</span>
+                  Lịch sử giá
                 </Link>
               </div>
               <p className="text-2xl font-extrabold text-indigo-600 dark:text-indigo-400 mt-1">

@@ -11,7 +11,6 @@ import {
   ShieldCheck, 
   CheckCircle2,
   AlertCircle,
-  Package,
 } from 'lucide-react';
 import { useUserCart } from '../../contexts/UserCartContext';
 import { Modal } from '../../components/user/Modal';

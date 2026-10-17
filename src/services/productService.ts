@@ -2,23 +2,8 @@ import { Product } from '../types/Product';
 import { initialProducts } from '../mock/products';
 import { getStorageItem, setStorageItem } from './storage';
 import { apiClient } from '../api/client';
-import { priceHistoryService } from './priceHistoryService';
 
 const STORAGE_KEY = 'kv_products';
-
-// ─── In-memory cache cho getAll() ───────────────────────────────────────────
-// Giúp API call thứ 2 trở đi trả về kết quả < 1ms thay vì gọi lại server.
-const CACHE_TTL_MS = 60_000; // 60 giây
-let _cache: { data: Product[]; expiresAt: number } | null = null;
-
-// Micro-cache cho getPaginated (search, category, page) để đạt tốc độ phản hồi < 2ms
-const _queryCache = new Map<string, { items: Product[]; total: number; expiresAt: number }>();
-
-/** Xóa cache (gọi sau khi tạo / sửa / xóa sản phẩm) */
-export function invalidateProductCache(): void {
-  _cache = null;
-  _queryCache.clear();
-}
 
 function mapApiProduct(p: any): Product {
   const rawStatus = String(p.status || 'active').toLowerCase();
@@ -57,151 +42,84 @@ function mapApiProduct(p: any): Product {
   };
 }
 
-export const productService = {
-  getAll: async (forceRefresh: boolean = false): Promise<Product[]> => {
-    // Trả về cache nếu còn hạn và không bị ép refresh
-    if (!forceRefresh && _cache && Date.now() < _cache.expiresAt) {
-      return _cache.data;
-    }
+let memoryCacheProducts: Product[] | null = null;
+let lastProductsFetchTime = 0;
+const PRODUCTS_CACHE_TTL = 45000; // 45 giây
+let activeFetchPromise: Promise<Product[]> | null = null;
 
-    try {
-      // Hỗ trợ lấy toàn bộ danh mục sản phẩm từ CSDL MySQL (lên tới 10.000 sản phẩm)
-      const res = await apiClient.get('/products', {
-        params: { all_products: true, page_size: 10000 },
-      });
-      const rawList = Array.isArray(res.data)
-        ? res.data
-        : (Array.isArray(res.data?.items) ? res.data.items : null);
-      if (rawList && rawList.length > 0) {
-        const list = rawList.map(mapApiProduct);
-        // Lưu vào in-memory cache với TTL
-        _cache = { data: list, expiresAt: Date.now() + CACHE_TTL_MS };
-        // Tránh lỗi QuotaExceededError khi danh mục có 5000+ sản phẩm
-        if (list.length <= 500) {
-          try {
-            setStorageItem(STORAGE_KEY, list);
-          } catch {
-            // Quota limit
-          }
-        }
-        return list;
-      }
-    } catch (err) {
-      console.warn('[productService] Backend API offline hoặc lỗi, sử dụng bộ nhớ cục bộ:', err);
+export const productService = {
+  /** Lấy danh sách sản phẩm tức thì từ RAM cache (0ms) khi chuyển trang */
+  getCached: (): Product[] => {
+    if (memoryCacheProducts && memoryCacheProducts.length > 0) {
+      return memoryCacheProducts;
     }
     const stored = getStorageItem<Product[]>(STORAGE_KEY, initialProducts);
-    const fallback = stored.map((p) => ({
+    const cleaned = stored.filter(
+      (p) => !String(p?.id || '').startsWith('PROD-TRF-') && !String(p?.sku || '').startsWith('SKU-TRF-') && !String(p?.sku || '').startsWith('PROD-TRF-')
+    );
+    const mapped = cleaned.map((p) => ({
       ...p,
       image: (p.image && !p.image.includes('/images/products/') && !p.image.includes('placeholder')) ? p.image : '',
     }));
-    // Cache cả fallback để tránh gọi lại nhiều lần
-    _cache = { data: fallback, expiresAt: Date.now() + CACHE_TTL_MS };
-    return fallback;
+    if (mapped.length > 0) {
+      memoryCacheProducts = mapped;
+      return mapped;
+    }
+    return initialProducts;
   },
 
-  /**
-   * Lấy danh sách sản phẩm phân trang (mặc định 20 sp) kèm tìm kiếm, lọc nhóm hàng.
-   * Sử dụng RAM micro-cache để các lần tìm kiếm/lọc tiếp theo phản hồi tức thì < 2ms.
-   */
-  getPaginated: async (options: {
-    page?: number;
-    pageSize?: number;
-    search?: string;
-    category?: string;
-    forceRefresh?: boolean;
-  } = {}): Promise<{
-    items: Product[];
-    total: number;
-    page: number;
-    pageSize: number;
-    responseTimeMs: number;
-    fromCache: boolean;
-  }> => {
-    const page = Math.max(1, options.page || 1);
-    const pageSize = Math.max(1, options.pageSize || 20);
-    const search = (options.search || '').trim();
-    const category = (options.category === 'all' || !options.category) ? '' : options.category.trim();
-    const cacheKey = `${page}_${pageSize}_${search.toLowerCase()}_${category.toLowerCase()}`;
-
-    const startTime = performance.now();
-
-    // 1. Kiểm tra RAM micro-cache (< 2ms)
-    if (!options.forceRefresh && _queryCache.has(cacheKey)) {
-      const cached = _queryCache.get(cacheKey)!;
-      if (Date.now() < cached.expiresAt) {
-        const responseTimeMs = Number((performance.now() - startTime).toFixed(2));
-        return {
-          items: cached.items,
-          total: cached.total,
-          page,
-          pageSize,
-          responseTimeMs,
-          fromCache: true,
-        };
-      }
+  getAll: async (forceRefresh: boolean = false): Promise<Product[]> => {
+    // Trả về ngay lập tức nếu dữ liệu trong RAM còn tươi (TTL 45s) và không yêu cầu cưỡng chế tải lại
+    if (!forceRefresh && memoryCacheProducts && memoryCacheProducts.length > 0 && Date.now() - lastProductsFetchTime < PRODUCTS_CACHE_TTL) {
+      return memoryCacheProducts;
     }
 
-    try {
-      const params: any = {
-        page,
-        page_size: pageSize,
-      };
-      if (search) params.search = search;
-      if (category) params.category = category;
-
-      const res = await apiClient.get('/products', { params });
-      const rawList = Array.isArray(res.data)
-        ? res.data
-        : (Array.isArray(res.data?.items) ? res.data.items : []);
-      const total = typeof res.data?.total === 'number' ? res.data.total : rawList.length;
-      const items = rawList.map(mapApiProduct);
-
-      // Lưu vào RAM micro-cache (TTL 120s)
-      _queryCache.set(cacheKey, {
-        items,
-        total,
-        expiresAt: Date.now() + 120_000,
-      });
-
-      const responseTimeMs = Number((performance.now() - startTime).toFixed(2));
-      return {
-        items,
-        total,
-        page,
-        pageSize,
-        responseTimeMs,
-        fromCache: false,
-      };
-    } catch (err) {
-      console.warn('[productService.getPaginated] Lỗi gọi API, sử dụng fallback cục bộ:', err);
-      // Fallback: Lấy từ storage hoặc initialProducts
-      const allStored = getStorageItem<Product[]>(STORAGE_KEY, initialProducts);
-      let filtered = allStored;
-      if (category) {
-        filtered = filtered.filter((p) => p.category?.toLowerCase() === category.toLowerCase());
-      }
-      if (search) {
-        const q = search.toLowerCase();
-        filtered = filtered.filter(
-          (p) =>
-            p.name.toLowerCase().includes(q) ||
-            p.sku.toLowerCase().includes(q) ||
-            (p.barcode && String(p.barcode).toLowerCase().includes(q))
-        );
-      }
-      const total = filtered.length;
-      const startIdx = (page - 1) * pageSize;
-      const items = filtered.slice(startIdx, startIdx + pageSize);
-      const responseTimeMs = Number((performance.now() - startTime).toFixed(2));
-      return {
-        items,
-        total,
-        page,
-        pageSize,
-        responseTimeMs,
-        fromCache: false,
-      };
+    if (activeFetchPromise && !forceRefresh) {
+      return activeFetchPromise;
     }
+
+    activeFetchPromise = (async () => {
+      try {
+        // Hỗ trợ lấy toàn bộ danh mục sản phẩm từ CSDL MySQL (lên tới 10.000 sản phẩm)
+        const res = await apiClient.get('/products', {
+          params: { all_products: true, page_size: 10000 },
+        });
+        const rawList = Array.isArray(res.data)
+          ? res.data
+          : (Array.isArray(res.data?.items) ? res.data.items : null);
+        if (rawList && rawList.length > 0) {
+          const list = rawList.map(mapApiProduct);
+          memoryCacheProducts = list;
+          lastProductsFetchTime = Date.now();
+          // Tránh lỗi QuotaExceededError khi danh mục có 5000+ sản phẩm
+          if (list.length <= 500) {
+            try {
+              setStorageItem(STORAGE_KEY, list);
+            } catch {
+              // Quota limit
+            }
+          }
+          return list;
+        }
+      } catch (err) {
+        console.warn('[productService] Backend API offline hoặc lỗi, sử dụng bộ nhớ cục bộ:', err);
+      } finally {
+        activeFetchPromise = null;
+      }
+      const stored = getStorageItem<Product[]>(STORAGE_KEY, initialProducts);
+      const cleaned = stored.filter(
+        (p) => !String(p?.id || '').startsWith('PROD-TRF-') && !String(p?.sku || '').startsWith('SKU-TRF-') && !String(p?.sku || '').startsWith('PROD-TRF-')
+      );
+      const result = cleaned.map((p) => ({
+        ...p,
+        image: (p.image && !p.image.includes('/images/products/') && !p.image.includes('placeholder')) ? p.image : '',
+      }));
+      memoryCacheProducts = result;
+      lastProductsFetchTime = Date.now();
+      return result;
+    })();
+
+    return activeFetchPromise;
   },
 
   getById: async (id: string): Promise<Product | undefined> => {
@@ -257,7 +175,6 @@ export const productService = {
       };
       const res = await apiClient.post('/products', payload);
       const created = mapApiProduct(res.data);
-      invalidateProductCache(); // Xóa cache sau khi tạo mới
       const cached = getStorageItem<Product[]>(STORAGE_KEY, initialProducts);
       setStorageItem(STORAGE_KEY, [created, ...cached]);
       return created;
@@ -334,7 +251,7 @@ export const productService = {
 
       const res = await apiClient.put(`/products/${encodeURIComponent(strId)}`, payload);
       const updated = mapApiProduct(res.data);
-      invalidateProductCache(); // Xóa cache sau khi cập nhật
+
       const products = getStorageItem<Product[]>(STORAGE_KEY, initialProducts);
       const idx = products.findIndex((p) => String(p.id).trim() === strId);
       if (idx !== -1) {
@@ -358,34 +275,13 @@ export const productService = {
       const index = products.findIndex((p) => String(p.id).trim() === strId);
       if (index === -1) throw new Error('Không tìm thấy sản phẩm');
 
-      const oldProd = products[index];
       const updatedProduct = {
-        ...oldProd,
+        ...products[index],
         ...data,
         updatedAt: new Date().toISOString().split('T')[0],
       };
       products[index] = updatedProduct;
       setStorageItem(STORAGE_KEY, [...products]);
-
-      if (
-        (data.salePrice !== undefined && Number(data.salePrice) !== oldProd.salePrice) ||
-        (data.costPrice !== undefined && Number(data.costPrice) !== oldProd.costPrice)
-      ) {
-        priceHistoryService
-          .recordPriceChange({
-            productId: oldProd.id,
-            productSku: oldProd.sku,
-            productName: oldProd.name,
-            oldSalePrice: oldProd.salePrice,
-            newSalePrice: data.salePrice !== undefined ? Number(data.salePrice) : oldProd.salePrice,
-            oldCostPrice: oldProd.costPrice,
-            newCostPrice: data.costPrice !== undefined ? Number(data.costPrice) : oldProd.costPrice,
-            changedBy: (data as any).updatedBy || 'Quản lý kinh doanh',
-            reason: (data as any).priceChangeReason || 'Cập nhật giá từ màn hình chi tiết sản phẩm',
-          })
-          .catch(() => {});
-      }
-
       return updatedProduct;
     }
   },
@@ -405,7 +301,6 @@ export const productService = {
     } catch (err) {
       console.warn('[productService] Backend error, deleting locally:', err);
     }
-    invalidateProductCache(); // Xóa cache sau khi xóa sản phẩm
     const cached = getStorageItem<Product[]>(STORAGE_KEY, initialProducts);
     setStorageItem(STORAGE_KEY, cached.filter((p) => String(p.id).trim() !== strId));
     return true;

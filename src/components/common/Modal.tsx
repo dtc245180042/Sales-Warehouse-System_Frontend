@@ -9,7 +9,6 @@ interface ModalProps {
   children: React.ReactNode;
   footer?: React.ReactNode;
   maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '4xl';
-  size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '4xl' | string;
 }
 
 export const Modal: React.FC<ModalProps> = ({
@@ -20,7 +19,6 @@ export const Modal: React.FC<ModalProps> = ({
   children,
   footer,
   maxWidth = 'lg',
-  size,
 }) => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -38,7 +36,7 @@ export const Modal: React.FC<ModalProps> = ({
 
   if (!isOpen) return null;
 
-  const maxWidthClasses: Record<string, string> = {
+  const maxWidthClasses = {
     sm: 'max-w-sm',
     md: 'max-w-md',
     lg: 'max-w-lg',
@@ -46,9 +44,6 @@ export const Modal: React.FC<ModalProps> = ({
     '2xl': 'max-w-2xl',
     '4xl': 'max-w-4xl',
   };
-
-  const activeWidthKey = (size || maxWidth) as string;
-  const widthClass = maxWidthClasses[activeWidthKey] || 'max-w-lg';
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
@@ -60,7 +55,7 @@ export const Modal: React.FC<ModalProps> = ({
 
       <div className="flex min-h-full items-center justify-center p-4 text-center sm:p-0">
         <div
-          className={`relative transform overflow-hidden rounded-2xl bg-white dark:bg-slate-900 text-left shadow-2xl transition-all w-full ${widthClass} border border-slate-200 dark:border-slate-800 my-8`}
+          className={`relative transform overflow-hidden rounded-2xl bg-white dark:bg-slate-900 text-left shadow-2xl transition-all w-full ${maxWidthClasses[maxWidth]} border border-slate-200 dark:border-slate-800 my-8`}
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}

@@ -786,12 +786,11 @@ export const UserManagement: React.FC = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               {AVAILABLE_ROLES.map(({ role, label, desc }) => {
                 const isChecked = formData.roles.includes(role);
-                const isSelfAdmin = Boolean(
+                const isSelfAdmin =
                   editingUser &&
                   currentUser &&
                   currentUser.id === editingUser.id &&
-                  role === 'Admin'
-                );
+                  role === 'Admin';
 
                 return (
                   <label
@@ -805,7 +804,7 @@ export const UserManagement: React.FC = () => {
                     <input
                       type="checkbox"
                       checked={isChecked}
-                      disabled={isSelfAdmin}
+                      disabled={Boolean(isSelfAdmin)}
                       onChange={() => handleRoleToggle(role)}
                       className="mt-0.5 w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500"
                     />

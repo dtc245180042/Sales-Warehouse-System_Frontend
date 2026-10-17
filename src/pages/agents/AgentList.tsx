@@ -19,16 +19,14 @@ import {
   DollarSign,
   AlertCircle,
   FileSpreadsheet,
-  Lock,
-  ShieldAlert,
+  Store,
+  CreditCard,
 } from 'lucide-react';
 import { PageContainer } from '../../components/layout/PageContainer';
 import { Button } from '../../components/common/Button';
 import { Badge } from '../../components/common/Badge';
 import { Modal } from '../../components/common/Modal';
 import { ConfirmDialog } from '../../components/common/ConfirmDialog';
-import { AgentDetailModal } from '../../components/agents/AgentDetailModal';
-import { AgentCannotDeleteModal } from '../../components/agents/AgentCannotDeleteModal';
 import { formatCurrency } from '../../utils/formatters';
 import { exportToCSV } from '../../utils/csvExporter';
 import { agentService } from '../../services/agentService';
@@ -84,9 +82,10 @@ export const AgentList: React.FC = () => {
   const urlPage = parseInt(searchParams.get('page') || '1', 10);
   const urlPageSize = parseInt(searchParams.get('size') || '10', 10);
 
-  // ── Local state ──
-  const [agents, setAgents] = useState<Agent[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  // ── Local state - Nạp tức thì từ RAM cache (0ms) khi chuyển trang ──
+  const [agents, setAgents] = useState<Agent[]>(() => agentService.getCached());
+  const [isLoading, setIsLoading] = useState<boolean>(() => agentService.getCached().length === 0);
+  const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [search, setSearch] = useState(urlSearch);
   const [regionFilter, setRegionFilter] = useState(urlRegion);
@@ -98,12 +97,9 @@ export const AgentList: React.FC = () => {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingAgent, setEditingAgent] = useState<Agent | null>(null);
-  const [selectedDetailAgent, setSelectedDetailAgent] = useState<Agent | null>(null);
-  const [blockedDeleteAgent, setBlockedDeleteAgent] = useState<Agent | null>(null);
 
   // Form state
   const [formData, setFormData] = useState({
-    code: '',
     name: '',
     phone: '',
     email: '',
@@ -130,8 +126,9 @@ export const AgentList: React.FC = () => {
     setPageSize(urlPageSize);
   }, [urlSearch, urlRegion, urlGroup, urlStaff, urlStatus, urlPage, urlPageSize]);
 
-  const loadAgents = async () => {
-    setIsLoading(true);
+  const loadAgents = async (showSpinner: boolean = false) => {
+    if (showSpinner) setIsLoading(true);
+    setIsSyncing(true);
     setLoadError(null);
     try {
       const data = await agentService.getAll();
@@ -140,11 +137,13 @@ export const AgentList: React.FC = () => {
       setLoadError('Không thể tải danh sách đại lý. Vui lòng kiểm tra kết nối mạng và thử lại.');
     } finally {
       setIsLoading(false);
+      setIsSyncing(false);
     }
   };
 
   useEffect(() => {
-    loadAgents();
+    const hasCache = agents.length > 0;
+    loadAgents(!hasCache);
   }, []);
 
   // Danh sách nhân viên phụ trách trích xuất từ dữ liệu (SCRUM-469)
@@ -291,7 +290,6 @@ export const AgentList: React.FC = () => {
   const handleOpenCreate = () => {
     setEditingAgent(null);
     setFormData({
-      code: `DL-${1000 + agents.length + 1}`,
       name: '',
       phone: '',
       email: '',
@@ -312,7 +310,6 @@ export const AgentList: React.FC = () => {
   const handleOpenEdit = (a: Agent) => {
     setEditingAgent(a);
     setFormData({
-      code: a.code,
       name: a.name,
       phone: a.phone,
       email: a.email,
@@ -336,37 +333,28 @@ export const AgentList: React.FC = () => {
       showToast('Vui lòng nhập tên và số điện thoại đại lý', 'warning');
       return;
     }
+    const trimmedTaxCode = (formData.taxCode || '').trim();
+    if (trimmedTaxCode) {
+      const taxRegex = /^(\d{10}|\d{10}-\d{3}|\d{13})$/;
+      if (!taxRegex.test(trimmedTaxCode)) {
+        showToast('Mã số thuế không hợp lệ. Vui lòng nhập 10 số (ví dụ: 0301234567) hoặc 13 số.', 'warning');
+        return;
+      }
+    }
+
     try {
       if (editingAgent) {
         await agentService.update(editingAgent.id, formData);
-        showToast('Cập nhật thông tin đại lý thành công!', 'success');
+        showToast('Cập nhật thông tin đại lý thành công vào CSDL!', 'success');
       } else {
         await agentService.create(formData);
-        showToast('Thêm mới đại lý thành công!', 'success');
+        showToast('Thêm mới đại lý thành công vào CSDL!', 'success');
       }
       setIsModalOpen(false);
       loadAgents();
     } catch (err: any) {
-      showToast(err?.message || 'Có lỗi xảy ra, vui lòng thử lại', 'error');
-    }
-  };
-
-  const handleRequestDelete = (agent: Agent) => {
-    // SC-224 / SCRUM-435: Vô hiệu hoá thao tác xoá với đại lý đã phát sinh giao dịch
-    if (agent.totalOrders > 0 || agent.totalSpent > 0) {
-      setBlockedDeleteAgent(agent);
-    } else {
-      setDeleteId(agent.id);
-    }
-  };
-
-  const handleDeactivate = async (agent: Agent) => {
-    try {
-      await agentService.deactivate(agent.id);
-      showToast(`Đã chuyển đại lý "${agent.name}" sang trạng thái Ngừng giao dịch`, 'success');
-      loadAgents();
-    } catch {
-      showToast('Lỗi khi cập nhật trạng thái đại lý', 'error');
+      const errorMsg = err?.response?.data?.detail || err?.message || 'Có lỗi xảy ra khi lưu đại lý vào CSDL';
+      showToast(errorMsg, 'error');
     }
   };
 
@@ -377,8 +365,8 @@ export const AgentList: React.FC = () => {
       showToast('Đã xóa đại lý khỏi hệ thống', 'success');
       setDeleteId(null);
       loadAgents();
-    } catch (err: any) {
-      showToast(err?.message || 'Lỗi khi xóa đại lý', 'error');
+    } catch {
+      showToast('Lỗi khi xóa đại lý', 'error');
     }
   };
 
@@ -389,6 +377,15 @@ export const AgentList: React.FC = () => {
       subtitle={`Quản lý ${agents.length} đại lý và nhà phân phối trong hệ thống`}
       actions={
         <div className="flex items-center gap-2">
+          <Link to="/customers">
+            <Button
+              variant="outline"
+              size="sm"
+              leftIcon={<Users className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />}
+            >
+              DS Khách Hàng (/customers)
+            </Button>
+          </Link>
           <Button
             variant="outline"
             size="sm"
@@ -417,8 +414,25 @@ export const AgentList: React.FC = () => {
         </div>
       }
     >
+      {/* ── Tab Switcher chuyển nhanh Khách hàng ↔ Đại lý ── */}
+      <div className="flex items-center gap-2 mb-4 p-1.5 bg-slate-100 dark:bg-slate-800/80 rounded-2xl w-fit">
+        <Link
+          to="/customers"
+          className="px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 text-slate-600 dark:text-slate-400 hover:text-slate-900 transition"
+        >
+          <Users className="w-4 h-4" />
+          Danh Sách Khách Hàng (/customers)
+        </Link>
+        <div
+          className="px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm"
+        >
+          <Store className="w-4 h-4" />
+          Kênh Quản Lý Đại Lý & Hạn Mức (/agents)
+        </div>
+      </div>
+
       {/* ── Thẻ thống kê nhanh ── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-4">
         <div className="p-3.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl flex items-center gap-3 shadow-sm">
           <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 flex items-center justify-center shrink-0">
             <Building2 className="w-5 h-5" />
@@ -449,6 +463,18 @@ export const AgentList: React.FC = () => {
             <p className="text-xs text-slate-500">Tổng doanh số</p>
             <p className="text-sm font-black text-slate-900 dark:text-white truncate">
               {formatCurrency(agents.reduce((sum, a) => sum + (a.totalSpent || 0), 0))}
+            </p>
+          </div>
+        </div>
+
+        <div className="p-3.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl flex items-center gap-3 shadow-sm">
+          <div className="w-10 h-10 rounded-xl bg-purple-50 dark:bg-purple-950/40 text-purple-600 flex items-center justify-center shrink-0">
+            <CreditCard className="w-5 h-5" />
+          </div>
+          <div>
+            <p className="text-xs text-slate-500">Hạn mức được cấp</p>
+            <p className="text-sm font-black text-purple-600 truncate">
+              {formatCurrency(agents.reduce((sum, a) => sum + (a.creditLimit || 50000000), 0))}
             </p>
           </div>
         </div>
@@ -688,13 +714,16 @@ export const AgentList: React.FC = () => {
                     <span className="font-semibold truncate block">{agent.assignedStaffName || 'Chưa gán'}</span>
                   </div>
                   <div>
-                    <span className="text-[10px] text-slate-400 block">Doanh số</span>
-                    <span className="font-black text-indigo-600">{formatCurrency(agent.totalSpent)}</span>
+                    <span className="text-[10px] text-slate-400 block">Hạn mức được cấp</span>
+                    <span className="font-black text-purple-600">{formatCurrency(agent.creditLimit || 50000000)}</span>
                   </div>
                   <div>
-                    <span className="text-[10px] text-slate-400 block">Công nợ</span>
+                    <span className="text-[10px] text-slate-400 block">Công nợ / Khả dụng</span>
                     <span className={`font-bold ${agent.outstandingDebt > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
                       {agent.outstandingDebt > 0 ? formatCurrency(agent.outstandingDebt) : '0 đ'}
+                    </span>
+                    <span className="text-[10px] text-slate-400 block">
+                      Còn: {formatCurrency(agent.availableCredit || Math.max(0, (agent.creditLimit || 50000000) - agent.outstandingDebt))}
                     </span>
                   </div>
                 </div>
@@ -709,14 +738,13 @@ export const AgentList: React.FC = () => {
                   </a>
 
                   <div className="flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedDetailAgent(agent)}
-                      className="p-2 text-slate-400 hover:text-indigo-600 bg-slate-100 dark:bg-slate-800 rounded-xl transition"
-                      title="Xem chi tiết hồ sơ"
+                    <Link
+                      to={`/customers/${agent.id}`}
+                      className="p-2 text-slate-500 hover:text-indigo-600 bg-slate-100 dark:bg-slate-800 rounded-xl transition"
+                      title="Xem chi tiết & Hạn mức"
                     >
                       <Eye className="w-3.5 h-3.5" />
-                    </button>
+                    </Link>
                     <Link
                       to={`/agents/orders/new?agent=${agent.id}`}
                       className="flex items-center gap-1 px-3 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-sm transition"
@@ -725,24 +753,16 @@ export const AgentList: React.FC = () => {
                       <span>Tạo đơn</span>
                     </Link>
                     <button
-                      type="button"
                       onClick={() => handleOpenEdit(agent)}
                       className="p-2 text-slate-400 hover:text-amber-600 bg-slate-100 dark:bg-slate-800 rounded-xl transition"
-                      title="Chỉnh sửa hồ sơ"
                     >
                       <Edit className="w-3.5 h-3.5" />
                     </button>
                     <button
-                      type="button"
-                      onClick={() => handleRequestDelete(agent)}
-                      className={`p-2 rounded-xl transition ${
-                        agent.totalOrders > 0
-                          ? 'text-amber-500 bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100'
-                          : 'text-slate-400 hover:text-rose-600 bg-slate-100 dark:bg-slate-800'
-                      }`}
-                      title={agent.totalOrders > 0 ? 'Đã phát sinh giao dịch - Bấm để xem lý do không thể xóa' : 'Xóa đại lý'}
+                      onClick={() => setDeleteId(agent.id)}
+                      className="p-2 text-slate-400 hover:text-rose-600 bg-slate-100 dark:bg-slate-800 rounded-xl transition"
                     >
-                      {agent.totalOrders > 0 ? <Lock className="w-3.5 h-3.5" /> : <Trash2 className="w-3.5 h-3.5" />}
+                      <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 </div>
@@ -765,6 +785,7 @@ export const AgentList: React.FC = () => {
                 <th className="px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider">Người Phụ Trách</th>
                 <th className="px-4 py-3 text-right text-[11px] font-bold text-slate-500 uppercase tracking-wider">Tổng Đơn</th>
                 <th className="px-4 py-3 text-right text-[11px] font-bold text-slate-500 uppercase tracking-wider">Doanh Số</th>
+                <th className="px-4 py-3 text-right text-[11px] font-bold text-slate-500 uppercase tracking-wider">Hạn Mức Cấp</th>
                 <th className="px-4 py-3 text-right text-[11px] font-bold text-slate-500 uppercase tracking-wider">Công Nợ</th>
                 <th className="px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider">Trạng Thái</th>
                 <th className="px-4 py-3 text-right text-[11px] font-bold text-slate-500 uppercase tracking-wider">Thao Tác</th>
@@ -773,7 +794,7 @@ export const AgentList: React.FC = () => {
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {isLoading ? (
                 <tr>
-                  <td colSpan={10} className="py-16 text-center text-xs text-slate-500">
+                  <td colSpan={11} className="py-16 text-center text-xs text-slate-500">
                     <div className="w-7 h-7 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
                     Đang tải danh sách đại lý...
                   </td>
@@ -875,19 +896,30 @@ export const AgentList: React.FC = () => {
                         </span>
                       </td>
 
+                      {/* Hạn mức cấp */}
+                      <td className="px-4 py-3 text-right">
+                        <span className="text-sm font-black text-purple-600 dark:text-purple-400 block">
+                          {formatCurrency(agent.creditLimit || 50000000)}
+                        </span>
+                        <span className="text-[11px] text-slate-400">
+                          Tối đa {agent.maxDebtDays || 30} ngày
+                        </span>
+                      </td>
+
                       {/* Công nợ */}
                       <td className="px-4 py-3 text-right">
-                        <Link
-                          to={`/agents/${agent.id}/debts`}
-                          className={`text-sm font-bold hover:underline ${
+                        <span
+                          className={`text-sm font-bold block ${
                             agent.outstandingDebt > 0
                               ? 'text-rose-600 dark:text-rose-400'
                               : 'text-emerald-600 dark:text-emerald-400'
                           }`}
-                          title="Xem chi tiết công nợ & hoá đơn đại lý"
                         >
-                          {agent.outstandingDebt > 0 ? formatCurrency(agent.outstandingDebt) : '—'}
-                        </Link>
+                          {agent.outstandingDebt > 0 ? formatCurrency(agent.outstandingDebt) : '0 đ'}
+                        </span>
+                        <span className="text-[11px] text-slate-400">
+                          Còn: {formatCurrency(agent.availableCredit || Math.max(0, (agent.creditLimit || 50000000) - agent.outstandingDebt))}
+                        </span>
                       </td>
 
                       {/* Trạng thái */}
@@ -900,22 +932,13 @@ export const AgentList: React.FC = () => {
                       {/* Thao tác */}
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
-                          {/* Nút Xem chi tiết hồ sơ đại lý */}
-                          <button
-                            type="button"
-                            onClick={() => setSelectedDetailAgent(agent)}
+                          {/* Nút Xem chi tiết & Hạn mức */}
+                          <Link
+                            to={`/customers/${agent.id}`}
                             className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                            title="Xem chi tiết hồ sơ"
+                            title="Xem chi tiết & Hạn mức công nợ"
                           >
                             <Eye className="w-4 h-4" />
-                          </button>
-                          {/* Nút Xem công nợ & hoá đơn đại lý (SCRUM-757) */}
-                          <Link
-                            to={`/agents/${agent.id}/debts`}
-                            className="p-1.5 rounded-lg text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors"
-                            title="Xem công nợ & hoá đơn đã phát hành"
-                          >
-                            <DollarSign className="w-4 h-4" />
                           </Link>
                           {/* Nút Tạo đơn hàng đại lý nhanh */}
                           <Link
@@ -926,24 +949,18 @@ export const AgentList: React.FC = () => {
                             <ShoppingBag className="w-4 h-4" />
                           </Link>
                           <button
-                            type="button"
                             onClick={() => handleOpenEdit(agent)}
                             className="p-1.5 rounded-lg text-slate-400 hover:text-amber-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                            title="Chỉnh sửa hồ sơ"
+                            title="Chỉnh sửa"
                           >
                             <Edit className="w-4 h-4" />
                           </button>
                           <button
-                            type="button"
-                            onClick={() => handleRequestDelete(agent)}
-                            className={`p-1.5 rounded-lg transition-colors ${
-                              agent.totalOrders > 0
-                                ? 'text-amber-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/40'
-                                : 'text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40'
-                            }`}
-                            title={agent.totalOrders > 0 ? 'Đã phát sinh giao dịch - Bấm để xem cảnh báo & ngừng giao dịch' : 'Xóa đại lý'}
+                            onClick={() => setDeleteId(agent.id)}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
+                            title="Xóa"
                           >
-                            {agent.totalOrders > 0 ? <Lock className="w-4 h-4" /> : <Trash2 className="w-4 h-4" />}
+                            <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
                       </td>
@@ -1051,33 +1068,6 @@ export const AgentList: React.FC = () => {
       >
         <form onSubmit={handleSave} className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                Mã đại lý {editingAgent && '(Cố định)'}
-              </label>
-              <input
-                type="text"
-                value={formData.code}
-                onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                placeholder="VD: DL-1012"
-                readOnly={!!editingAgent}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm font-mono focus:ring-2 focus:ring-indigo-500 outline-none read-only:opacity-70"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                Mã số thuế (MST)
-              </label>
-              <input
-                type="text"
-                value={formData.taxCode}
-                onChange={(e) => setFormData({ ...formData, taxCode: e.target.value })}
-                placeholder="VD: 0301234567"
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-              />
-            </div>
-
             <div className="sm:col-span-2">
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                 Tên đại lý / Công ty *
@@ -1134,29 +1124,26 @@ export const AgentList: React.FC = () => {
 
             <div>
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                Nhóm khách hàng
+                Mã số thuế
               </label>
-              <select
-                value={formData.customerGroup}
-                onChange={(e) => setFormData({ ...formData, customerGroup: e.target.value as AgentGroup })}
+              <input
+                type="text"
+                value={formData.taxCode}
+                onChange={(e) => setFormData({ ...formData, taxCode: e.target.value })}
+                placeholder="0300000000"
                 className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-              >
-                <option value="platinum">Platinum (Hạng Kim Cương)</option>
-                <option value="gold">Gold (Hạng Vàng)</option>
-                <option value="silver">Silver (Hạng Bạc)</option>
-                <option value="standard">Standard (Tiêu chuẩn)</option>
-              </select>
+              />
             </div>
 
             <div className="sm:col-span-2">
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                Địa chỉ chi tiết
+                Địa chỉ
               </label>
               <input
                 type="text"
                 value={formData.address}
                 onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                placeholder="Số nhà, tên đường, phường..."
+                placeholder="Số nhà, đường, phường, quận..."
                 className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
               />
             </div>
@@ -1170,19 +1157,6 @@ export const AgentList: React.FC = () => {
                 value={formData.province}
                 onChange={(e) => setFormData({ ...formData, province: e.target.value })}
                 placeholder="TP. Hồ Chí Minh"
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                Quận / Huyện
-              </label>
-              <input
-                type="text"
-                value={formData.district}
-                onChange={(e) => setFormData({ ...formData, district: e.target.value })}
-                placeholder="Quận 1 / Cầu Giấy..."
                 className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
               />
             </div>
@@ -1204,7 +1178,23 @@ export const AgentList: React.FC = () => {
 
             <div>
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                Người phụ trách (Sales)
+                Nhóm khách hàng
+              </label>
+              <select
+                value={formData.customerGroup}
+                onChange={(e) => setFormData({ ...formData, customerGroup: e.target.value as AgentGroup })}
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+              >
+                <option value="platinum">Platinum</option>
+                <option value="gold">Gold</option>
+                <option value="silver">Silver</option>
+                <option value="standard">Standard</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                Người phụ trách
               </label>
               <select
                 value={formData.assignedStaffId}
@@ -1224,9 +1214,9 @@ export const AgentList: React.FC = () => {
               </select>
             </div>
 
-            <div className="sm:col-span-2">
+            <div>
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                Trạng thái hoạt động
+                Trạng thái
               </label>
               <select
                 value={formData.status}
@@ -1234,8 +1224,8 @@ export const AgentList: React.FC = () => {
                 className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
               >
                 <option value="active">Đang hoạt động</option>
-                <option value="inactive">Ngừng giao dịch / Tạm ngưng</option>
-                <option value="pending">Chờ duyệt hồ sơ</option>
+                <option value="inactive">Tạm ngưng</option>
+                <option value="pending">Chờ duyệt</option>
               </select>
             </div>
           </div>
@@ -1251,30 +1241,13 @@ export const AgentList: React.FC = () => {
         </form>
       </Modal>
 
-      {/* ── Modal Chi tiết đại lý (SCRUM-432) ── */}
-      <AgentDetailModal
-        isOpen={!!selectedDetailAgent}
-        onClose={() => setSelectedDetailAgent(null)}
-        agent={selectedDetailAgent}
-        onEdit={handleOpenEdit}
-        onDeactivate={handleDeactivate}
-      />
-
-      {/* ── Modal Cảnh báo & Vô hiệu hoá xoá đại lý có giao dịch (SCRUM-435) ── */}
-      <AgentCannotDeleteModal
-        isOpen={!!blockedDeleteAgent}
-        onClose={() => setBlockedDeleteAgent(null)}
-        agent={blockedDeleteAgent}
-        onDeactivate={handleDeactivate}
-      />
-
-      {/* ── Confirm xóa (chỉ hiển thị khi đại lý chưa có giao dịch) ── */}
+      {/* ── Confirm xóa ── */}
       <ConfirmDialog
         isOpen={!!deleteId}
         onClose={() => setDeleteId(null)}
         onConfirm={handleDelete}
         title="Xác nhận xóa đại lý"
-        message="Đại lý này chưa phát sinh giao dịch nào. Bạn có chắc chắn muốn xóa đại lý này khỏi hệ thống? Thao tác này không thể hoàn tác."
+        message="Bạn có chắc chắn muốn xóa đại lý này khỏi hệ thống? Thao tác này không thể hoàn tác."
         confirmText="Xóa đại lý"
         variant="danger"
       />

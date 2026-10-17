@@ -14,6 +14,12 @@ import {
   History,
   ShieldAlert,
   UserCheck,
+  CreditCard,
+  Edit3,
+  Calendar,
+  FileSpreadsheet,
+  RefreshCw,
+  Sliders,
 } from 'lucide-react';
 import { PageContainer } from '../../components/layout/PageContainer';
 import { Button } from '../../components/common/Button';
@@ -21,14 +27,20 @@ import { Badge } from '../../components/common/Badge';
 import { Loading } from '../../components/common/Loading';
 import { EmptyState } from '../../components/common/EmptyState';
 import { Modal } from '../../components/common/Modal';
+import { CurrencyInput } from '../../components/common/CurrencyInput';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 import { customerService } from '../../services/customerService';
 import { orderService } from '../../services/orderService';
 import { customerLockService, CustomerLockStatus, CustomerLockHistoryItem } from '../../services/customerLockService';
+import { creditService } from '../../services/creditService';
+import { debtRiskService } from '../../services/debtRiskService';
+import { CustomerCreditProfile } from '../../types/CreditProfile';
 import { Customer } from '../../types/Customer';
+import { CustomerDebtFlag, CustomerDebtFlagHistoryItem } from '../../types/DebtRisk';
 import { Order } from '../../types/Order';
 import { useToast } from '../../contexts/ToastContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { DeliveryAddressManager } from '../../components/customers/DeliveryAddressManager';
 
 export const CustomerDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -40,6 +52,19 @@ export const CustomerDetail: React.FC = () => {
   const [customerOrders, setCustomerOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // S7-04 Trạng thái gắn cờ rủi ro & lịch sử
+  const [debtFlag, setDebtFlag] = useState<CustomerDebtFlag | null>(null);
+  const [debtFlagHistory, setDebtFlagHistory] = useState<CustomerDebtFlagHistoryItem[]>([]);
+  const [isReevaluating, setIsReevaluating] = useState(false);
+
+  // Hồ sơ hạn mức công nợ
+  const [creditProfile, setCreditProfile] = useState<CustomerCreditProfile | null>(null);
+  const [isCreditModalOpen, setIsCreditModalOpen] = useState(false);
+  const [creditLimitInput, setCreditLimitInput] = useState<number>(0);
+  const [maxDebtDaysInput, setMaxDebtDaysInput] = useState<number>(30);
+  const [creditReasonInput, setCreditReasonInput] = useState<string>('');
+  const [submittingCredit, setSubmittingCredit] = useState(false);
+
   // SC-228 Trạng thái khoá & lịch sử
   const [lockStatus, setLockStatus] = useState<CustomerLockStatus | null>(null);
   const [lockHistory, setLockHistory] = useState<CustomerLockHistoryItem[]>([]);
@@ -49,12 +74,13 @@ export const CustomerDetail: React.FC = () => {
   const [unlockReason, setUnlockReason] = useState('');
   const [submittingLock, setSubmittingLock] = useState(false);
 
-  // Quyền: Kế toán công nợ và Admin
+  // Quyền: Kế toán công nợ, Quản lý kinh doanh, Giám đốc và Admin
+  const roleLower = String(user?.role || '').toLowerCase();
   const canManageLock =
-    user?.role === 'Accountant' ||
-    user?.role === 'Admin' ||
-    user?.role?.includes('Accountant') ||
-    user?.role?.includes('Admin');
+    roleLower.includes('accountant') ||
+    roleLower.includes('admin') ||
+    roleLower.includes('manager') ||
+    roleLower.includes('director');
 
   const fetchLockData = async (customerId: string) => {
     try {
@@ -66,6 +92,64 @@ export const CustomerDetail: React.FC = () => {
       setLockHistory(historyData);
     } catch (err) {
       console.warn('[CustomerDetail] Error fetching lock status:', err);
+    }
+  };
+
+  const fetchCreditData = async (customerId: string, fallbackCustomer?: Customer) => {
+    try {
+      const cp = await creditService.getProfile(customerId);
+      setCreditProfile(cp);
+      setCreditLimitInput(cp.creditLimit);
+      setMaxDebtDaysInput(cp.maxDebtDays);
+    } catch (err) {
+      console.warn('[CustomerDetail] Error fetching credit profile, using customer defaults:', err);
+      const defaultLimit = fallbackCustomer?.creditLimit || 50000000;
+      const defaultDebt = fallbackCustomer?.currentDebt || 0;
+      const defaultDays = fallbackCustomer?.maxDebtDays || 30;
+      const fallbackProfile: CustomerCreditProfile = {
+        id: 0,
+        customerId: customerId,
+        creditLimit: defaultLimit,
+        maxDebtDays: defaultDays,
+        currentDebt: defaultDebt,
+        availableCredit: Math.max(0, defaultLimit - defaultDebt),
+        hasOverdue: false,
+        overdueDays: 0,
+        isBlocked: false,
+      };
+      setCreditProfile(fallbackProfile);
+      setCreditLimitInput(defaultLimit);
+      setMaxDebtDaysInput(defaultDays);
+    }
+  };
+
+  const fetchDebtRiskData = async (customerId: string) => {
+    try {
+      const [flagData, historyData] = await Promise.all([
+        debtRiskService.getFlag(customerId),
+        debtRiskService.getHistory(customerId),
+      ]);
+      setDebtFlag(flagData);
+      setDebtFlagHistory(historyData);
+    } catch (err) {
+      console.warn('[CustomerDetail] Error fetching debt risk data:', err);
+    }
+  };
+
+  const handleReevaluateRisk = async () => {
+    if (!customer) return;
+    try {
+      setIsReevaluating(true);
+      const res = await debtRiskService.reevaluate(customer.id);
+      setDebtFlag(res);
+      const hist = await debtRiskService.getHistory(customer.id);
+      setDebtFlagHistory(hist);
+      showToast(`Đã đánh giá lại rủi ro cho đại lý '${customer.name}': Cấp độ ${res.riskLevel}`, 'info');
+      await fetchCreditData(customer.id, customer);
+    } catch (err: any) {
+      showToast(err.message || 'Lỗi khi đánh giá lại rủi ro', 'error');
+    } finally {
+      setIsReevaluating(false);
     }
   };
 
@@ -81,7 +165,11 @@ export const CustomerDetail: React.FC = () => {
             (o) => o.customerId === found.id || o.customerName === found.name
           );
           setCustomerOrders(matchOrders);
-          await fetchLockData(found.id);
+          await Promise.all([
+            fetchLockData(found.id),
+            fetchCreditData(found.id, found),
+            fetchDebtRiskData(found.id),
+          ]);
         }
       } finally {
         setLoading(false);
@@ -89,6 +177,33 @@ export const CustomerDetail: React.FC = () => {
     };
     fetch();
   }, [id]);
+
+  const handleCreditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!customer) return;
+    const cleanReason = creditReasonInput.trim();
+    if (!cleanReason || cleanReason.length < 3) {
+      showToast('Bắt buộc nhập lý do điều chỉnh hạn mức (tối thiểu 3 ký tự)', 'warning');
+      return;
+    }
+
+    try {
+      setSubmittingCredit(true);
+      const updated = await creditService.updateProfile(customer.id, {
+        credit_limit: Number(creditLimitInput),
+        max_debt_days: Number(maxDebtDaysInput),
+        reason: cleanReason,
+      });
+      setCreditProfile(updated);
+      showToast(`Đã cập nhật hạn mức công nợ cho đại lý '${customer.name}' thành công!`, 'success');
+      setIsCreditModalOpen(false);
+      setCreditReasonInput('');
+    } catch (err: any) {
+      showToast(err.message || 'Lỗi khi cập nhật hạn mức công nợ', 'error');
+    } finally {
+      setSubmittingCredit(false);
+    }
+  };
 
   const handleLockSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -152,12 +267,12 @@ export const CustomerDetail: React.FC = () => {
   return (
     <PageContainer
       title={customer.name}
-      subtitle={`Mã khách: ${customer.code} | Ngày tạo: ${customer.createdAt}`}
+      subtitle={`Mã đại lý: ${customer.code} • Nhóm: ${customer.customer_group || customer.customerGroup || 'RETAIL'} • Phụ trách: ${customer.assignedStaffName || customer.assigned_sales_rep || 'Chưa phân công'}`}
       actions={
         <div className="flex items-center gap-2">
           <Link to="/customers">
             <Button variant="secondary" size="sm" leftIcon={<ArrowLeft className="w-4 h-4" />}>
-              Danh sách
+              Danh sách đại lý
             </Button>
           </Link>
 
@@ -190,6 +305,17 @@ export const CustomerDetail: React.FC = () => {
             </>
           )}
 
+          {/* Nút Xem sổ chi tiết công nợ (S8-10) */}
+          <Link to={`/customers/debt-ledger?customerId=${customer.id}`}>
+            <Button
+              variant="outline"
+              size="sm"
+              leftIcon={<FileSpreadsheet className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />}
+            >
+              Sổ công nợ
+            </Button>
+          </Link>
+
           {/* Nút Tạo đơn bán hàng - Bị vô hiệu hoá nếu đại lý đang bị khoá */}
           {isLocked ? (
             <div title="Đại lý đang bị khoá giao dịch. Không thể tạo đơn mới.">
@@ -204,9 +330,9 @@ export const CustomerDetail: React.FC = () => {
               </Button>
             </div>
           ) : (
-            <Link to="/sales/pos">
+            <Link to={`/orders/create?customerId=${customer.id}`}>
               <Button variant="primary" size="sm" leftIcon={<ShoppingBag className="w-4 h-4" />}>
-                Tạo đơn bán hàng
+                Tạo đơn hàng
               </Button>
             </Link>
           )}
@@ -243,6 +369,76 @@ export const CustomerDetail: React.FC = () => {
         </div>
       )}
 
+      {/* Banner Cảnh báo cờ rủi ro công nợ */}
+      {debtFlag && (debtFlag.is_flagged || debtFlag.risk_level !== 'SAFE') && (
+        <div
+          id="debt-risk-flag-banner"
+          className={`mb-6 p-4 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm ${
+            debtFlag.risk_level === 'HIGH_RISK'
+              ? 'bg-rose-50/90 dark:bg-rose-950/40 border-rose-300 dark:border-rose-800 text-rose-900 dark:text-rose-100'
+              : debtFlag.risk_level === 'OVERDUE'
+              ? 'bg-red-50/90 dark:bg-red-950/40 border-red-300 dark:border-red-800 text-red-900 dark:text-red-100'
+              : debtFlag.risk_level === 'LIMIT_EXCEEDED'
+              ? 'bg-purple-50/90 dark:bg-purple-950/40 border-purple-300 dark:border-purple-800 text-purple-900 dark:text-purple-100'
+              : 'bg-amber-50/90 dark:bg-amber-950/40 border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-100'
+          }`}
+        >
+          <div className="flex items-start gap-3.5">
+            <ShieldAlert className="w-6 h-6 shrink-0 mt-0.5 text-rose-600 dark:text-rose-400" />
+            <div className="space-y-1 text-xs sm:text-sm">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h4 className="font-extrabold uppercase tracking-tight">
+                  CỜ RỦI RO CÔNG NỢ ĐẠI LÝ
+                </h4>
+                <span className="text-xs px-2.5 py-0.5 rounded-full font-bold bg-white/80 dark:bg-slate-900/80 border border-current shadow-xs">
+                  {debtFlag.risk_level === 'HIGH_RISK'
+                    ? '🔴 NGUY CƠ CAO'
+                    : debtFlag.risk_level === 'OVERDUE'
+                    ? '⏰ NỢ QUÁ HẠN'
+                    : debtFlag.risk_level === 'LIMIT_EXCEEDED'
+                    ? '📉 VƯỢT HẠN MỨC'
+                    : '⚠️ CẢNH BÁO (>80%)'}
+                </span>
+                <span className="text-xs px-2 py-0.5 rounded-full font-semibold bg-black/10 dark:bg-white/10">
+                  Hành vi: {debtFlag.action_applied === 'BLOCK' ? '🔒 Khóa bán' : debtFlag.action_applied === 'REQUIRE_APPROVAL' ? '📝 Chuyển chờ duyệt' : '⚠️ Cảnh báo'}
+                </span>
+              </div>
+              <p className="text-xs leading-relaxed opacity-90">
+                {debtFlag.flag_reason || 'Đại lý vi phạm hạn mức tiền hoặc có khoản nợ quá hạn ngày thanh toán cho phép.'}
+              </p>
+              <div className="flex items-center gap-4 text-[11px] opacity-75 pt-0.5">
+                <span>Dư nợ: <strong>{formatCurrency(debtFlag.total_debt)}</strong></span>
+                {debtFlag.overdue_amount > 0 && (
+                  <span>Quá hạn: <strong>{formatCurrency(debtFlag.overdue_amount)}</strong> ({debtFlag.max_overdue_days} ngày)</span>
+                )}
+                {debtFlag.excess_amount > 0 && (
+                  <span>Vượt mức: <strong>{formatCurrency(debtFlag.excess_amount)}</strong></span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handleReevaluateRisk}
+              disabled={isReevaluating}
+              className="bg-white/80 dark:bg-slate-800 text-xs shadow-xs"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${isReevaluating ? 'animate-spin' : ''}`} />
+              {isReevaluating ? 'Đang đánh giá...' : 'Đánh giá lại ngay'}
+            </Button>
+            <Link to="/settings/debt-risk">
+              <Button variant="outline" size="sm" className="text-xs">
+                <Sliders className="w-3.5 h-3.5 mr-1" />
+                Cấu hình
+              </Button>
+            </Link>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column: Profile Card (1 col) */}
         <div className="space-y-6">
@@ -259,7 +455,7 @@ export const CustomerDetail: React.FC = () => {
             <h3 className="text-lg font-bold text-slate-900 dark:text-white">{customer.name}</h3>
             <p className="text-xs text-slate-400 mt-0.5">{customer.code}</p>
 
-            <div className="mt-3 flex justify-center gap-2">
+            <div className="mt-3 flex flex-wrap justify-center gap-1.5">
               {isLocked ? (
                 <Badge variant="danger" size="sm" dot>
                   Đã khoá giao dịch
@@ -268,6 +464,24 @@ export const CustomerDetail: React.FC = () => {
                 <Badge variant={customer.status === 'active' ? 'success' : 'neutral'} size="sm" dot>
                   {customer.status === 'active' ? 'Đang hoạt động' : 'Tạm ngưng'}
                 </Badge>
+              )}
+              {debtFlag && (
+                <span
+                  className={`text-[11px] px-2 py-0.5 rounded-full font-bold border ${
+                    debtFlag.risk_level === 'HIGH_RISK'
+                      ? 'bg-rose-100 text-rose-800 border-rose-300 dark:bg-rose-950 dark:text-rose-200'
+                      : debtFlag.risk_level === 'OVERDUE'
+                      ? 'bg-red-100 text-red-800 border-red-300 dark:bg-red-950 dark:text-red-200'
+                      : debtFlag.risk_level === 'LIMIT_EXCEEDED'
+                      ? 'bg-purple-100 text-purple-800 border-purple-300 dark:bg-purple-950 dark:text-purple-200'
+                      : debtFlag.risk_level === 'WARNING'
+                      ? 'bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950 dark:text-amber-200'
+                      : 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950 dark:text-emerald-200'
+                  }`}
+                  title={debtFlag.flag_reason || undefined}
+                >
+                  Cờ: {debtFlag.risk_level}
+                </span>
               )}
             </div>
 
@@ -301,6 +515,101 @@ export const CustomerDetail: React.FC = () => {
                 {formatCurrency(customer.totalSpent)}
               </p>
             </div>
+          </div>
+
+          {/* Hồ Sơ Hạn Mức Tín Dụng & Công Nợ Đại Lý */}
+          <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-card">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <CreditCard className="w-4 h-4 text-indigo-500" />
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200">
+                  Hạn Mức Công Nợ & Tín Dụng
+                </h4>
+              </div>
+              {canManageLock && (
+                <button
+                  type="button"
+                  onClick={() => setIsCreditModalOpen(true)}
+                  className="px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-xs font-bold text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 border border-indigo-200 dark:border-indigo-800 flex items-center gap-1.5 transition-colors shadow-sm"
+                  title="Thiết lập hạn mức tín dụng và thời hạn nợ cho đại lý"
+                >
+                  <CreditCard className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                  <span>Thiết lập hạn mức tín dụng</span>
+                </button>
+              )}
+            </div>
+
+            {creditProfile ? (
+              <div className="space-y-3">
+                <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800">
+                  <span className="text-[11px] text-slate-400 uppercase font-semibold block">Hạn Mức Được Cấp</span>
+                  <span className="text-base font-black text-indigo-600 dark:text-indigo-400">
+                    {formatCurrency(creditProfile.creditLimit)}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800">
+                    <span className="text-[10px] text-slate-400 uppercase block font-semibold">Dư Nợ Hiện Tại</span>
+                    <span className="font-bold text-amber-600 dark:text-amber-400">
+                      {formatCurrency(creditProfile.currentDebt)}
+                    </span>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800">
+                    <span className="text-[10px] text-slate-400 uppercase block font-semibold">Khả Dụng Còn Lại</span>
+                    <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                      {formatCurrency(creditProfile.availableCredit ?? Math.max(0, creditProfile.creditLimit - creditProfile.currentDebt))}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between text-xs px-1 text-slate-500 dark:text-slate-400">
+                  <span className="flex items-center gap-1">
+                    <Calendar className="w-3.5 h-3.5" />
+                    Số ngày nợ tối đa:
+                  </span>
+                  <span className="font-bold text-slate-800 dark:text-slate-200">
+                    {creditProfile.maxDebtDays > 0 ? `${creditProfile.maxDebtDays} ngày` : 'Thanh toán ngay (0 ngày)'}
+                  </span>
+                </div>
+
+                {/* Progress bar mức sử dụng hạn mức */}
+                {creditProfile.creditLimit > 0 && (
+                  <div className="pt-1">
+                    <div className="flex justify-between text-[11px] text-slate-400 mb-1">
+                      <span>Mức sử dụng hạn mức</span>
+                      <span className="font-bold">
+                        {Math.min(100, Math.round((creditProfile.currentDebt / creditProfile.creditLimit) * 100))}%
+                      </span>
+                    </div>
+                    <div className="w-full h-2 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                      <div
+                        className={`h-full transition-all duration-500 rounded-full ${
+                          creditProfile.currentDebt > creditProfile.creditLimit
+                            ? 'bg-rose-500'
+                            : (creditProfile.currentDebt / creditProfile.creditLimit) > 0.8
+                            ? 'bg-amber-500'
+                            : 'bg-indigo-600'
+                        }`}
+                        style={{
+                          width: `${Math.min(100, Math.max(0, (creditProfile.currentDebt / creditProfile.creditLimit) * 100))}%`
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <Link
+                  to={`/customers/debt-ledger?customerId=${customer.id}`}
+                  className="w-full mt-2 py-2 px-3 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-xs font-bold text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 border border-indigo-200 dark:border-indigo-800 flex items-center justify-center gap-1.5 transition-colors shadow-sm"
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                  <span>Xem Sổ Chi Tiết Công Nợ</span>
+                </Link>
+              </div>
+            ) : (
+              <p className="text-xs text-slate-400 italic">Đang tải hồ sơ hạn mức...</p>
+            )}
           </div>
 
           {/* Lịch sử khoá / mở giao dịch (SC-228 Subtask 2) */}
@@ -343,10 +652,72 @@ export const CustomerDetail: React.FC = () => {
               <p className="text-xs text-slate-400 italic">Chưa có lịch sử thay đổi trạng thái giao dịch.</p>
             )}
           </div>
+
+          {/* Lịch sử cảnh báo và thay đổi trạng thái rủi ro công nợ */}
+          <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-card">
+            <div className="flex items-center justify-between gap-2 mb-3">
+              <div className="flex items-center gap-2">
+                <ShieldAlert className="w-4 h-4 text-rose-500" />
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200">
+                  Lịch Sử Rủi Ro & Khóa Bán
+                </h4>
+              </div>
+              <span className="text-[10px] font-semibold text-slate-400">
+                {debtFlagHistory.length} bản ghi
+              </span>
+            </div>
+
+            {debtFlagHistory.length > 0 ? (
+              <div className="space-y-3 max-h-64 overflow-y-auto pr-1">
+                {debtFlagHistory.map((h) => {
+                  const isLock = h.event_type === 'AUTO_LOCKED' || h.event_type === 'FLAGGED';
+                  return (
+                    <div
+                      key={h.id}
+                      className="p-2.5 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 text-xs space-y-1"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span
+                          className={`font-bold px-1.5 py-0.5 rounded text-[10px] ${
+                            isLock
+                              ? 'bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300'
+                              : 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300'
+                          }`}
+                        >
+                          {h.event_type === 'FLAGGED'
+                            ? '🚩 GẮN CỜ RỦI RO'
+                            : h.event_type === 'UNFLAGGED'
+                            ? '✅ GỠ CỜ RỦI RO'
+                            : h.event_type === 'AUTO_LOCKED'
+                            ? '🔒 TỰ ĐỘNG KHÓA BÁN'
+                            : h.event_type === 'AUTO_UNLOCKED'
+                            ? '🔓 TỰ ĐỘNG MỞ BÁN'
+                            : h.event_type === 'REEVALUATED'
+                            ? '🔄 ĐÁNH GIÁ LẠI'
+                            : h.event_type}
+                        </span>
+                        <span className="text-[11px] text-slate-400">{formatDate(h.created_at || '')}</span>
+                      </div>
+                      <p className="text-slate-700 dark:text-slate-300 font-medium">{h.reason}</p>
+                      <div className="flex items-center justify-between text-[10px] text-slate-400 pt-0.5">
+                        <span>Nguồn: <strong>{h.source}</strong></span>
+                        <span>Dư nợ: <strong>{formatCurrency(h.total_debt)}</strong></span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-xs text-slate-400 italic">Chưa phát sinh cảnh báo hay vi phạm công nợ nào.</p>
+            )}
+          </div>
         </div>
 
         {/* Right Column: Order History of this customer (2 cols) */}
         <div className="lg:col-span-2 space-y-6">
+          {/* SCRUM-225 (S3-04): Quản lý nhiều điểm giao hàng cho một đại lý */}
+          <DeliveryAddressManager customerId={customer.id} customerName={customer.name} />
+
           <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-card">
             <div className="flex items-center justify-between mb-4">
               <div>
@@ -534,6 +905,112 @@ export const CustomerDetail: React.FC = () => {
               leftIcon={<Unlock className="w-4 h-4" />}
             >
               {submittingLock ? 'Đang xử lý...' : 'Xác nhận mở khoá'}
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Modal Thiết Lập Hạn Mức Công Nợ & Số Ngày Nợ */}
+      <Modal
+        isOpen={isCreditModalOpen}
+        onClose={() => setIsCreditModalOpen(false)}
+        title="Thiết Lập Hạn Mức Tín Dụng & Công Nợ"
+        maxWidth="md"
+      >
+        <form onSubmit={handleCreditSubmit} className="space-y-4">
+          <div className="p-3.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 text-xs text-indigo-900 dark:text-indigo-200 flex items-start gap-2.5">
+            <CreditCard className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-bold">Quy chuẩn hạn mức đại lý (SC-226):</p>
+              <p className="mt-0.5">
+                Thiết lập hạn mức công nợ và số ngày nợ tối đa cho phép. Các thay đổi sẽ được lưu vào lịch sử kiểm toán của hệ thống.
+              </p>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+              Hạn mức công nợ tối đa (VNĐ) *
+            </label>
+            <CurrencyInput
+              value={creditLimitInput}
+              onChange={(val) => setCreditLimitInput(val)}
+              suffix="VNĐ"
+              placeholder="Ví dụ: 50.000.000"
+              className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs sm:text-sm font-bold text-indigo-600 dark:text-indigo-400 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+              required
+            />
+            <p className="mt-1 text-[11px] text-slate-400">
+              Hiện tại: {formatCurrency(creditLimitInput)}
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+              Số ngày nợ tối đa (ngày) *
+            </label>
+            <div className="grid grid-cols-4 gap-2 mb-2">
+              {[0, 15, 30, 45].map((d) => (
+                <button
+                  key={d}
+                  type="button"
+                  onClick={() => setMaxDebtDaysInput(d)}
+                  className={`py-1.5 px-2 rounded-lg text-xs font-bold border transition-all ${
+                    maxDebtDaysInput === d
+                      ? 'border-indigo-600 bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300'
+                      : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'
+                  }`}
+                >
+                  {d === 0 ? '0 ngày' : `${d} ngày`}
+                </button>
+              ))}
+            </div>
+            <input
+              type="number"
+              min="0"
+              max="365"
+              value={maxDebtDaysInput}
+              onChange={(e) => setMaxDebtDaysInput(Number(e.target.value) || 0)}
+              className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs sm:text-sm font-medium focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+              required
+            />
+            <p className="mt-1 text-[11px] text-slate-400">
+              {maxDebtDaysInput === 0 ? '0 = Bắt buộc thanh toán ngay, không cho nợ ngày' : `Đại lý được nợ tối đa ${maxDebtDaysInput} ngày kể từ khi xuất kho.`}
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+              Lý do điều chỉnh hạn mức * (Bắt buộc)
+            </label>
+            <textarea
+              rows={2}
+              value={creditReasonInput}
+              onChange={(e) => setCreditReasonInput(e.target.value)}
+              placeholder="Ví dụ: Nâng hạn mức công nợ theo hợp đồng phân phối mới quý 4..."
+              className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs sm:text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+              required
+            />
+          </div>
+
+          <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => setIsCreditModalOpen(false)}
+              disabled={submittingCredit}
+            >
+              Hủy bỏ
+            </Button>
+            <Button
+              type="submit"
+              variant="primary"
+              size="sm"
+              disabled={submittingCredit || creditReasonInput.trim().length < 3}
+              leftIcon={<CreditCard className="w-4 h-4" />}
+            >
+              {submittingCredit ? 'Đang lưu...' : 'Lưu hạn mức công nợ'}
             </Button>
           </div>
         </form>

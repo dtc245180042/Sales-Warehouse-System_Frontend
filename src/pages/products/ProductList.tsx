@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Plus,
@@ -12,7 +12,6 @@ import {
   RefreshCw,
   X,
   Layers,
-  History,
 } from 'lucide-react';
 import { PageContainer } from '../../components/layout/PageContainer';
 import { DataTable, Column } from '../../components/common/DataTable';
@@ -116,59 +115,53 @@ export const ProductList: React.FC = () => {
   const urlCategory = searchParams.get('category') || 'all';
   const urlStatus = searchParams.get('status') || 'all';
 
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  // searchInput: giá trị hiển thị ngay khi gõ (controlled input)
-  const [searchInput, setSearchInput] = useState<string>(urlSearch);
-  // search: giá trị thực sự dùng để lọc (debounce 2 giây)
+  // Nạp tức thì từ RAM cache (0ms) khi chuyển trang
+  const [products, setProducts] = useState<Product[]>(() => productService.getCached());
+  const [loading, setLoading] = useState<boolean>(() => productService.getCached().length === 0);
+  const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [search, setSearch] = useState<string>(urlSearch);
-  // isPendingSearch: true khi đang chờ debounce
-  const [isPendingSearch, setIsPendingSearch] = useState(false);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cachedTree = useMemo(() => categoryService.getCachedTree(), []);
+  const initialCategoryOpts = useMemo(() => {
+    const opts: { id: string; name: string; label: string }[] = [];
+    const traverse = (nodes: CategoryTree[], depth: number = 0) => {
+      nodes.forEach((n) => {
+        const prefix = '  '.repeat(depth);
+        const tag = n.level === 1 ? '📁 [Ngành]' : n.level === 2 ? '📁 [Nhóm]' : '📄 [Tiểu nhóm]';
+        opts.push({
+          id: String(n.id),
+          name: n.name,
+          label: `${prefix}${tag} ${n.name}`,
+        });
+        if (n.children && n.children.length > 0) {
+          traverse(n.children, depth + 1);
+        }
+      });
+    };
+    traverse(cachedTree);
+    return opts;
+  }, [cachedTree]);
+
+  const [categoryTree, setCategoryTree] = useState<CategoryTree[]>(cachedTree);
+  const [categoryFilterOptions, setCategoryFilterOptions] = useState<{ id: string; name: string; label: string }[]>(initialCategoryOpts);
   const [selectedCategory, setSelectedCategory] = useState<string>(urlCategory);
-  const [categoryTree, setCategoryTree] = useState<CategoryTree[]>([]);
-  const [categoryFilterOptions, setCategoryFilterOptions] = useState<{ id: string; name: string; label: string }[]>([]);
   const [selectedStatus, setSelectedStatus] = useState<string>(urlStatus);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   // Đồng bộ hai chiều từ URL -> State khi người dùng nhấn Back / Forward trên trình duyệt
   useEffect(() => {
-    setSearchInput(urlSearch);
     setSearch(urlSearch);
     setSelectedCategory(urlCategory);
     setSelectedStatus(urlStatus);
   }, [urlSearch, urlCategory, urlStatus]);
 
-  // Debounce 2 giây: cập nhật `search` (dùng lọc) sau 2s kể từ lần gõ cuối
-  const handleSearchChange = useCallback((newValue: string) => {
-    setSearchInput(newValue); // cập nhật ngay input
-    setIsPendingSearch(true); // hiển thị spinner
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
-      setSearch(newValue);      // sau 2s mới thực sự lọc
-      setIsPendingSearch(false);
-      const params = new URLSearchParams(searchParams.toString());
-      if (newValue.trim()) params.set('q', newValue.trim());
-      else params.delete('q');
-      setSearchParams(params, { replace: true });
-    }, 2000);
-  }, [searchParams, setSearchParams]);
-
-  // Xóa tìm kiếm ngay lập tức (không debounce)
-  const handleClearSearch = useCallback(() => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    setSearchInput('');
-    setSearch('');
-    setIsPendingSearch(false);
-    const params = new URLSearchParams(searchParams.toString());
-    params.delete('q');
+  // Hàm cập nhật URL Search Params khi bộ lọc thay đổi
+  const handleSearchChange = (newSearch: string) => {
+    setSearch(newSearch);
+    const params = new URLSearchParams(searchParams);
+    if (newSearch.trim()) params.set('q', newSearch.trim());
+    else params.delete('q');
     setSearchParams(params, { replace: true });
-  }, [searchParams, setSearchParams]);
-
-  // Cleanup debounce khi unmount
-  useEffect(() => {
-    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
-  }, []);
+  };
 
   const handleCategoryChange = (newCat: string) => {
     setSelectedCategory(newCat);
@@ -195,18 +188,21 @@ export const ProductList: React.FC = () => {
   const [blockedProduct, setBlockedProduct] = useState<Product | null>(null);
   const [bulkBlockedProducts, setBulkBlockedProducts] = useState<Product[]>([]);
 
-  const loadProducts = async () => {
-    setLoading(true);
+  const loadProducts = async (showSpinner: boolean = false) => {
+    if (showSpinner) setLoading(true);
+    setIsSyncing(true);
     try {
       const data = await productService.getAll();
       setProducts(data);
     } finally {
       setLoading(false);
+      setIsSyncing(false);
     }
   };
 
   useEffect(() => {
-    loadProducts();
+    const hasCache = products.length > 0;
+    loadProducts(!hasCache);
 
     // Tải danh mục ngành hàng / nhóm hàng dạng cây 3 cấp (SCRUM-214)
     categoryService.getTree().then((tree) => {
@@ -531,13 +527,6 @@ export const ProductList: React.FC = () => {
             <Eye className="w-4 h-4" />
           </Link>
           <Link
-            to={`/products/${p.id}/price-history`}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-            title="Lịch sử thay đổi giá"
-          >
-            <History className="w-4 h-4" />
-          </Link>
-          <Link
             to={`/products/${p.id}/edit`}
             className="p-1.5 rounded-lg text-slate-400 hover:text-amber-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
             title="Chỉnh sửa"
@@ -609,6 +598,7 @@ export const ProductList: React.FC = () => {
       <DataTable
         data={filteredProducts}
         columns={columns}
+        defaultPageSize={20}
         keyExtractor={(p) => p.id}
         selectable
         selectedIds={selectedIds}
@@ -630,27 +620,15 @@ export const ProductList: React.FC = () => {
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
               <input
                 type="text"
-                value={searchInput}
+                value={search}
                 onChange={(e) => handleSearchChange(e.target.value)}
                 placeholder="Tìm theo tên, SKU, mã vạch, nhóm hàng..."
                 className="w-full pl-9 pr-9 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs sm:text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
               />
-              {/* Spinner khi đang chờ debounce 2 giây */}
-              {isPendingSearch && (
-                <span
-                  className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center"
-                  title="Đang chờ 2 giây trước khi lọc..."
-                >
-                  <svg className="w-3.5 h-3.5 animate-spin text-indigo-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-                  </svg>
-                </span>
-              )}
-              {searchInput && !isPendingSearch && (
+              {search && (
                 <button
                   type="button"
-                  onClick={handleClearSearch}
+                  onClick={() => handleSearchChange('')}
                   className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 rounded-full text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
                   title="Xóa tìm kiếm"
                 >

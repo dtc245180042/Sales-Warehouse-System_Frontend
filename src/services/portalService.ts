@@ -178,24 +178,5 @@ export const portalService = {
     const res = await apiClient.get<PortalOrderDetail>(`/portal/orders/${orderId}`);
     return res.data;
   },
-
-  cancelOrder: async (orderId: string, reason: string): Promise<any> => {
-    const res = await apiClient.post(`/portal/orders/${orderId}/cancel`, { reason });
-    return res.data;
-  },
-
-  updateOrder: async (
-    orderId: string,
-    data: { delivery_address_id?: number; expected_delivery_date?: string; delivery_notes?: string }
-  ): Promise<any> => {
-    const res = await apiClient.put(`/portal/orders/${orderId}`, data);
-    return res.data;
-  },
-
-  confirmDelivery: async (orderId: string): Promise<any> => {
-    const res = await apiClient.post(`/portal/orders/${orderId}/confirm-delivery`);
-    return res.data;
-  },
 };
-
 

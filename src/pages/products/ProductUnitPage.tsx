@@ -562,8 +562,9 @@ const ProductRow: React.FC<ProductRowProps> = ({ product, hasConfig, isSelected,
 export const ProductUnitPage: React.FC = () => {
   const { showToast } = useToast();
 
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loadingProducts, setLoadingProducts] = useState(true);
+  // Nạp danh sách sản phẩm tức thì từ cache RAM (0ms)
+  const [products, setProducts] = useState<Product[]>(() => productService.getCached());
+  const [loadingProducts, setLoadingProducts] = useState<boolean>(() => productService.getCached().length === 0);
   const [search, setSearch] = useState('');
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [unitConfig, setUnitConfig] = useState<ProductUnitConfig | null>(null);
@@ -612,20 +613,9 @@ export const ProductUnitPage: React.FC = () => {
 
   const handleAddOrUpdateUnit = (data: Omit<UnitConversion, 'id'>) => {
     if (!unitConfig) return;
-    const cleanUnitName = data.unitName.trim();
-    const isDuplicate = unitConfig.units.some(
-      (u) =>
-        (!editingUnit || u.id !== editingUnit.id) &&
-        u.unitName.trim().toLowerCase() === cleanUnitName.toLowerCase()
-    );
-    if (isDuplicate) {
-      showToast(`Đơn vị tính "${cleanUnitName}" đã tồn tại cho sản phẩm này.`, 'warning');
-      return;
-    }
-
     if (editingUnit) {
       const updated = unitConfig.units.map((u) =>
-        u.id === editingUnit.id ? { ...u, ...data, unitName: cleanUnitName } : u
+        u.id === editingUnit.id ? { ...u, ...data } : u
       );
       setUnitConfig({ ...unitConfig, units: updated });
     } else {

@@ -1,38 +1,37 @@
-export type OrderStatus =
-  | 'draft'               // Nháp
-  | 'pending'             // Chờ duyệt
-  | 'pending_approval'    // Chờ phê duyệt ngoại lệ
-  | 'confirmed'           // Đã duyệt
-  | 'preparing'           // Đang soạn hàng
-  | 'shipping'            // Đã xuất
-  | 'completed'           // Đã giao
-  | 'closed'              // Đóng
-  | 'cancelled';          // Đã hủy
-
+export type OrderStatus = 'draft' | 'pending' | 'pending_approval' | 'confirmed' | 'shipping' | 'completed' | 'cancelled';
 export type PaymentMethod = 'cash' | 'transfer' | 'card';
 export type PaymentStatus = 'paid' | 'unpaid' | 'partial';
 
 export interface OrderItem {
   productId: string;
+  product_id?: string | number;
   sku: string;
   name: string;
   unit?: string;
   price: number;
-  quantity: number; // Số lượng đặt
-  deliveredQuantity?: number; // Số lượng thực giao (SCRUM-696)
-  shortageReason?: string; // Lý do giao thiếu nếu có (SCRUM-696)
-  unit?: string; // Đơn vị tính (Cái, Chiếc, Bộ, Thùng...)
+  quantity: number;
   discount: number;
   subtotal: number;
-}
-
-export interface OrderTimelineEvent {
-  status: OrderStatus;
-  label: string;
-  timestamp: string;
-  performedBy?: string;
-  role?: string;
-  note?: string;
+  floorPrice?: number;
+  floor_price?: number;
+  isBelowFloor?: boolean;
+  is_below_floor?: boolean;
+  appliedDiscountPolicyName?: string;
+  applied_discount_policy_name?: string;
+  appliedDiscountPolicyId?: number;
+  applied_discount_policy_id?: number;
+  discountRate?: number;
+  discount_rate?: number;
+  discountAmount?: number;
+  discount_amount?: number;
+  availableStock?: number;
+  available_stock?: number;
+  physicalStock?: number;
+  physical_stock?: number;
+  reservedStock?: number;
+  reserved_stock?: number;
+  warehouse?: string;
+  maxOrderableQuantity?: number;
 }
 
 export interface Order {
@@ -42,92 +41,111 @@ export interface Order {
   customerName: string;
   customerPhone: string;
   customerAddress?: string;
-  agentId?: string;
-  agentName?: string;
-  region?: string;
   items: OrderItem[];
   subtotal: number;
   discount: number;
-  tax?: number;
+  tax: number;
   total: number;
   paidAmount: number;
-  changeAmount?: number;
+  changeAmount: number;
   paymentMethod: PaymentMethod;
   paymentStatus: PaymentStatus;
   status: OrderStatus;
   staffId: string;
   staffName: string;
   note?: string;
-  hasShortage?: boolean; // Đơn hàng có phát sinh giao thiếu (SCRUM-696)
-  shortageResolution?: string; // Phương án xử lý giao thiếu: bù đợt 2, trừ công nợ...
-  expectedDeliveryDate?: string;
-  deliveryAddressId?: number | string;
-  deliveryAddress?: string;
+  requiresApproval?: boolean;
+  approvalReason?: string;
+  customerIsLocked?: boolean;
+  customerLockWarning?: string;
+  deliveryAddressId?: number;
+  deliveryAddressName?: string;
   deliveryReceiverName?: string;
   deliveryPhone?: string;
-  deliveryAddressName?: string;
-  source?: string;
-  channel?: string;
-  timeline?: OrderTimelineEvent[];
-  cancelledReason?: string;
-  cancelledAt?: string;
-  cancelledBy?: string;
-  closedAt?: string;
-  closedBy?: string;
+  deliveryAddress?: string;
+  deliveryNotes?: string;
+  expectedDeliveryDate?: string;
+  copiedFromOrderId?: string;
   createdAt: string;
   updatedAt: string;
 }
 
-export interface ProductSearchForOrder {
-  id: string;
-  sku: string;
-  name: string;
-  unit: string;
-  price: number;
-  sale_price?: number;
-  stock: number;
-  availableUnits?: string[];
-  available_units?: string[];
-  category?: string;
-  image?: string;
+export interface OrderCopyResponse {
+  order: Order;
+  warnings: string[];
+  message: string;
 }
 
 export interface OrderCalculateItem {
-  product_id: string;
+  product_id: string | number;
   quantity: number;
-  price: number;
+  price?: number;
   unit?: string;
 }
 
-export interface PurchaseHistoryItemSuggestion {
-  productId: string;
+export interface OrderCalculateRequest {
+  customer_id: string;
+  items: OrderCalculateItem[];
+  price_list_id?: number;
+}
+
+export interface OrderCalculateItemResponse {
+  product_id: string;
+  sku?: string;
+  name: string;
+  unit?: string;
+  unit_price: number;
+  quantity: number;
+  discount_amount: number;
+  discount_rate?: number;
+  subtotal: number;
+  applied_discount_name?: string;
+}
+
+export interface OrderCalculateResponse {
+  subtotal: number;
+  discount: number;
+  total: number;
+  items: OrderCalculateItemResponse[];
+}
+
+export interface ProductSearchForOrder {
+  id: number | string;
   sku: string;
   name: string;
-  unit: string;
   price: number;
-  currentPrice?: number;
-  lastPrice?: number;
+  sale_price: number;
   stock: number;
-  lastPurchasedDate?: string;
-  avgQuantity: number;
-  totalOrdersCount: number;
-  category?: string;
+  available_stock?: number;
+  physical_stock?: number;
+  reserved_stock?: number;
+  warehouse?: string;
+  unit: string;
+  packaging_spec?: string;
+  available_units: string[];
 }
 
-export interface PurchaseHistoryGroupSuggestion {
-  category: string;
-  itemCount: number;
-  totalSuggestedQuantity: number;
-  items: PurchaseHistoryItemSuggestion[];
+export interface LineItemAvailabilityResult {
+  product_id: string;
+  sku: string;
+  product_name: string;
+  unit: string;
+  requested_quantity: number;
+  physical_stock: number;
+  reserved_stock: number;
+  available_stock: number;
+  max_orderable_quantity: number;
+  warehouse_name: string;
+  warehouse_code: string;
+  is_available: boolean;
+  warning_message?: string;
 }
 
-export interface PurchaseHistorySuggestionResponse {
-  customerId: string;
-  windowDays: number;
-  hasPurchaseHistory?: boolean;
-  totalOrdersInWindow?: number;
-  lastOrder?: any;
-  items: PurchaseHistoryItemSuggestion[];
-  groups: PurchaseHistoryGroupSuggestion[];
+export interface CheckOrderAvailabilityResponse {
+  customer_id: string;
+  warehouse_name: string;
+  warehouse_code: string;
+  all_items_available: boolean;
+  items: LineItemAvailabilityResult[];
+  summary_message?: string;
 }
-

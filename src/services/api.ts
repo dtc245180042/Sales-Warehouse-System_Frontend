@@ -15,7 +15,7 @@ import { validateVNPhoneNumber } from '../utils/phoneUtils';
 
 // Create base Axios instance (ready for real backend URL)
 export const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8001/api/v1',
+  baseURL: import.meta.env.VITE_API_URL || 'http://127.0.0.1:8001/api/v1',
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
@@ -61,6 +61,26 @@ const setStored = <T>(key: string, val: T): void => {
   }
 };
 
+function toLocalDateTimeString(val?: string): string {
+  if (!val) return '';
+  try {
+    let s = val.trim();
+    if (!s.endsWith('Z') && !/[+-]\d{2}(:\d{2})?$/.test(s)) {
+      s = s.replace(' ', 'T') + 'Z';
+    }
+    const d = new Date(s);
+    if (isNaN(d.getTime())) return val;
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const hours = String(d.getHours()).padStart(2, '0');
+    const mins = String(d.getMinutes()).padStart(2, '0');
+    return `${year}-${month}-${day} ${hours}:${mins}`;
+  } catch {
+    return val;
+  }
+}
+
 // Simulating API network delay
 const delay = (ms = 350) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -82,7 +102,6 @@ export const api = {
           list = res.data.map((p: any) => ({
             id: p.id,
             code: p.sku || p.code || p.id,
-            sku: p.sku || p.code,
             name: p.name,
             category: p.category,
             price: Number(p.salePrice ?? p.sale_price ?? 0),
@@ -91,9 +110,7 @@ export const api = {
             unit: p.unit || 'Chiếc',
             image: (p.image && !p.image.includes('/images/products/') && !p.image.includes('placeholder')) ? (p.image || p.image_url || p.imageUrl || '') : '',
             description: p.description || '',
-            status: Number(p.stock ?? 0) <= 0 ? 'out_of_stock' : (Number(p.stock ?? 0) <= 10 ? 'low_stock' : 'in_stock'),
             rating: 4.8,
-            soldCount: Number(p.soldCount ?? p.sold_count ?? 10),
             reviewsCount: 15,
             isNew: false,
             isHot: true,
@@ -261,11 +278,11 @@ export const api = {
             paymentMethod: o.paymentMethod || o.payment_method || 'transfer',
             paymentStatus: o.paymentStatus || o.payment_status || 'paid',
             status: o.status || 'pending',
-            staffId: o.staffId || o.staff_id || 'USR-004',
-            staffName: o.staffName || o.staff_name || '',
+            staffId: o.staffId || o.staff_id || '',
+            staffName: o.staffName || o.staff_name || o.customerName || o.customer_name || '',
             note: o.note || '',
-            createdAt: o.createdAt || (o.created_at ? o.created_at.replace('T', ' ').slice(0, 16) : new Date().toISOString().replace('T', ' ').slice(0, 16)),
-            updatedAt: o.updatedAt || (o.updated_at ? o.updated_at.replace('T', ' ').slice(0, 16) : new Date().toISOString().replace('T', ' ').slice(0, 16)),
+            createdAt: toLocalDateTimeString(o.createdAt || o.created_at),
+            updatedAt: toLocalDateTimeString(o.updatedAt || o.updated_at),
           }));
           setStored(STORAGE_KEYS.ORDERS, list);
         }
@@ -395,10 +412,10 @@ export const api = {
 
       // Update user today's stats
       const profile = getStored<UserProfileData>(STORAGE_KEYS.PROFILE, initialUserProfile);
-      profile.todayOrdersCount = (profile.todayOrdersCount ?? 0) + 1;
-      profile.monthlyOrdersCount = (profile.monthlyOrdersCount ?? 0) + 1;
-      profile.personalRevenue = (profile.personalRevenue ?? 0) + newOrder.total;
-      profile.productsSoldCount = (profile.productsSoldCount ?? 0) + data.items.reduce((acc, it) => acc + it.quantity, 0);
+      profile.todayOrdersCount += 1;
+      profile.monthlyOrdersCount += 1;
+      profile.personalRevenue += newOrder.total;
+      profile.productsSoldCount += data.items.reduce((acc, it) => acc + it.quantity, 0);
       setStored(STORAGE_KEYS.PROFILE, profile);
 
       return newOrder;

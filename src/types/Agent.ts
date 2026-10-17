@@ -19,12 +19,12 @@ export interface Agent {
   totalOrders: number;
   totalSpent: number;
   outstandingDebt: number;         // Công nợ tồn
-  creditLimit?: number;            // Hạn mức tín dụng / công nợ được cấp (SCRUM-757)
+  creditLimit?: number;            // Hạn mức tín dụng được cấp (VNĐ)
+  maxDebtDays?: number;            // Số ngày nợ tối đa cho phép
+  availableCredit?: number;        // Hạn mức khả dụng còn lại
   lastOrderDate?: string;
   createdAt: string;
   status: AgentStatus;
   taxCode?: string;                // Mã số thuế
   contactPerson?: string;          // Người liên hệ chính
-  defaultWarehouseId?: string;     // Kho phục vụ mặc định (SCRUM-538)
-  defaultWarehouseName?: string;   // Tên kho phục vụ mặc định
 }

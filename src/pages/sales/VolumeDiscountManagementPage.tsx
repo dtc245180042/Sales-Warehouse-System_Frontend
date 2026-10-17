@@ -233,7 +233,7 @@ export const VolumeDiscountManagementPage: React.FC = () => {
         setFormError(`Bậc ${i + 1}: Số lượng tối thiểu phải > 0.`);
         return;
       }
-      if (t.max_quantity != null && t.max_quantity < t.min_quantity) {
+      if (t.max_quantity !== null && t.max_quantity < t.min_quantity) {
         setFormError(`Bậc ${i + 1}: Số lượng tối đa (${t.max_quantity}) nhỏ hơn số lượng tối thiểu (${t.min_quantity}).`);
         return;
       }
@@ -243,11 +243,11 @@ export const VolumeDiscountManagementPage: React.FC = () => {
       }
       if (i < sortedTiers.length - 1) {
         const next = sortedTiers[i + 1];
-        if (t.max_quantity == null) {
+        if (t.max_quantity === null) {
           setFormError(`Bậc ${i + 1} không giới hạn số lượng trên, không thể có thêm bậc kế tiếp.`);
           return;
         }
-        if (t.max_quantity != null && t.max_quantity >= next.min_quantity) {
+        if (t.max_quantity >= next.min_quantity) {
           setFormError(`Bậc [${t.min_quantity}-${t.max_quantity}] chồng lấn với bậc kế tiếp từ ${next.min_quantity}.`);
           return;
         }

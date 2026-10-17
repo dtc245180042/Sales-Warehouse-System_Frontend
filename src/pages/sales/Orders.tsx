@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Link, useSearchParams, useNavigate } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   Eye,
   Ban,
@@ -8,8 +8,7 @@ import {
   Download,
   Calendar,
   CreditCard,
-  ShieldAlert,
-  Copy,
+  Printer,
   Filter,
   X,
   MapPin,
@@ -28,6 +27,7 @@ import { PageContainer } from '../../components/layout/PageContainer';
 import { DataTable, Column } from '../../components/common/DataTable';
 import { Button } from '../../components/common/Button';
 import { Badge } from '../../components/common/Badge';
+import { ConfirmDialog } from '../../components/common/ConfirmDialog';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 import { exportToCSV } from '../../utils/csvExporter';
 import { orderService } from '../../services/orderService';
@@ -36,6 +36,7 @@ import { Order, OrderStatus } from '../../types/Order';
 import { Agent } from '../../types/Agent';
 import { useToast } from '../../contexts/ToastContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { OrderPrintModal } from '../../components/orders/OrderPrintModal';
 
 const REGION_OPTIONS = ['all', 'Miền Nam', 'Miền Bắc', 'Miền Trung'];
 
@@ -56,7 +57,6 @@ const ORDERS_FILTER_STORAGE_KEY = 'omspro_orders_filter_cache';
 export const Orders: React.FC = () => {
   const { showToast } = useToast();
   const { user, role } = useAuth();
-  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
   // Read URL params
@@ -68,9 +68,11 @@ export const Orders: React.FC = () => {
   const urlStartDate = searchParams.get('from') || '';
   const urlEndDate = searchParams.get('to') || '';
 
-  // Local filter states
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [agents, setAgents] = useState<Agent[]>([]);
+  // Local filter states - Nạp tức thì từ cache RAM (0ms) khi chuyển trang
+  const [orders, setOrders] = useState<Order[]>(() => orderService.getCached());
+  const [agents, setAgents] = useState<Agent[]>(() => agentService.getCached());
+  const [isInitialLoading, setIsInitialLoading] = useState<boolean>(() => orderService.getCached().length === 0);
+  const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [search, setSearch] = useState(urlSearch);
   const [statusFilter, setStatusFilter] = useState<string>(urlStatus);
   const [agentFilter, setAgentFilter] = useState<string>(urlAgent);
@@ -79,8 +81,7 @@ export const Orders: React.FC = () => {
   const [startDate, setStartDate] = useState<string>(urlStartDate);
   const [endDate, setEndDate] = useState<string>(urlEndDate);
   const [cancelOrderId, setCancelOrderId] = useState<string | null>(null);
-  const [cancelReason, setCancelReason] = useState('');
-  const [copyingId, setCopyingId] = useState<string | null>(null);
+  const [printOrder, setPrintOrder] = useState<Order | null>(null);
 
   // SCRUM-613: Nhân viên kinh doanh (SalesStaff) chỉ xem đơn của các đại lý được phân công hoặc do mình tạo
   const isSalesStaff = role === 'SalesStaff';
@@ -173,29 +174,54 @@ export const Orders: React.FC = () => {
     setEndDate(urlEndDate);
   }, [urlSearch, urlStatus, urlAgent, urlStaff, urlRegion, urlStartDate, urlEndDate]);
 
-  // Load orders & agents
-  const loadOrders = async () => {
-    const [ordersData, agentsData] = await Promise.all([
-      orderService.getAll(),
-      agentService.getAll().catch(() => [] as Agent[]),
-    ]);
-    setOrders(ordersData);
-    setAgents(agentsData);
+  // Load orders & agents ngầm mà không làm trắng/chớp màn hình
+  const loadOrders = async (silent: boolean = true, forceRefresh: boolean = false) => {
+    if (!silent) setIsInitialLoading(true);
+    setIsSyncing(true);
+    try {
+      const [ordersData, agentsData] = await Promise.all([
+        orderService.getAll(forceRefresh),
+        agentService.getAll().catch(() => [] as Agent[]),
+      ]);
+      setOrders(ordersData);
+      setAgents(agentsData);
+      if (forceRefresh) {
+        showToast(`Đã làm mới danh sách đơn hàng (${ordersData.length} đơn)`, 'success');
+      }
+    } catch (err) {
+      console.warn('[Orders] Lỗi tải dữ liệu:', err);
+      if (forceRefresh) {
+        showToast('Không thể kết nối đến máy chủ để làm mới đơn hàng', 'error');
+      }
+    } finally {
+      setIsInitialLoading(false);
+      setIsSyncing(false);
+    }
   };
 
   useEffect(() => {
-    loadOrders();
+    // Nếu đã có cache thì render 0ms ngay và gọi ngầm, nếu chưa có thì hiện loading
+    const hasCachedData = orders.length > 0;
+    loadOrders(hasCachedData);
   }, []);
 
   // Trích xuất danh sách nhân viên từ danh sách đơn hàng
   const staffOptions = useMemo(() => {
     const map = new Map<string, string>();
+    let hasCustomerOrder = false;
     orders.forEach((o) => {
-      if (o.staffName) {
+      const isCustomerPlaced = !o.staffId && (o.staffName === o.customerName || !o.staffName);
+      if (isCustomerPlaced) {
+        hasCustomerOrder = true;
+      } else if (o.staffName && o.staffName.trim()) {
         map.set(o.staffId || o.staffName, o.staffName);
       }
     });
-    return Array.from(map.entries()).map(([value, label]) => ({ value, label }));
+    const list = Array.from(map.entries()).map(([value, label]) => ({ value, label }));
+    if (hasCustomerOrder) {
+      list.push({ value: '__customer__', label: 'Khách hàng tự đặt (Portal/Online)' });
+    }
+    return list;
   }, [orders]);
 
   // Helper detect region from address or order
@@ -329,13 +355,13 @@ export const Orders: React.FC = () => {
   // Filtered orders list
   const filteredOrders = useMemo(() => {
     return orders.filter((o) => {
-      // 1. Keyword search (Code, Customer name, Phone, Staff name)
+      // 1. Keyword search (Code, Customer name, Phone, Staff/Creator name)
       if (search.trim()) {
         const q = search.toLowerCase();
-        const matchCode = o.code.toLowerCase().includes(q);
-        const matchCustomer = o.customerName.toLowerCase().includes(q);
-        const matchPhone = o.customerPhone.includes(q);
-        const matchStaff = o.staffName.toLowerCase().includes(q);
+        const matchCode = (o.code || '').toLowerCase().includes(q);
+        const matchCustomer = (o.customerName || '').toLowerCase().includes(q);
+        const matchPhone = (o.customerPhone || '').includes(q);
+        const matchStaff = (o.staffName || o.customerName || '').toLowerCase().includes(q);
         if (!matchCode && !matchCustomer && !matchPhone && !matchStaff) {
           return false;
         }
@@ -357,8 +383,13 @@ export const Orders: React.FC = () => {
 
       // 4. Staff filter
       if (staffFilter !== 'all') {
-        const matchStaff = o.staffId === staffFilter || o.staffName === staffFilter;
-        if (!matchStaff) return false;
+        if (staffFilter === '__customer__') {
+          const isCustomerPlaced = !o.staffId && (o.staffName === o.customerName || !o.staffName);
+          if (!isCustomerPlaced) return false;
+        } else {
+          const matchStaff = o.staffId === staffFilter || o.staffName === staffFilter;
+          if (!matchStaff) return false;
+        }
       }
 
       // 5. Region filter
@@ -447,38 +478,25 @@ export const Orders: React.FC = () => {
     };
   }, [filteredOrders]);
 
-  // S4-06: Hủy đơn hàng kèm bắt buộc nhập lý do
   const handleCancelOrder = async () => {
     if (!cancelOrderId) return;
-    if (!cancelReason.trim() || cancelReason.trim().length < 5) {
-      showToast('Vui lòng nhập lý do hủy đơn (tối thiểu 5 ký tự)', 'warning');
-      return;
-    }
+    const targetId = cancelOrderId;
+    setCancelOrderId(null);
     try {
-      await orderService.cancelOrder(cancelOrderId, cancelReason.trim());
+      // Optimistic update: Đổi trạng thái hủy tức thì trên giao diện (0ms)
+      setOrders((prev) =>
+        prev.map((o) =>
+          o.id === targetId || o.code === targetId
+            ? { ...o, status: 'cancelled' }
+            : o
+        )
+      );
+      await orderService.cancelOrder(targetId);
       showToast('Đã hủy đơn hàng và hoàn lại số lượng tồn kho thành công', 'success');
-      setCancelOrderId(null);
-      setCancelReason('');
-      loadOrders();
     } catch (err: any) {
+      // Rollback lại từ server nếu phát sinh lỗi
+      loadOrders(false);
       showToast(err?.message || 'Lỗi khi hủy đơn hàng', 'error');
-    }
-  };
-
-  // S4-09: Sao chép đơn hàng cũ
-  const handleCopyOrder = async (orderId: string) => {
-    setCopyingId(orderId);
-    try {
-      const res = await orderService.copyOrder(orderId);
-      showToast(res.message || 'Sao chép đơn hàng thành công sang đơn nháp mới!', 'success');
-      if (res.warnings && res.warnings.length > 0) {
-        showToast(res.warnings.join('; '), 'warning');
-      }
-      navigate(`/agents/orders/new?orderId=${encodeURIComponent(res.order.id)}`);
-    } catch (err: any) {
-      showToast(err?.response?.data?.detail || 'Lỗi khi sao chép đơn hàng', 'error');
-    } finally {
-      setCopyingId(null);
     }
   };
 
@@ -512,12 +530,11 @@ export const Orders: React.FC = () => {
   };
 
   const statusConfigs: Record<
-    string,
+    OrderStatus,
     { label: string; variant: 'success' | 'warning' | 'danger' | 'info' | 'primary' | 'neutral' }
   > = {
     draft: { label: 'Nháp', variant: 'neutral' },
     pending: { label: 'Chờ duyệt', variant: 'warning' },
-    pending_approval: { label: 'Chờ duyệt', variant: 'warning' },
     confirmed: { label: 'Đã duyệt', variant: 'primary' },
     preparing: { label: 'Đang soạn hàng', variant: 'info' },
     shipping: { label: 'Đã xuất kho', variant: 'info' },
@@ -611,16 +628,9 @@ export const Orders: React.FC = () => {
       render: (o) => {
         const conf = statusConfigs[o.status] || { label: o.status, variant: 'neutral' };
         return (
-          <div className="flex flex-col gap-1 items-start">
-            <Badge variant={conf.variant as any} size="sm" dot>
-              {conf.label}
-            </Badge>
-            {o.hasShortage && (
-              <span className="inline-block text-[10px] font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800/80 px-1.5 py-0.5 rounded">
-                Giao thiếu
-              </span>
-            )}
-          </div>
+          <Badge variant={conf.variant as any} size="sm" dot>
+            {conf.label}
+          </Badge>
         );
       },
     },
@@ -629,23 +639,40 @@ export const Orders: React.FC = () => {
       header: 'Người Tạo Đơn',
       sortable: true,
       render: (o) => {
-        const isCurrentUser = user && (user.name === o.staffName || String(user.id) === String(o.staffId));
+        const isCustomerPlaced = !o.staffId && (o.staffName === o.customerName || !o.staffName);
+        const creatorName = (o.staffName && o.staffName.trim())
+          || (o.customerName && o.customerName.trim())
+          || 'Khách vãng lai';
+        const isCurrentUser = user && (user.name === creatorName || String(user.id) === String(o.staffId));
+        const avatarBg = isCustomerPlaced ? '0284c7' : '6366f1';
         const avatarSrc = isCurrentUser && user?.avatar
           ? user.avatar
-          : (o as any).staffAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(o.staffName)}&background=6366f1&color=fff&size=128`;
+          : (o as any).staffAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(creatorName)}&background=${avatarBg}&color=fff&size=128`;
+
         return (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
             <img
               src={avatarSrc}
-              alt={o.staffName}
-              className="w-7 h-7 rounded-full object-cover ring-2 ring-indigo-500/20 shadow-sm shrink-0"
+              alt={creatorName}
+              className={`w-7 h-7 rounded-full object-cover ring-2 ${isCustomerPlaced ? 'ring-sky-500/30' : 'ring-indigo-500/20'} shadow-sm shrink-0`}
               onError={(e) => {
-                (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(o.staffName)}&background=6366f1&color=fff&size=128`;
+                (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(creatorName)}&background=${avatarBg}&color=fff&size=128`;
               }}
             />
-            <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap">
-              {o.staffName}
-            </span>
+            <div className="flex flex-col min-w-0">
+              <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap truncate max-w-[130px]" title={creatorName}>
+                {creatorName}
+              </span>
+              {isCustomerPlaced ? (
+                <span className="text-[10px] text-sky-600 dark:text-sky-400 font-medium leading-none">
+                  (Khách tự đặt)
+                </span>
+              ) : (
+                <span className="text-[10px] text-slate-400 dark:text-slate-500 leading-none">
+                  Nhân viên
+                </span>
+              )}
+            </div>
           </div>
         );
       },
@@ -663,30 +690,16 @@ export const Orders: React.FC = () => {
           >
             <Eye className="w-4 h-4" />
           </Link>
-          <Link
-            to={`/orders/${o.id}/delivery`}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors"
-            title="Theo dõi trạng thái giao hàng (Timeline)"
-          >
-            <Truck className="w-4 h-4" />
-          </Link>
-
-          {/* S4-09: Nút Sao chép đơn */}
           <button
-            onClick={() => handleCopyOrder(o.id)}
-            disabled={copyingId === o.id}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors disabled:opacity-50"
-            title="Sao chép đơn sang đơn nháp mới (S4-09)"
+            onClick={() => setPrintOrder(o)}
+            className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            title="In / Lưu PDF đơn hàng"
           >
-            <Copy className="w-4 h-4" />
+            <Printer className="w-4 h-4" />
           </button>
-
           {!['shipping', 'completed', 'closed', 'cancelled'].includes(o.status) && (
             <button
-              onClick={() => {
-                setCancelOrderId(o.id);
-                setCancelReason('');
-              }}
+              onClick={() => setCancelOrderId(o.id)}
               className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
               title="Hủy đơn hàng"
             >
@@ -707,21 +720,22 @@ export const Orders: React.FC = () => {
           <Button
             variant="outline"
             size="sm"
+            onClick={() => loadOrders(false, true)}
+            disabled={isSyncing}
+            leftIcon={<RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin text-indigo-600' : ''}`} />}
+            title="Tải lại danh sách đơn hàng mới nhất từ hệ thống"
+          >
+            {isSyncing ? 'Đang tải...' : 'Tải lại đơn hàng'}
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
             onClick={handleExportCSV}
             leftIcon={<Download className="w-4 h-4" />}
           >
             Xuất Excel/CSV
           </Button>
-          <Link to="/sales/orders/approvals">
-            <Button
-              variant="outline"
-              size="sm"
-              className="text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100"
-              leftIcon={<ShieldAlert className="w-4 h-4 text-amber-600" />}
-            >
-              Đơn chờ duyệt vi phạm
-            </Button>
-          </Link>
           <Link to="/sales/pos">
             <Button variant="primary" size="sm" leftIcon={<ShoppingCart className="w-4 h-4" />}>
               Mở quầy POS bán hàng
@@ -1103,64 +1117,33 @@ export const Orders: React.FC = () => {
         </div>
       </div>
 
-      {/* ── BẢNG DANH SÁCH & PHÂN TRANG KẾT QUẢ ── */}
+      {/* ── BẢNG DANH SÁCH & PHÂN TRANG KẾT QUẢ (20 dòng/trang) ── */}
       <DataTable
         data={filteredOrders}
         columns={columns}
+        defaultPageSize={20}
         keyExtractor={(o) => o.id}
+        loading={isInitialLoading}
         emptyTitle="Không tìm thấy đơn hàng"
         emptyDescription="Thử nới lỏng hoặc xóa các tiêu chí bộ lọc để hiển thị nhiều kết quả hơn."
       />
 
-      {/* S4-06: Modal Hủy Đơn Hàng Bắt Buộc Nhập Lý Do */}
-      {cancelOrderId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fadeIn">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 max-w-md w-full shadow-2xl space-y-4">
-            <div className="flex items-center gap-2.5 text-rose-600">
-              <Ban className="w-5 h-5 shrink-0" />
-              <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                Xác nhận hủy đơn hàng (S4-06)
-              </h3>
-            </div>
-            <p className="text-xs text-slate-500">
-              Số lượng sản phẩm đã bán trong đơn sẽ được tự động hoàn trả lại vào tồn kho khả dụng.
-            </p>
-            <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                Lý do hủy đơn hàng <span className="text-rose-500">*</span>
-              </label>
-              <textarea
-                value={cancelReason}
-                onChange={(e) => setCancelReason(e.target.value)}
-                placeholder="Nhập lý do hủy chi tiết (tối thiểu 5 ký tự)..."
-                rows={3}
-                className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500 placeholder:text-slate-400"
-              />
-              <span className="text-[11px] text-slate-400 mt-1 block">Yêu cầu tối thiểu 5 ký tự</span>
-            </div>
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => {
-                  setCancelOrderId(null);
-                  setCancelReason('');
-                }}
-              >
-                Đóng
-              </Button>
-              <Button
-                variant="danger"
-                size="sm"
-                onClick={handleCancelOrder}
-                disabled={cancelReason.trim().length < 5}
-              >
-                Xác nhận hủy đơn
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        isOpen={!!cancelOrderId}
+        onClose={() => setCancelOrderId(null)}
+        onConfirm={handleCancelOrder}
+        title="Xác nhận hủy đơn hàng"
+        message="Bạn có chắc chắn muốn hủy đơn hàng này? Số lượng sản phẩm đã bán trong đơn sẽ được hoàn trả lại vào tồn kho."
+        confirmText="Hủy đơn hàng"
+        variant="danger"
+      />
+
+      <OrderPrintModal
+        isOpen={!!printOrder}
+        onClose={() => setPrintOrder(null)}
+        orderId={printOrder?.id || null}
+        orderCode={printOrder?.code}
+      />
     </PageContainer>
   );
 };

@@ -7,9 +7,8 @@ export interface Category {
   level: number;
   is_active: boolean;
   product_count: number;
-  products_count?: number;
   total_product_count?: number;
-  children_count?: number;
+  children_count: number;
   created_at?: string;
   updated_at?: string;
 }

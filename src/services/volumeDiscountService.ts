@@ -219,11 +219,6 @@ export const volumeDiscountService = {
       neededForNext,
     };
   },
-
-  resetToDefault(): DiscountTier[] {
-    cachedActiveTiers = [...DEFAULT_VOLUME_DISCOUNT_TIERS];
-    return cachedActiveTiers;
-  },
 };
 
 // Kích hoạt nạp tiers từ Backend API

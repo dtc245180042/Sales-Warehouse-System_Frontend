@@ -9,32 +9,32 @@ import {
 import { initialProducts } from '../mock/products';
 
 const DEFAULT_CATEGORIES: Category[] = [
-  { id: 1, code: 'DIEN_TU', name: 'Thiết bị điện tử & Viễn thông', level: 1, parent_id: null, is_active: true, product_count: 19 },
-  { id: 2, code: 'GIA_DUNG', name: 'Điện gia dụng & Nhà bếp', level: 1, parent_id: null, is_active: true, product_count: 6 },
-  { id: 3, code: 'DIEN_THOAI_MTB', name: 'Điện thoại & Máy tính bảng', level: 2, parent_id: 1, is_active: true, product_count: 6 },
-  { id: 4, code: 'LAPTOP_PC', name: 'Máy tính & Thiết bị IT', level: 2, parent_id: 1, is_active: true, product_count: 10 },
-  { id: 11, code: 'AUDIO_ACCESSORIES', name: 'Âm thanh & Phụ kiện công nghệ', level: 2, parent_id: 1, is_active: true, product_count: 6 },
-  { id: 12, code: 'NETWORK_SMART', name: 'Thiết bị mạng & Nhà thông minh', level: 2, parent_id: 1, is_active: true, product_count: 3 },
-  { id: 5, code: 'NHA_BEP', name: 'Thiết bị nấu nướng nhà bếp', level: 2, parent_id: 2, is_active: true, product_count: 2 },
-  { id: 13, code: 'GIA_DUNG_SMART', name: 'Thiết bị gia dụng & Đời sống', level: 2, parent_id: 2, is_active: true, product_count: 4 },
-  { id: 6, code: 'SMARTPHONE', name: 'Điện thoại thông minh (Smartphones)', level: 3, parent_id: 3, is_active: true, product_count: 3 },
-  { id: 7, code: 'TABLET', name: 'Máy tính bảng (Tablets)', level: 3, parent_id: 3, is_active: true, product_count: 1 },
-  { id: 14, code: 'SMARTWATCH', name: 'Đồng hồ & Vòng đeo tay thông minh', level: 3, parent_id: 3, is_active: true, product_count: 2 },
-  { id: 8, code: 'LAPTOP_GAMING', name: 'Laptop Gaming đồ họa', level: 3, parent_id: 4, is_active: true, product_count: 1 },
-  { id: 15, code: 'LAPTOP_ULTRABOOK', name: 'Laptop mỏng nhẹ & Ultrabook', level: 3, parent_id: 4, is_active: true, product_count: 2 },
-  { id: 16, code: 'PERIPHERALS', name: 'Bàn phím, Chuột & Thiết bị ngoại vi', level: 3, parent_id: 4, is_active: true, product_count: 4 },
-  { id: 17, code: 'MONITORS', name: 'Màn hình & Thiết bị hiển thị', level: 3, parent_id: 4, is_active: true, product_count: 2 },
-  { id: 18, code: 'STORAGE', name: 'Ổ cứng & Thiết bị lưu trữ', level: 3, parent_id: 4, is_active: true, product_count: 1 },
-  { id: 19, code: 'HEADPHONES', name: 'Tai nghe & Headphone', level: 3, parent_id: 11, is_active: true, product_count: 3 },
-  { id: 20, code: 'SPEAKERS', name: 'Loa Bluetooth & Soundbar', level: 3, parent_id: 11, is_active: true, product_count: 2 },
-  { id: 21, code: 'CHARGERS', name: 'Củ sạc, Cáp sạc & Trạm sạc', level: 3, parent_id: 11, is_active: true, product_count: 1 },
-  { id: 22, code: 'ROUTERS_MESH', name: 'Router WiFi & Hệ thống Mesh', level: 3, parent_id: 12, is_active: true, product_count: 2 },
-  { id: 23, code: 'CAMERAS_SECURITY', name: 'Camera AI & Thiết bị an ninh', level: 3, parent_id: 12, is_active: true, product_count: 1 },
-  { id: 9, code: 'NOI_CHIEN', name: 'Nồi chiên không dầu & Lò nướng', level: 3, parent_id: 5, is_active: true, product_count: 1 },
-  { id: 10, code: 'BEP_TU', name: 'Bếp từ & Bếp hồng ngoại', level: 3, parent_id: 5, is_active: true, product_count: 1 },
-  { id: 24, code: 'ROBOT_VACUUMS', name: 'Robot hút bụi & Lau nhà thông minh', level: 3, parent_id: 13, is_active: true, product_count: 2 },
-  { id: 25, code: 'AIR_PURIFIERS', name: 'Máy lọc không khí & Tạo ẩm', level: 3, parent_id: 13, is_active: true, product_count: 1 },
-  { id: 26, code: 'SMART_LIGHTING', name: 'Đèn & Chiếu sáng thông minh', level: 3, parent_id: 13, is_active: true, product_count: 1 },
+  { id: 1, code: 'DIEN_TU', name: 'Thiết bị điện tử & Viễn thông', level: 1, parent_id: null, is_active: true, products_count: 19 },
+  { id: 2, code: 'GIA_DUNG', name: 'Điện gia dụng & Nhà bếp', level: 1, parent_id: null, is_active: true, products_count: 6 },
+  { id: 3, code: 'DIEN_THOAI_MTB', name: 'Điện thoại & Máy tính bảng', level: 2, parent_id: 1, is_active: true, products_count: 6 },
+  { id: 4, code: 'LAPTOP_PC', name: 'Máy tính & Thiết bị IT', level: 2, parent_id: 1, is_active: true, products_count: 10 },
+  { id: 11, code: 'AUDIO_ACCESSORIES', name: 'Âm thanh & Phụ kiện công nghệ', level: 2, parent_id: 1, is_active: true, products_count: 6 },
+  { id: 12, code: 'NETWORK_SMART', name: 'Thiết bị mạng & Nhà thông minh', level: 2, parent_id: 1, is_active: true, products_count: 3 },
+  { id: 5, code: 'NHA_BEP', name: 'Thiết bị nấu nướng nhà bếp', level: 2, parent_id: 2, is_active: true, products_count: 2 },
+  { id: 13, code: 'GIA_DUNG_SMART', name: 'Thiết bị gia dụng & Đời sống', level: 2, parent_id: 2, is_active: true, products_count: 4 },
+  { id: 6, code: 'SMARTPHONE', name: 'Điện thoại thông minh (Smartphones)', level: 3, parent_id: 3, is_active: true, products_count: 3 },
+  { id: 7, code: 'TABLET', name: 'Máy tính bảng (Tablets)', level: 3, parent_id: 3, is_active: true, products_count: 1 },
+  { id: 14, code: 'SMARTWATCH', name: 'Đồng hồ & Vòng đeo tay thông minh', level: 3, parent_id: 3, is_active: true, products_count: 2 },
+  { id: 8, code: 'LAPTOP_GAMING', name: 'Laptop Gaming đồ họa', level: 3, parent_id: 4, is_active: true, products_count: 1 },
+  { id: 15, code: 'LAPTOP_ULTRABOOK', name: 'Laptop mỏng nhẹ & Ultrabook', level: 3, parent_id: 4, is_active: true, products_count: 2 },
+  { id: 16, code: 'PERIPHERALS', name: 'Bàn phím, Chuột & Thiết bị ngoại vi', level: 3, parent_id: 4, is_active: true, products_count: 4 },
+  { id: 17, code: 'MONITORS', name: 'Màn hình & Thiết bị hiển thị', level: 3, parent_id: 4, is_active: true, products_count: 2 },
+  { id: 18, code: 'STORAGE', name: 'Ổ cứng & Thiết bị lưu trữ', level: 3, parent_id: 4, is_active: true, products_count: 1 },
+  { id: 19, code: 'HEADPHONES', name: 'Tai nghe & Headphone', level: 3, parent_id: 11, is_active: true, products_count: 3 },
+  { id: 20, code: 'SPEAKERS', name: 'Loa Bluetooth & Soundbar', level: 3, parent_id: 11, is_active: true, products_count: 2 },
+  { id: 21, code: 'CHARGERS', name: 'Củ sạc, Cáp sạc & Trạm sạc', level: 3, parent_id: 11, is_active: true, products_count: 1 },
+  { id: 22, code: 'ROUTERS_MESH', name: 'Router WiFi & Hệ thống Mesh', level: 3, parent_id: 12, is_active: true, products_count: 2 },
+  { id: 23, code: 'CAMERAS_SECURITY', name: 'Camera AI & Thiết bị an ninh', level: 3, parent_id: 12, is_active: true, products_count: 1 },
+  { id: 9, code: 'NOI_CHIEN', name: 'Nồi chiên không dầu & Lò nướng', level: 3, parent_id: 5, is_active: true, products_count: 1 },
+  { id: 10, code: 'BEP_TU', name: 'Bếp từ & Bếp hồng ngoại', level: 3, parent_id: 5, is_active: true, products_count: 1 },
+  { id: 24, code: 'ROBOT_VACUUMS', name: 'Robot hút bụi & Lau nhà thông minh', level: 3, parent_id: 13, is_active: true, products_count: 2 },
+  { id: 25, code: 'AIR_PURIFIERS', name: 'Máy lọc không khí & Tạo ẩm', level: 3, parent_id: 13, is_active: true, products_count: 1 },
+  { id: 26, code: 'SMART_LIGHTING', name: 'Đèn & Chiếu sáng thông minh', level: 3, parent_id: 13, is_active: true, products_count: 1 },
 ];
 
 function buildMockTree(categories: Category[]): CategoryTree[] {
@@ -53,25 +53,69 @@ function buildMockTree(categories: Category[]): CategoryTree[] {
   return roots;
 }
 
+let memoryCacheCategoryTree: CategoryTree[] | null = null;
+let memoryCacheCategories: Category[] | null = null;
+let lastTreeFetchTime = 0;
+let lastListFetchTime = 0;
+const CATEGORIES_CACHE_TTL = 60000; // 60 giây
+
 export const categoryService = {
+  /** Lấy cây danh mục tức thì từ RAM cache (0ms) */
+  getCachedTree: (): CategoryTree[] => {
+    if (memoryCacheCategoryTree && memoryCacheCategoryTree.length > 0) {
+      return memoryCacheCategoryTree;
+    }
+    const mock = buildMockTree(DEFAULT_CATEGORIES);
+    memoryCacheCategoryTree = mock;
+    return mock;
+  },
+
+  /** Lấy danh sách phẳng danh mục tức thì từ RAM cache (0ms) */
+  getCachedList: (): Category[] => {
+    if (memoryCacheCategories && memoryCacheCategories.length > 0) {
+      return memoryCacheCategories;
+    }
+    memoryCacheCategories = DEFAULT_CATEGORIES;
+    return DEFAULT_CATEGORIES;
+  },
+
   // Lấy danh mục nhóm hàng dạng cây nhiều cấp (tối thiểu 3 cấp)
-  getTree: async (): Promise<CategoryTree[]> => {
+  getTree: async (forceRefresh: boolean = false): Promise<CategoryTree[]> => {
+    if (!forceRefresh && memoryCacheCategoryTree && memoryCacheCategoryTree.length > 0 && Date.now() - lastTreeFetchTime < CATEGORIES_CACHE_TTL) {
+      return memoryCacheCategoryTree;
+    }
     try {
       const response = await apiClient.get('/categories/tree');
       if (Array.isArray(response.data) && response.data.length > 0) {
+        memoryCacheCategoryTree = response.data;
+        lastTreeFetchTime = Date.now();
         return response.data;
       }
     } catch (err) {
       console.warn('[categoryService] Backend API offline hoặc lỗi, sử dụng cây danh mục mẫu:', err);
     }
-    return buildMockTree(DEFAULT_CATEGORIES);
+    const fallback = buildMockTree(DEFAULT_CATEGORIES);
+    memoryCacheCategoryTree = fallback;
+    lastTreeFetchTime = Date.now();
+    return fallback;
   },
 
   // Lấy danh sách phẳng (có lọc theo parent_id, level, keyword)
-  getList: async (params?: { parent_id?: number; level?: number; keyword?: string }): Promise<Category[]> => {
+  getList: async (
+    params?: { parent_id?: number; level?: number; keyword?: string },
+    forceRefresh: boolean = false
+  ): Promise<Category[]> => {
+    const isDefault = !params || Object.keys(params).length === 0;
+    if (isDefault && !forceRefresh && memoryCacheCategories && memoryCacheCategories.length > 0 && Date.now() - lastListFetchTime < CATEGORIES_CACHE_TTL) {
+      return memoryCacheCategories;
+    }
     try {
       const response = await apiClient.get('/categories', { params });
       if (Array.isArray(response.data) && response.data.length > 0) {
+        if (isDefault) {
+          memoryCacheCategories = response.data;
+          lastListFetchTime = Date.now();
+        }
         return response.data;
       }
     } catch (err) {
@@ -87,6 +131,10 @@ export const categoryService = {
     if (params?.keyword) {
       const kw = params.keyword.toLowerCase();
       list = list.filter((c) => c.name.toLowerCase().includes(kw) || c.code.toLowerCase().includes(kw));
+    }
+    if (isDefault) {
+      memoryCacheCategories = list;
+      lastListFetchTime = Date.now();
     }
     return list;
   },
