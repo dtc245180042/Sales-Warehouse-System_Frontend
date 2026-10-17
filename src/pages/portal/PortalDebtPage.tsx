@@ -207,11 +207,11 @@ export const PortalDebtPage: React.FC = () => {
       prev.map((inv) =>
         inv.id === invoiceId
           ? {
-              ...inv,
-              paidAmount: inv.totalAmount,
-              remainingDebt: 0,
-              paymentStatus: 'PAID',
-            }
+            ...inv,
+            paidAmount: inv.totalAmount,
+            remainingDebt: 0,
+            paymentStatus: 'PAID',
+          }
           : inv
       )
     );
@@ -470,13 +470,12 @@ export const PortalDebtPage: React.FC = () => {
 
             <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-3 overflow-hidden p-0.5">
               <div
-                className={`h-full rounded-full transition-all duration-500 ${
-                  debtSummary.utilizationRate > 90
-                    ? 'bg-rose-500'
-                    : debtSummary.utilizationRate > 70
+                className={`h-full rounded-full transition-all duration-500 ${debtSummary.utilizationRate > 90
+                  ? 'bg-rose-500'
+                  : debtSummary.utilizationRate > 70
                     ? 'bg-amber-500'
                     : 'bg-emerald-500'
-                }`}
+                  }`}
                 style={{ width: `${Math.min(100, debtSummary.utilizationRate)}%` }}
               />
             </div>
@@ -514,11 +513,10 @@ export const PortalDebtPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setSelectedStatus('all')}
-                className={`px-3 py-1.5 rounded-lg font-semibold transition ${
-                  selectedStatus === 'all'
-                    ? 'bg-primary-600 text-white shadow-xs'
-                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
-                }`}
+                className={`px-3 py-1.5 rounded-lg font-semibold transition ${selectedStatus === 'all'
+                  ? 'bg-primary-600 text-white shadow-xs'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
+                  }`}
               >
                 Tất cả ({invoices.length})
               </button>
@@ -526,11 +524,10 @@ export const PortalDebtPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setSelectedStatus('debtOnly')}
-                className={`px-3 py-1.5 rounded-lg font-semibold transition flex items-center gap-1 ${
-                  selectedStatus === 'debtOnly'
-                    ? 'bg-primary-600 text-white shadow-xs'
-                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
-                }`}
+                className={`px-3 py-1.5 rounded-lg font-semibold transition flex items-center gap-1 ${selectedStatus === 'debtOnly'
+                  ? 'bg-primary-600 text-white shadow-xs'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
+                  }`}
               >
                 Còn nợ ({invoices.filter((i) => (i.remainingDebt || 0) > 0).length})
               </button>
@@ -538,11 +535,10 @@ export const PortalDebtPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setSelectedStatus('OVERDUE')}
-                className={`px-3 py-1.5 rounded-lg font-semibold transition flex items-center gap-1 ${
-                  selectedStatus === 'OVERDUE'
-                    ? 'bg-rose-600 text-white shadow-xs'
-                    : 'bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400 hover:bg-rose-100'
-                }`}
+                className={`px-3 py-1.5 rounded-lg font-semibold transition flex items-center gap-1 ${selectedStatus === 'OVERDUE'
+                  ? 'bg-rose-600 text-white shadow-xs'
+                  : 'bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400 hover:bg-rose-100'
+                  }`}
               >
                 <AlertTriangle className="w-3.5 h-3.5" />
                 Quá hạn ({debtSummary.overdueCount})
@@ -551,11 +547,10 @@ export const PortalDebtPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setSelectedStatus('PENDING')}
-                className={`px-3 py-1.5 rounded-lg font-semibold transition ${
-                  selectedStatus === 'PENDING'
-                    ? 'bg-amber-600 text-white shadow-xs'
-                    : 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400 hover:bg-amber-100'
-                }`}
+                className={`px-3 py-1.5 rounded-lg font-semibold transition ${selectedStatus === 'PENDING'
+                  ? 'bg-amber-600 text-white shadow-xs'
+                  : 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400 hover:bg-amber-100'
+                  }`}
               >
                 Chờ thanh toán
               </button>
@@ -563,11 +558,10 @@ export const PortalDebtPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setSelectedStatus('PAID')}
-                className={`px-3 py-1.5 rounded-lg font-semibold transition ${
-                  selectedStatus === 'PAID'
-                    ? 'bg-emerald-600 text-white shadow-xs'
-                    : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 hover:bg-emerald-100'
-                }`}
+                className={`px-3 py-1.5 rounded-lg font-semibold transition ${selectedStatus === 'PAID'
+                  ? 'bg-emerald-600 text-white shadow-xs'
+                  : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 hover:bg-emerald-100'
+                  }`}
               >
                 Đã thanh toán đủ
               </button>
@@ -671,13 +665,12 @@ export const PortalDebtPage: React.FC = () => {
                           {/* Remaining Debt */}
                           <td className="py-3.5 px-4 text-right">
                             <span
-                              className={`font-mono font-extrabold text-sm ${
-                                hasDebt
-                                  ? inv.paymentStatus === 'OVERDUE'
-                                    ? 'text-rose-600 dark:text-rose-400'
-                                    : 'text-amber-600 dark:text-amber-400'
-                                  : 'text-slate-400'
-                              }`}
+                              className={`font-mono font-extrabold text-sm ${hasDebt
+                                ? inv.paymentStatus === 'OVERDUE'
+                                  ? 'text-rose-600 dark:text-rose-400'
+                                  : 'text-amber-600 dark:text-amber-400'
+                                : 'text-slate-400'
+                                }`}
                             >
                               {formatCurrency(inv.remainingDebt || 0)}
                             </span>
