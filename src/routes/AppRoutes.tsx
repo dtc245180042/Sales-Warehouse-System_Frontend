@@ -59,6 +59,7 @@ import { DeliveryRoutingPage } from '../pages/inventory/DeliveryRoutingPage';
 // Portal B2B Pages (S4-10, S5-01 / SCRUM-243)
 import { PortalOrderPage } from '../pages/portal/PortalOrderPage';
 import { PortalOrdersPage } from '../pages/portal/PortalOrdersPage';
+import { PortalDeliveryTrackingPage } from '../pages/portal/PortalDeliveryTrackingPage';
 
 // Stock Dispatch & Delivery Confirmation (S6-08 / SC-259)
 import { StockDispatchListPage } from '../pages/inventory/StockDispatchListPage';
@@ -78,9 +79,11 @@ import { DeliveryDetailPage } from '../pages/delivery/DeliveryDetailPage';
 import { CollectionReceiptPage } from '../pages/accounting/CollectionReceiptPage';
 import { CollectionConfirmPage } from '../pages/accounting/CollectionConfirmPage';
 
-// Biên bản đối chiếu công nợ (SCRUM-267: 747, 749, 750)
+// Biên bản đối chiếu công nợ & Tổng hợp công nợ (SCRUM-267, SCRUM-268)
 import { DebtReconciliationPage } from '../pages/accounting/DebtReconciliationPage';
 import { PortalReconciliationPage } from '../pages/portal/PortalReconciliationPage';
+import { PortalDebtPage } from '../pages/portal/PortalDebtPage';
+
 
 // All 7 business roles allowed in Sprint 1 & 2 backoffice
 const ALL_BACKOFFICE_ROLES: UserRole[] = [
@@ -587,6 +590,23 @@ export const AppRoutes: React.FC = () => {
           </ProtectedRoute>
         }
       />
+      {/* Theo dõi trạng thái giao hàng của đơn với timeline các mốc giao hàng (SCRUM-260 / SCRUM-695) */}
+      <Route
+        path="/portal/orders/:orderId/tracking"
+        element={
+          <ProtectedRoute allowedRoles={['Customer', 'User', 'Admin', ...ALL_BACKOFFICE_ROLES]}>
+            <PortalDeliveryTrackingPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/portal/tracking"
+        element={
+          <ProtectedRoute allowedRoles={['Customer', 'User', 'Admin', ...ALL_BACKOFFICE_ROLES]}>
+            <PortalDeliveryTrackingPage />
+          </ProtectedRoute>
+        }
+      />
       <Route
         path="/portal"
         element={<Navigate to="/portal/orders" replace />}
@@ -600,6 +620,17 @@ export const AppRoutes: React.FC = () => {
           </ProtectedRoute>
         }
       />
+
+      {/* Cổng Đại lý xem tổng hợp công nợ & hoá đơn (SCRUM-268: 757) */}
+      <Route
+        path="/portal/debt"
+        element={
+          <ProtectedRoute allowedRoles={['Customer', 'User', 'Admin', ...ALL_BACKOFFICE_ROLES]}>
+            <PortalDebtPage />
+          </ProtectedRoute>
+        }
+      />
+
 
       {/* Fallback 404 Route - SCRUM-204 */}
       <Route

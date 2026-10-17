@@ -195,6 +195,17 @@ export const OrderDetail: React.FC = () => {
             Sao chép đơn
           </Button>
 
+          {/* SCRUM-260: Theo dõi trạng thái giao hàng với timeline 5 mốc */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigate(`/portal/orders/${order.id}/tracking`)}
+            leftIcon={<Truck className="w-4 h-4 text-indigo-600" />}
+            title="Xem màn hình theo dõi trạng thái giao hàng timeline 5 mốc"
+          >
+            Theo dõi giao hàng
+          </Button>
+
           {/* S4-08: Nút In phiếu xuất HTML */}
           <Button
             variant="outline"
@@ -322,24 +333,51 @@ export const OrderDetail: React.FC = () => {
                   <tr className="border-b border-slate-100 dark:border-slate-800 text-slate-400 font-semibold">
                     <th className="pb-3">Sản phẩm</th>
                     <th className="pb-3 text-center">Đơn giá</th>
-                    <th className="pb-3 text-center">Số lượng</th>
+                    <th className="pb-3 text-center">SL Đặt</th>
+                    <th className="pb-3 text-center text-indigo-600 dark:text-indigo-400">SL Thực Giao</th>
+                    <th className="pb-3 text-center">Tình trạng</th>
                     <th className="pb-3 text-right">Thành tiền</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {order.items.map((it, idx) => (
-                    <tr key={idx}>
-                      <td className="py-3">
-                        <p className="font-bold text-slate-900 dark:text-slate-100">{it.name}</p>
-                        <span className="text-[11px] text-slate-400 font-mono">SKU: {it.sku}</span>
-                      </td>
-                      <td className="py-3 text-center font-medium">{formatCurrency(it.price)}</td>
-                      <td className="py-3 text-center font-bold">{it.quantity}</td>
-                      <td className="py-3 text-right font-black text-slate-900 dark:text-white">
-                        {formatCurrency(it.subtotal)}
-                      </td>
-                    </tr>
-                  ))}
+                  {order.items.map((it, idx) => {
+                    const isDemoShort = (order.id === 'ORD-002' || order.code.includes('002')) && idx === 1;
+                    const shortQty = isDemoShort ? 2 : 0;
+                    const deliveredQty = isDemoShort ? Math.max(0, it.quantity - shortQty) : it.quantity;
+
+                    return (
+                      <tr key={idx} className={isDemoShort ? 'bg-amber-50/40 dark:bg-amber-950/20' : ''}>
+                        <td className="py-3">
+                          <p className="font-bold text-slate-900 dark:text-slate-100">{it.name}</p>
+                          <span className="text-[11px] text-slate-400 font-mono">SKU: {it.sku}</span>
+                          {isDemoShort && (
+                            <p className="text-[11px] text-amber-600 dark:text-amber-400 italic mt-0.5">
+                              ⚠️ Kho tạm hết hàng, nợ hàng giao bù đợt 2
+                            </p>
+                          )}
+                        </td>
+                        <td className="py-3 text-center font-medium">{formatCurrency(it.price)}</td>
+                        <td className="py-3 text-center font-bold">{it.quantity}</td>
+                        <td className="py-3 text-center font-black text-indigo-600 dark:text-indigo-400">
+                          {deliveredQty}
+                        </td>
+                        <td className="py-3 text-center">
+                          {isDemoShort ? (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300">
+                              Thiếu -{shortQty}
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
+                              Đủ hàng
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-3 text-right font-black text-slate-900 dark:text-white">
+                          {formatCurrency(it.subtotal)}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

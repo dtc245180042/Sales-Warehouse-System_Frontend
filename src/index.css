@@ -144,21 +144,105 @@
   animation: slideLeft 0.25s ease-out forwards;
 }
 
-/* Print styles for POS receipt */
+/* ============================================================ */
+/* Print styles (Khắc phục lỗi in bị trắng trang toàn hệ thống) */
+/* ============================================================ */
 @media print {
-  body * {
+  /* 1. In hóa đơn POS nhiệt 80mm khi có #printable-receipt */
+  body:has(#printable-receipt) * {
     visibility: hidden;
   }
-  #printable-receipt, #printable-receipt * {
+  body:has(#printable-receipt) #printable-receipt,
+  body:has(#printable-receipt) #printable-receipt * {
     visibility: visible;
   }
-  #printable-receipt {
+  body:has(#printable-receipt) #printable-receipt {
     position: absolute;
     left: 0;
     top: 0;
     width: 80mm;
     margin: 0;
     padding: 10px;
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  /* 2. In Hóa đơn điện tử khi mở Modal HĐĐT (#printable-invoice) */
+  body:has(#printable-invoice) * {
+    visibility: hidden;
+  }
+  body:has(#printable-invoice) #printable-invoice,
+  body:has(#printable-invoice) #printable-invoice * {
+    visibility: visible;
+  }
+  body:has(#printable-invoice) #printable-invoice {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 20px 30px;
+    background: #ffffff !important;
+    color: #000000 !important;
+    border: none !important;
+    box-shadow: none !important;
+    font-family: "Times New Roman", Times, serif !important;
+  }
+
+  /* 3. In Vận đơn giao hàng (#printable-delivery) */
+  body:has(#printable-delivery):not(:has(#printable-backorder-slip)) * {
+    visibility: hidden;
+  }
+  body:has(#printable-delivery):not(:has(#printable-backorder-slip)) #printable-delivery,
+  body:has(#printable-delivery):not(:has(#printable-backorder-slip)) #printable-delivery * {
+    visibility: visible;
+  }
+  body:has(#printable-delivery):not(:has(#printable-backorder-slip)) #printable-delivery {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 16px;
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  /* 3.1. In Phiếu giao bù đợt 2 (#printable-backorder-slip) */
+  body:has(#printable-backorder-slip) * {
+    visibility: hidden;
+  }
+  body:has(#printable-backorder-slip) #printable-backorder-slip,
+  body:has(#printable-backorder-slip) #printable-backorder-slip * {
+    visibility: visible;
+  }
+  body:has(#printable-backorder-slip) #printable-backorder-slip {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 16px;
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  /* 4. Ẩn tất cả các nút bấm, input, modal backdrop, thanh điều hướng khi in */
+  button,
+  input,
+  nav,
+  .no-print,
+  .print-hidden,
+  .print\:hidden {
+    display: none !important;
+  }
+
+  /* 5. Cấu hình trang in chuẩn A4, hiển thị màu sắc và nền trắng */
+  html, body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 }
 

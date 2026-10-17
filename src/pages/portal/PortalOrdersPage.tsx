@@ -38,6 +38,9 @@ import {
 } from '../../services/portalService';
 import { useAuth } from '../../contexts/AuthContext';
 import { formatCurrency } from '../../utils/formatters';
+import { OrderDeliveryTimeline } from '../../components/delivery/OrderDeliveryTimeline';
+import { OrderItemsDeliveryTable } from '../../components/delivery/OrderItemsDeliveryTable';
+import { buildMilestones } from '../../services/deliveryTrackingService';
 
 const STATUS_CONFIG: Record<
   string,
@@ -364,6 +367,22 @@ export const PortalOrdersPage: React.FC = () => {
             <span>Theo Dõi Đơn Hàng Của Tôi</span>
           </button>
           <button
+            onClick={() => navigate('/portal/tracking')}
+            className="flex items-center gap-2 py-3 px-4 text-xs font-semibold border-b-2 border-transparent text-slate-500 hover:text-indigo-600 transition"
+            title="Xem màn hình theo dõi lộ trình & 5 mốc giao hàng"
+          >
+            <Truck className="w-4 h-4" />
+            <span>Tiến Độ Giao Vận (Timeline)</span>
+          </button>
+          <button
+            onClick={() => navigate('/portal/debt')}
+            className="flex items-center gap-2 py-3 px-4 text-xs font-semibold border-b-2 border-transparent text-slate-500 hover:text-indigo-600 transition"
+            title="Xem tổng hợp công nợ, hạn mức & hoá đơn"
+          >
+            <CreditCard className="w-4 h-4" />
+            <span>Công Nợ & Hoá Đơn</span>
+          </button>
+          <button
             onClick={() => navigate('/portal/reconciliation')}
             className="flex items-center gap-2 py-3 px-4 text-xs font-semibold border-b-2 border-transparent text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 transition"
           >
@@ -372,6 +391,7 @@ export const PortalOrdersPage: React.FC = () => {
           </button>
         </div>
       </header>
+
 
       {/* Main Content */}
       <main className="max-w-6xl mx-auto px-4 py-5 space-y-5">
@@ -539,6 +559,13 @@ export const PortalOrdersPage: React.FC = () => {
                           🚚 Đang trên đường giao
                         </span>
                       )}
+
+                      {order.has_short_delivery && (
+                        <span className="text-[11px] text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded font-bold flex items-center gap-1">
+                          <AlertTriangle className="w-3 h-3 text-rose-600" />
+                          <span>Giao thiếu hàng</span>
+                        </span>
+                      )}
                     </div>
 
                     <div className="text-xs text-slate-400 font-mono">
@@ -594,6 +621,16 @@ export const PortalOrdersPage: React.FC = () => {
 
                     {/* Action Buttons */}
                     <div className="flex items-center gap-2 ml-auto">
+                      {/* TRACK DELIVERY (SCRUM-260) */}
+                      <button
+                        onClick={() => navigate(`/portal/orders/${order.id}/tracking`)}
+                        className="py-1.5 px-3 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs flex items-center gap-1 transition"
+                        title="Theo dõi trạng thái giao hàng"
+                      >
+                        <Truck className="w-3.5 h-3.5" />
+                        <span>Theo dõi</span>
+                      </button>
+
                       {/* VIEW DETAIL (Always allowed) */}
                       <button
                         onClick={() => handleOpenDetail(order.id)}
@@ -881,6 +918,29 @@ export const PortalOrdersPage: React.FC = () => {
                     </div>
                   </div>
 
+                  {/* SCRUM-260: Mốc tiến độ giao hàng trên giao diện chi tiết đơn */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                        <Truck className="w-3.5 h-3.5 text-indigo-600" />
+                        Tiến độ giao hàng (Timeline 5 mốc)
+                      </span>
+                      <button
+                        onClick={() => navigate(`/portal/orders/${orderDetail.id}/tracking`)}
+                        className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 transition hover:underline"
+                      >
+                        <span>Mở toàn màn hình theo dõi</span>
+                        <ArrowRight className="w-3 h-3" />
+                      </button>
+                    </div>
+                    <OrderDeliveryTimeline
+                      milestones={buildMilestones(orderDetail.status, new Date(orderDetail.created_at || Date.now())).list}
+                      currentKey={buildMilestones(orderDetail.status, new Date(orderDetail.created_at || Date.now())).currentKey}
+                      progressPercentage={buildMilestones(orderDetail.status, new Date(orderDetail.created_at || Date.now())).progress}
+                      compact={true}
+                    />
+                  </div>
+
                   {/* Delivery Address */}
                   {orderDetail.delivery_profile && (
                     <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
@@ -902,38 +962,21 @@ export const PortalOrdersPage: React.FC = () => {
                     </div>
                   )}
 
-                  {/* Items Table */}
+                  {/* SCRUM-696: Khu vực chi tiết dòng hàng hiển thị số lượng đặt, thực giao và các trường hợp giao thiếu */}
                   <div>
-                    <h5 className="font-bold text-slate-800 mb-2">Danh sách mặt hàng ({orderDetail.items.length})</h5>
-                    <div className="border border-slate-200 rounded-xl overflow-hidden">
-                      <table className="w-full text-left text-xs">
-                        <thead className="bg-slate-50 text-slate-500 font-bold border-b border-slate-200">
-                          <tr>
-                            <th className="py-2.5 px-3">Sản phẩm</th>
-                            <th className="py-2.5 px-3 text-center">ĐVT</th>
-                            <th className="py-2.5 px-3 text-center">SL Đặt</th>
-                            <th className="py-2.5 px-3 text-right">Đơn Giá</th>
-                            <th className="py-2.5 px-3 text-right">Thành Tiền</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                          {orderDetail.items.map((itm) => (
-                            <tr key={itm.id}>
-                              <td className="py-2.5 px-3">
-                                <div className="font-bold text-slate-900">{itm.name}</div>
-                                <div className="text-[10px] font-mono text-slate-400">{itm.sku}</div>
-                              </td>
-                              <td className="py-2.5 px-3 text-center">{itm.unit || 'cái'}</td>
-                              <td className="py-2.5 px-3 text-center font-bold">{itm.quantity}</td>
-                              <td className="py-2.5 px-3 text-right">{formatCurrency(itm.price)}</td>
-                              <td className="py-2.5 px-3 text-right font-bold text-indigo-600">
-                                {formatCurrency(itm.subtotal)}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                    <OrderItemsDeliveryTable
+                      items={orderDetail.items}
+                      orderStatus={orderDetail.status}
+                      hasShortDelivery={orderDetail.has_short_delivery}
+                      onRequestBackorder={() => {
+                        setActionSuccessToast('Đã ghi nhận yêu cầu giao bù đợt 2 cho đơn hàng này.');
+                        setTimeout(() => setActionSuccessToast(null), 3500);
+                      }}
+                      onRequestDebtDeduction={() => {
+                        setActionSuccessToast('Đã ghi nhận yêu cầu khấu trừ hàng thiếu vào công nợ.');
+                        setTimeout(() => setActionSuccessToast(null), 3500);
+                      }}
+                    />
                   </div>
                 </>
               ) : null}

@@ -29,7 +29,8 @@ import {
   Info,
   Layers,
   ShieldAlert,
-  ArrowRight
+  ArrowRight,
+  Truck
 } from 'lucide-react';
 import {
   portalService,
@@ -399,6 +400,14 @@ export const PortalOrderPage: React.FC = () => {
           >
             <Package className="w-4 h-4" />
             <span>Theo Dõi Đơn Hàng Của Tôi</span>
+          </button>
+          <button
+            onClick={() => navigate('/portal/tracking')}
+            className="flex items-center gap-2 py-3 px-4 text-xs font-semibold border-b-2 border-transparent text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 transition"
+            title="Theo dõi lộ trình & 5 mốc giao hàng"
+          >
+            <Truck className="w-4 h-4" />
+            <span>Tiến Độ Giao Vận (Timeline)</span>
           </button>
           <button
             onClick={() => navigate('/portal/reconciliation')}
