@@ -27,7 +27,7 @@ interface InventoryItemView {
   productId: string;
   sku: string;
   name: string;
-  image: string;
+  image?: string;
   category: string;
   warehouse: string;
   initialStock: number;

@@ -10,6 +10,7 @@ import {
   TrendingUp,
   PackageCheck,
   ArrowDownLeft,
+  History,
 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { PageContainer } from '../../components/layout/PageContainer';
