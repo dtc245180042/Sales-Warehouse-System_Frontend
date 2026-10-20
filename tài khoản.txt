@@ -1,36 +1,24 @@
-DANH SÁCH TÀI KHOẢN DEMO (MẬT KHẨU CHUNG DỄ NHỚ: 123456):
+# DANH SÁCH TÀI KHOẢN HỆ THỐNG CHUẨN XÁC (ĐÃ CẬP NHẬT & KIỂM THỬ THÀNH CÔNG)
 
-1. Quản trị hệ thống (System Admin):
-- Tên đăng nhập: admin (hoặc admin_pro)
-- Email: admin@warehouse.local (hoặc admin@khovanpro.vn)
-- Mật khẩu: 123456
+Link đăng nhập: http://localhost:5173/login
+(Có thể đăng nhập bằng Tên đăng nhập HOẶC Email)
 
-2. Quản lý kinh doanh (Sales Manager):
-- Tên đăng nhập: sales_mgr (hoặc sales_mgr_pro)
-- Email: sales_mgr@warehouse.local (hoặc salesmanager@khovanpro.vn)
-- Mật khẩu: 123456
+* MẬT KHẨU CHUNG DỄ NHỚ CHO TẤT CẢ TÀI KHOẢN: 123456
+(Hệ thống hỗ trợ đồng thời mật khẩu chung 123456 và mật khẩu theo vai trò)
 
-3. Nhân viên kinh doanh (Sales Staff / Rep):
-- Tên đăng nhập: sales_rep (hoặc sales_rep_pro)
-- Email: sales_rep@warehouse.local (hoặc salesstaff@khovanpro.vn)
-- Mật khẩu: 123456
+---------------------------------------------------------------------------------------------------------------------------------
+| STT | Tên đăng nhập | Mật khẩu chung | Mật khẩu theo vai trò | Email chính                  | Email dự phòng             | Vai trò (Role)   | Kho phụ trách    |
+|-----|---------------|----------------|-----------------------|------------------------------|----------------------------|------------------|------------------|
+| 1   | admin         | 123456         | Admin@123456          | admin@saleswarehouse.com     | admin@warehouse.local      | Admin            | Toàn hệ thống    |
+| 2   | sales_mgr     | 123456         | SalesMgr@1234         | sales_mgr@warehouse.local    | salesmanager@khovanpro.vn  | Sales Manager    | Toàn hệ thống    |
+| 3   | sales_rep     | 123456         | SalesRep@1234         | sales_rep@warehouse.local    | salesstaff@khovanpro.vn    | Sales Rep        | Toàn hệ thống    |
+| 4   | wh_mgr        | 123456         | WhMgr@1234            | wh_mgr@warehouse.local       | whmanager@khovanpro.vn     | WH Manager       | Kho Tổng Hà Nội  |
+| 5   | warehouse     | 123456         | Warehouse@1234        | warehouse@warehouse.local    | whstaff@khovanpro.vn       | Warehouse        | Kho Đà Nẵng      |
+| 6   | accountant    | 123456         | Accountant@1234       | accountant@warehouse.local   | accountant@khovanpro.vn    | Accountant       | Toàn hệ thống    |
+| 7   | customer      | 123456         | Customer@1234         | customer@warehouse.local     | customer@warehouse.local   | Customer         | Đại lý B2B       |
+---------------------------------------------------------------------------------------------------------------------------------
 
-4. Quản lý kho (Warehouse Manager):
-- Tên đăng nhập: wh_mgr (hoặc wh_mgr_pro)
-- Email: wh_mgr@warehouse.local (hoặc whmanager@khovanpro.vn)
-- Mật khẩu: 123456
-
-5. Thủ kho (Warehouse Staff):
-- Tên đăng nhập: warehouse (hoặc wh_staff_pro)
-- Email: warehouse@warehouse.local (hoặc whstaff@khovanpro.vn)
-- Mật khẩu: 123456
-
-6. Kế toán (Accountant):
-- Tên đăng nhập: accountant (hoặc accountant_pro)
-- Email: accountant@warehouse.local (hoặc accountant@khovanpro.vn)
-- Mật khẩu: 123456
-
-7. Khách hàng / Đại lý (Customer):
-- Tên đăng nhập: customer
-- Email: customer@warehouse.local
-- Mật khẩu: 123456
+* Hướng dẫn nhanh khi đăng nhập:
+1. Nhập Tên đăng nhập (ví dụ: admin)
+2. Nhập Mật khẩu: 123456 (hoặc Admin@123456)
+3. Nhấn "Đăng nhập hệ thống"

@@ -81,10 +81,12 @@ import { StockTransferList } from '../pages/inventory/StockTransferList';
 import { StockTransferCreate } from '../pages/inventory/StockTransferCreate';
 import { StockTransferDetail } from '../pages/inventory/StockTransferDetail';
 
-// Quản lý lô hàng & Xuất kho điều phối
+// Quản lý lô hàng & Xuất kho điều phối & Soạn hàng
 import { LotManagementPage } from '../pages/inventory/LotManagementPage';
 import { StockDispatchListPage } from '../pages/inventory/StockDispatchListPage';
 import { BackorderListPage } from '../pages/inventory/BackorderListPage';
+import { PickingListsPage } from '../pages/inventory/PickingListsPage';
+import { PickingDetailPage } from '../pages/inventory/PickingDetailPage';
 
 // Hóa đơn VAT & Phiếu thu công nợ
 import { InvoiceListPage } from '../pages/invoices/InvoiceListPage';
@@ -773,12 +775,32 @@ export const AppRoutes: React.FC = () => {
           }
         />
         <Route
+          path="/inventory/picking-lists"
+          element={
+            <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
+              <PickingListsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/inventory/picking-lists/:id"
+          element={
+            <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
+              <PickingDetailPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/inventory/dispatches"
           element={
             <ProtectedRoute allowedRoles={ALL_BACKOFFICE_ROLES}>
               <StockDispatchListPage />
             </ProtectedRoute>
           }
+        />
+        <Route
+          path="/inventory/dispatch"
+          element={<Navigate to="/inventory/dispatches" replace />}
         />
         <Route
           path="/inventory/backorders"
