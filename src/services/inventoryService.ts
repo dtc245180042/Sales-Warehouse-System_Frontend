@@ -111,7 +111,7 @@ export const inventoryService = {
   getStockInReceipts: async (): Promise<StockInReceipt[]> => {
     try {
       const res = await apiClient.get('/inventory/stock-in');
-      if (Array.isArray(res.data)) {
+      if (Array.isArray(res.data) && res.data.length > 0) {
         const list = res.data.map(mapApiStockIn);
         memoryCacheStockIn = list;
         setStorageItem(KEYS.STOCK_IN, list);
@@ -194,7 +194,7 @@ export const inventoryService = {
   getStockOutReceipts: async (): Promise<StockOutReceipt[]> => {
     try {
       const res = await apiClient.get('/inventory/stock-out');
-      if (Array.isArray(res.data)) {
+      if (Array.isArray(res.data) && res.data.length > 0) {
         const list = res.data.map(mapApiStockOut);
         memoryCacheStockOut = list;
         setStorageItem(KEYS.STOCK_OUT, list);
@@ -280,7 +280,7 @@ export const inventoryService = {
   getHistory: async (): Promise<InventoryHistoryRecord[]> => {
     try {
       const res = await apiClient.get('/inventory/history');
-      if (Array.isArray(res.data)) {
+      if (Array.isArray(res.data) && res.data.length > 0) {
         const list = res.data.map(mapApiHistory);
         setStorageItem(KEYS.HISTORY, list);
         return list;

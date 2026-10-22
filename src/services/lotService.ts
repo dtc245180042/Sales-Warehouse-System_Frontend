@@ -57,7 +57,17 @@ export const lotService = {
       requested_quantity: quantity,
       total_allocated: quantity,
       shortfall: 0,
-      suggestions: [],
+      suggestions: [
+        {
+          lot_id: 10,
+          lot_number: 'LOT-2026-IP15P-01',
+          exp_date: '2026-11-20',
+          available_quantity: 20,
+          allocated_quantity: Math.min(quantity, 20),
+          is_near_expiry: true,
+          days_to_expiry: 35,
+        },
+      ],
     };
   },
 

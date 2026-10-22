@@ -94,7 +94,7 @@ export const customerService = {
 
   /** Lấy danh sách khách hàng/đại lý tức thì từ RAM cache (0ms) */
   getCached: (): Customer[] => {
-    if (memoryCacheCustomers !== null) {
+    if (memoryCacheCustomers && memoryCacheCustomers.length > 0) {
       return memoryCacheCustomers;
     }
     const cached = getStorageItem<Customer[]>(STORAGE_KEY, []);
@@ -136,7 +136,7 @@ export const customerService = {
       return memoryCachePaginated[key];
     }
 
-    if (!forceRefresh && activePaginatedPromises[key]) {
+    if (!forceRefresh && key in activePaginatedPromises) {
       return activePaginatedPromises[key];
     }
 
@@ -254,7 +254,7 @@ export const customerService = {
     const fetchPromise = (async () => {
       try {
         const res = await apiClient.get('/customers', { params });
-        if (Array.isArray(res.data)) {
+        if (Array.isArray(res.data) && res.data.length > 0) {
           const list = res.data.map(mapApiCustomer);
           if (isDefaultFetch) {
             memoryCacheCustomers = list;

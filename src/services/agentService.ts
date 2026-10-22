@@ -56,7 +56,7 @@ function mapCustomerToAgent(c: any): Agent {
 export const agentService = {
   /** Lấy danh sách đại lý tức thì từ RAM cache (0ms) */
   getCached: (): Agent[] => {
-    if (memoryCacheAgents !== null) {
+    if (memoryCacheAgents && memoryCacheAgents.length > 0) {
       return memoryCacheAgents;
     }
     const cached = getStorageItem<Agent[]>(STORAGE_KEY, []);
@@ -70,8 +70,8 @@ export const agentService = {
   getAll: async (): Promise<Agent[]> => {
     try {
       const res = await apiClient.get('/customers', { params: { page_size: 500 } });
-      const rawList = res.data?.items || (Array.isArray(res.data) ? res.data : null);
-      if (rawList !== null) {
+      const rawList = res.data?.items || (Array.isArray(res.data) ? res.data : []);
+      if (rawList.length > 0) {
         const mapped = rawList.map(mapCustomerToAgent);
         memoryCacheAgents = mapped;
         setStorageItem(STORAGE_KEY, mapped);

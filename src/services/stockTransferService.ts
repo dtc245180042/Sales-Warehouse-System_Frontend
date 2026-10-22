@@ -12,7 +12,6 @@ import { getStorageItem, setStorageItem } from './storage';
 
 const STORAGE_KEY = 'kv_stock_transfers';
 
-// Dữ liệu mẫu ban đầu nếu localStorage trống
 const INITIAL_DEMO_TRANSFERS: StockTransfer[] = [];
 
 export const stockTransferService = {

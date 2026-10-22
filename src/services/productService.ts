@@ -50,7 +50,7 @@ let activeFetchPromise: Promise<Product[]> | null = null;
 export const productService = {
   /** Lấy danh sách sản phẩm tức thì từ RAM cache (0ms) khi chuyển trang */
   getCached: (): Product[] => {
-    if (memoryCacheProducts !== null) {
+    if (memoryCacheProducts && memoryCacheProducts.length > 0) {
       return memoryCacheProducts;
     }
     const stored = getStorageItem<Product[]>(STORAGE_KEY, initialProducts);
@@ -87,7 +87,7 @@ export const productService = {
         const rawList = Array.isArray(res.data)
           ? res.data
           : (Array.isArray(res.data?.items) ? res.data.items : null);
-        if (rawList !== null) {
+        if (rawList && rawList.length > 0) {
           const list = rawList.map(mapApiProduct);
           memoryCacheProducts = list;
           lastProductsFetchTime = Date.now();
